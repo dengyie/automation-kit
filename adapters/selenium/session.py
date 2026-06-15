@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Any, Callable, Optional
 
+from adapters.errors import AdapterStartupError
 from automation_core.artifacts import ArtifactStore
 from automation_core.drivers import ActionResult, ArtifactHandle, SessionInfo
 
@@ -73,8 +74,12 @@ class SeleniumSessionFactory:
         self.artifact_root = artifact_root
 
     def create(self) -> SeleniumSession:
+        try:
+            driver = self.driver_factory()
+        except Exception as exc:
+            raise AdapterStartupError("failed to create selenium driver") from exc
         return SeleniumSession(
-            driver=self.driver_factory(),
+            driver=driver,
             identifier=self.identifier,
             artifact_root=self.artifact_root,
         )

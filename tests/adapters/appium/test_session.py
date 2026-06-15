@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 
+from adapters import AdapterStartupError
 from adapters.appium import AppiumSession, AppiumSessionFactory
 from automation_core.drivers import DriverSession
 
@@ -139,3 +140,17 @@ def test_appium_session_factory_creates_session(tmp_path):
 
     assert isinstance(session, AppiumSession)
     assert session.info.identifier == "device-1"
+
+
+def test_appium_session_factory_wraps_driver_startup_failure(tmp_path):
+    def failing_driver_factory():
+        raise RuntimeError("device failed")
+
+    factory = AppiumSessionFactory(
+        driver_factory=failing_driver_factory,
+        identifier="device-1",
+        artifact_root=tmp_path,
+    )
+
+    with pytest.raises(AdapterStartupError, match="failed to create appium driver"):
+        factory.create()

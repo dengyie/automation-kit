@@ -891,3 +891,70 @@ The authoring object type was tightened from an unstructured object to
 
 Proceed to any remaining runner/report polish or adapter shell work needed to
 keep the repo aligned with the development plan.
+
+## 2026-06-16: Adapter Startup Error Boundaries
+
+### Completed
+
+- Added `adapters.AdapterStartupError` as a shared adapter-layer startup error.
+- Wrapped Selenium driver factory construction failures in
+  `SeleniumSessionFactory.create()`.
+- Wrapped Appium driver factory construction failures in
+  `AppiumSessionFactory.create()`.
+- Kept the adapter session implementations unchanged after construction so
+  runtime driver behavior is still owned by the concrete session classes.
+- Added tests proving:
+  - adapter factories still create sessions normally,
+  - driver factory failures surface as `AdapterStartupError`,
+  - default tests do not need Selenium or Appium installed.
+
+### Verification
+
+Adapter tests:
+
+```bash
+.venv/bin/python -m pytest tests/adapters --no-cov -q
+```
+
+Result:
+
+```text
+18 passed
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+99 passed
+Total coverage: 94.20%
+Required coverage: 80%
+```
+
+### Review
+
+Used `production-code-quality-review` required setup scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- the new error stays in the adapter layer and does not leak into
+  `automation_core`,
+- factory startup failures now return a readable, testable adapter error,
+- the try/except scope is limited to session creation and does not mask runtime
+  action failures inside the session objects.
+
+### Next Phase
+
+Proceed to any remaining runner/report or adapter polish only if it advances
+the documented basic usable state.

@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 
+from adapters import AdapterStartupError
 from adapters.selenium import SeleniumSession, SeleniumSessionFactory
 from automation_core.drivers import DriverSession
 
@@ -107,3 +108,17 @@ def test_selenium_session_factory_creates_session(tmp_path):
 
     assert isinstance(session, SeleniumSession)
     assert session.info.identifier == "browser-1"
+
+
+def test_selenium_session_factory_wraps_driver_startup_failure(tmp_path):
+    def failing_driver_factory():
+        raise RuntimeError("browser failed")
+
+    factory = SeleniumSessionFactory(
+        driver_factory=failing_driver_factory,
+        identifier="browser-1",
+        artifact_root=tmp_path,
+    )
+
+    with pytest.raises(AdapterStartupError, match="failed to create selenium driver"):
+        factory.create()

@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Any, Callable, Optional
 
+from adapters.errors import AdapterStartupError
 from automation_core.artifacts import ArtifactStore
 from automation_core.drivers import ActionResult, ArtifactHandle, SessionInfo
 
@@ -88,8 +89,12 @@ class AppiumSessionFactory:
         self.artifact_root = artifact_root
 
     def create(self) -> AppiumSession:
+        try:
+            driver = self.driver_factory()
+        except Exception as exc:
+            raise AdapterStartupError("failed to create appium driver") from exc
         return AppiumSession(
-            driver=self.driver_factory(),
+            driver=driver,
             identifier=self.identifier,
             artifact_root=self.artifact_root,
         )
