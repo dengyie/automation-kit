@@ -13,6 +13,7 @@ class RunnerConfig:
     live: bool = False
     emit_json: bool = False
     factory: Optional[str] = None
+    workflow_factory: Optional[str] = None
     url: Optional[str] = None
     app_id: Optional[str] = None
 
@@ -42,6 +43,7 @@ def load_runner_config(source: ConfigSource) -> RunnerConfig:
         live=_optional_bool(source, "live"),
         emit_json=_optional_bool(source, "json"),
         factory=_optional_string(source, "factory"),
+        workflow_factory=_optional_string(source, "workflow_factory"),
         url=_optional_string(source, "url"),
         app_id=_optional_string(source, "app_id"),
     )

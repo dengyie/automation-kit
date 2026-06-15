@@ -1949,3 +1949,69 @@ Follow-up inspection confirmed:
 
 Commit and push the runner environment configuration slice, then continue with
 the next roadmap slice.
+
+## 2026-06-16: Custom Workflow Factory Loading
+
+### Completed
+
+- Added `--workflow-factory module:object` support to `automation-runner run`.
+- Added `AUTOMATION_RUNNER_WORKFLOW_FACTORY` config support.
+- Custom workflow factories receive the same injected `session_factory` as
+  built-in workflows.
+- Built-in Damai smoke workflows keep their existing `--url` and `--app-id`
+  behavior.
+- Updated README and workflow docs with custom workflow factory commands.
+- Added tests for custom workflow factory dry runs, config-sourced workflow
+  factories, missing factory errors, and required workflow selection.
+
+### Verification
+
+Focused runner tests:
+
+```bash
+.venv/bin/python -m pytest tests/runner --no-cov -q
+```
+
+Result:
+
+```text
+40 passed
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+146 passed
+Total coverage: 95.30%
+Required coverage: 80%
+```
+
+### Review
+
+Used `production-code-quality-review` required setup scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- custom workflow loading stays in `automation_runner` and does not add
+  business logic to `automation_core`.
+- live execution still requires the explicit live path and a session factory.
+- built-in Damai workflow parameter validation remains unchanged.
+- custom workflow factories receive only the injected `session_factory`.
+- default tests remain offline and deterministic.
+
+### Next Phase
+
+Commit and push the custom workflow factory slice, then continue with the next
+roadmap slice.

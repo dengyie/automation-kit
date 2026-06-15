@@ -53,6 +53,7 @@ automation-runner run damai-web-smoke --json \
 automation-runner run damai-web-smoke --live --json \
   --factory tests.runner.fixtures:make_session \
   --url https://example.test/damai
+automation-runner run --workflow-factory my_package.workflow:create_workflow --json
 ```
 
 Runner options can also come from environment variables. Explicit CLI

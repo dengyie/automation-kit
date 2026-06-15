@@ -115,6 +115,80 @@ def test_cli_reads_runner_environment_defaults(monkeypatch, capsys):
     assert fixtures.CREATED_SESSIONS == []
 
 
+def test_cli_runs_custom_workflow_factory_in_dry_mode(capsys):
+    fixtures.reset()
+
+    exit_code = main(
+        [
+            "run",
+            "--workflow-factory",
+            "tests.runner.fixtures:create_custom_workflow",
+            "--json",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    report = json.loads(captured.out)
+
+    assert exit_code == 0
+    assert report["workflow"] == "tests.runner.fixtures:create_custom_workflow"
+    assert report["workflow_factory"] == "tests.runner.fixtures:create_custom_workflow"
+    assert report["session"] == {
+        "driver_name": "dry-run",
+        "platform": "dry",
+        "identifier": "tests.runner.fixtures:create_custom_workflow-dry-run",
+    }
+    assert report["actions"] == [
+        {"success": True, "message": "custom_action"},
+    ]
+    assert fixtures.CREATED_SESSIONS == []
+
+
+def test_cli_reads_custom_workflow_factory_from_config(capsys):
+    fixtures.reset()
+
+    exit_code = main(
+        ["run"],
+        config_source=DictConfigSource(
+            {
+                "json": "true",
+                "workflow_factory": "tests.runner.fixtures:create_custom_workflow",
+            }
+        ),
+    )
+
+    captured = capsys.readouterr()
+    report = json.loads(captured.out)
+
+    assert exit_code == 0
+    assert report["workflow"] == "tests.runner.fixtures:create_custom_workflow"
+
+
+def test_cli_requires_workflow_name_or_factory(capsys):
+    exit_code = main(["run"])
+
+    captured = capsys.readouterr()
+
+    assert exit_code == 2
+    assert "workflow or --workflow-factory is required" in captured.err
+
+
+def test_cli_rejects_missing_workflow_factory(capsys):
+    exit_code = main(
+        [
+            "run",
+            "--workflow-factory",
+            "tests.runner.fixtures:missing_workflow_factory",
+            "--json",
+        ]
+    )
+
+    captured = capsys.readouterr()
+
+    assert exit_code == 2
+    assert "could not load factory" in captured.err
+
+
 def test_cli_uses_config_source_for_live_workflow(capsys):
     fixtures.reset()
 

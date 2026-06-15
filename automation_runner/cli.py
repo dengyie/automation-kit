@@ -30,8 +30,9 @@ def build_parser() -> argparse.ArgumentParser:
     examples = subparsers.add_parser("examples", help="list example workflows")
     examples.add_argument("--dry-run", action="store_true", help="list only")
 
-    run = subparsers.add_parser("run", help="run an example workflow")
-    run.add_argument("workflow", choices=sorted(WORKFLOWS))
+    run = subparsers.add_parser("run", help="run a workflow")
+    run.add_argument("workflow", nargs="?", choices=sorted(WORKFLOWS))
+    run.add_argument("--workflow-factory", help="workflow factory import path")
     run.add_argument("--live", action="store_true", help="allow live execution")
     run.add_argument("--factory", help="session factory import path")
     run.add_argument("--url", help="URL for web workflows")
@@ -65,9 +66,18 @@ def _merge_config(args: argparse.Namespace, config: RunnerConfig) -> RunnerConfi
         live=args.live or config.live,
         emit_json=args.json or config.emit_json,
         factory=args.factory or config.factory,
+        workflow_factory=args.workflow_factory or config.workflow_factory,
         url=args.url or config.url,
         app_id=args.app_id or config.app_id,
     )
+
+
+def _workflow_name(args: argparse.Namespace, config: RunnerConfig) -> str:
+    if args.workflow:
+        return args.workflow
+    if config.workflow_factory:
+        return config.workflow_factory
+    raise ValueError("workflow or --workflow-factory is required")
 
 
 def main(
@@ -93,12 +103,16 @@ def main(
         except ValueError as exc:
             return _print_error(str(exc))
         config = _merge_config(args, config)
+        try:
+            workflow_name = _workflow_name(args, config)
+        except ValueError as exc:
+            return _print_error(str(exc))
         if config.live and not config.factory:
             return _print_error("--factory is required for live workflows")
-        if args.workflow == "damai-web-smoke":
+        if workflow_name == "damai-web-smoke":
             if not config.url:
                 return _print_error("--url is required for damai-web-smoke")
-        else:
+        elif workflow_name == "damai-android-smoke":
             if not config.app_id:
                 return _print_error("--app-id is required for damai-android-smoke")
         if config.live:
@@ -107,9 +121,20 @@ def main(
             except ValueError as exc:
                 return _print_error(str(exc))
         else:
-            session_factory = lambda: DryRunSession(args.workflow)
-        if args.workflow == "damai-web-smoke":
-            create_workflow = WORKFLOWS[args.workflow]
+            session_factory = lambda: DryRunSession(workflow_name)
+        if config.workflow_factory:
+            try:
+                create_workflow = load_object(config.workflow_factory)
+            except ValueError as exc:
+                return _print_error(str(exc))
+            runner = WorkflowRunner(
+                session_factory=lambda: create_workflow(
+                    session_factory=session_factory,
+                ),
+                workflow=lambda workflow: workflow.run(),
+            )
+        elif workflow_name == "damai-web-smoke":
+            create_workflow = WORKFLOWS[workflow_name]
             runner = WorkflowRunner(
                 session_factory=lambda: create_workflow(
                     session_factory=session_factory,
@@ -118,7 +143,7 @@ def main(
                 workflow=lambda workflow: workflow.run(),
             )
         else:
-            create_workflow = WORKFLOWS[args.workflow]
+            create_workflow = WORKFLOWS[workflow_name]
             runner = WorkflowRunner(
                 session_factory=lambda: create_workflow(
                     session_factory=session_factory,
@@ -140,11 +165,12 @@ def main(
             run_state.fail(finished_at=wall_finished_at)
         if config.emit_json:
             report = build_report(
-                args.workflow,
+                workflow_name,
                 result,
                 run_state=run_state,
                 live=config.live,
-                workflow_factory=config.factory if config.live else None,
+                workflow_factory=config.workflow_factory
+                or (config.factory if config.live else None),
                 elapsed_seconds=elapsed_seconds,
             )
             payload = json.dumps(report.to_dict(), sort_keys=True)
@@ -157,7 +183,7 @@ def main(
         else:
             if args.report_file:
                 return _print_error("--report-file requires --json")
-            print(f"{args.workflow} success={result.success}")
+            print(f"{workflow_name} success={result.success}")
         return 0 if result.success else 1
 
     return 1

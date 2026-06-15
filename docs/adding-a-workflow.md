@@ -72,6 +72,13 @@ automation-runner run damai-android-smoke --live --json \
   --app-id cn.damai
 ```
 
+Custom workflow factory run:
+
+```bash
+automation-runner run --workflow-factory my_package.workflow:create_workflow \
+  --json
+```
+
 Runner defaults can also come from environment variables:
 
 ```bash
@@ -84,11 +91,17 @@ Supported runner environment keys are:
 
 - `AUTOMATION_RUNNER_LIVE`
 - `AUTOMATION_RUNNER_JSON`
+- `AUTOMATION_RUNNER_WORKFLOW_FACTORY`
 - `AUTOMATION_RUNNER_FACTORY`
 - `AUTOMATION_RUNNER_URL`
 - `AUTOMATION_RUNNER_APP_ID`
 
 CLI arguments take precedence over environment values.
+
+Custom workflow factories receive `session_factory` and should return a
+runnable workflow object. Built-in Damai examples still use `--url` or
+`--app-id`; custom workflows own their own parameters outside
+`automation_core`.
 
 ## Report Contract
 
@@ -114,6 +127,10 @@ Each artifact entry contains:
 - `metadata`
 
 `events` contains serialized `EventEnvelope` records. Example workflows emit:
+
+`workflow` records the workflow identifier that was executed. For built-in
+examples it is the workflow name; for custom factory runs it is the custom
+factory import path.
 
 - `task.start` when the workflow session starts executing.
 - `artifact` for each captured artifact.

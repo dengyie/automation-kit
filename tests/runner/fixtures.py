@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from automation_core.drivers import ActionResult, ArtifactHandle, SessionInfo
+from examples.workflows import ExampleWorkflow, ExampleWorkflowResult
 
 
 CREATED_SESSIONS = []
@@ -53,6 +54,19 @@ def make_failing_session():
 def record_import():
     IMPORT_ATTEMPTS.append("loaded")
     return make_session
+
+
+def create_custom_workflow(session_factory):
+    return ExampleWorkflow(
+        name="custom-smoke",
+        session_factory=session_factory,
+        run_fn=lambda session: ExampleWorkflowResult(
+            session=session.info,
+            success=True,
+            actions=[session.execute_action("custom_action")],
+            artifacts=[],
+        ),
+    )
 
 
 def reset():
