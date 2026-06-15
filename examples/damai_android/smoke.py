@@ -28,6 +28,7 @@ def create_workflow(
     app_id: str,
 ) -> ExampleWorkflow:
     return ExampleWorkflow(
+        name="damai-android-smoke",
         session_factory=session_factory,
         run_fn=lambda session: run_smoke_workflow(session, app_id=app_id),
     )

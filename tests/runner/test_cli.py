@@ -48,6 +48,13 @@ def test_cli_runs_dry_workflow_without_live_flag(capsys):
         "platform": "dry",
         "identifier": "damai-web-smoke-dry-run",
     }
+    assert [event["event_type"] for event in report["events"]] == [
+        "task.start",
+        "artifact",
+        "task.end",
+    ]
+    assert report["events"][0]["task_id"] == "damai-web-smoke-dry-run"
+    assert report["events"][0]["payload"]["task_name"] == "damai-web-smoke"
     assert report["actions"] == [
         {"success": True, "message": "get"},
     ]
@@ -282,7 +289,20 @@ def test_cli_can_emit_json_report_for_live_workflow(capsys):
     assert report["live"] is True
     assert isinstance(report["elapsed_seconds"], float)
     assert report["elapsed_seconds"] >= 0
-    assert report["events"] == []
+    assert [event["event_type"] for event in report["events"]] == [
+        "task.start",
+        "artifact",
+        "task.end",
+    ]
+    assert report["events"][0]["task_id"] == "cli-run"
+    assert report["events"][0]["payload"]["task_name"] == "damai-web-smoke"
+    assert report["events"][1]["payload"] == {
+        "task_name": "damai-web-smoke",
+        "task_id": "cli-run",
+        "artifact_type": "screenshot",
+        "path": "home.png",
+    }
+    assert report["events"][2]["payload"]["outcome"] == "succeeded"
     assert report["error"] is None
     assert report["session"] == {
         "driver_name": "fake-cli",
@@ -356,6 +376,18 @@ def test_cli_emits_json_report_when_workflow_fails(tmp_path, capsys):
     assert report["run_id"] == "cli-run"
     assert report["live"] is True
     assert report["error"] == "RuntimeError: get failed"
+    assert [event["event_type"] for event in report["events"]] == [
+        "task.start",
+        "error",
+        "task.end",
+    ]
+    assert report["events"][1]["payload"] == {
+        "task_name": "damai-web-smoke",
+        "task_id": "cli-run",
+        "message": "get failed",
+        "error_type": "RuntimeError",
+    }
+    assert report["events"][2]["payload"]["outcome"] == "failed"
     assert report["actions"] == []
     assert report["artifacts"] == []
     assert fixtures.CREATED_SESSIONS[0].stopped is True

@@ -68,7 +68,7 @@ def build_report(
         run_id=result.session.identifier,
         live=live,
         elapsed_seconds=elapsed_seconds,
-        events=[],
+        events=[envelope.to_dict() for envelope in result.events],
         session=_serialize_session(result.session),
         actions=_serialize_actions(result.actions),
         artifacts=_serialize_artifacts(result.artifacts),

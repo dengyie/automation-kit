@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from automation_core.drivers import ActionResult, ArtifactHandle, SessionInfo
+from automation_core.events import TaskStartEvent
 from automation_runner.reports import build_report
 from examples.workflows import ExampleWorkflowResult
 
@@ -78,6 +79,34 @@ def test_build_report_defaults_to_non_live():
     assert report["run_id"] == "run-1"
     assert report["status"] == "failed"
     assert report["events"] == []
+
+
+def test_build_report_serializes_workflow_events():
+    result = ExampleWorkflowResult(
+        session=SessionInfo(
+            driver_name="fake",
+            platform="web",
+            identifier="run-1",
+        ),
+        success=True,
+        actions=[],
+        artifacts=[],
+        events=[
+            TaskStartEvent(
+                task_name="damai-web-smoke",
+                task_id="run-1",
+            ).to_envelope()
+        ],
+    )
+
+    report = build_report("damai-web-smoke", result).to_dict()
+
+    assert report["events"][0]["event_type"] == "task.start"
+    assert report["events"][0]["task_id"] == "run-1"
+    assert report["events"][0]["payload"] == {
+        "task_name": "damai-web-smoke",
+        "task_id": "run-1",
+    }
 
 
 def test_build_report_records_factory_elapsed_and_error_summary():

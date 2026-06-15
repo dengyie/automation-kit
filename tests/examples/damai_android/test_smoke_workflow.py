@@ -56,8 +56,17 @@ def test_damai_android_smoke_workflow_factory_returns_runnable_workflow():
 
     result = workflow.run()
 
+    assert workflow.name == "damai-android-smoke"
     assert result.success is True
     assert session.actions == [("activate_app", {"app_id": "cn.damai"})]
+    assert [event.event_type for event in result.events] == [
+        "task.start",
+        "artifact",
+        "artifact",
+        "task.end",
+    ]
+    assert result.events[0].payload["task_name"] == "damai-android-smoke"
+    assert result.events[-1].payload["outcome"] == "succeeded"
 
 
 def test_damai_android_workflow_factory_returns_failure_result():
@@ -74,6 +83,12 @@ def test_damai_android_workflow_factory_returns_failure_result():
     assert result.error == "RuntimeError: activation failed"
     assert result.actions == []
     assert result.artifacts == []
+    assert [event.event_type for event in result.events] == [
+        "task.start",
+        "error",
+        "task.end",
+    ]
+    assert result.events[1].payload["error_type"] == "RuntimeError"
     assert session.stopped is True
 
 

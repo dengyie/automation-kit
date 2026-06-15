@@ -1173,3 +1173,76 @@ Follow-up inspection confirmed:
 
 Proceed to the next development slice after validating whether additional
 report/event polish is required.
+
+## 2026-06-16: Structured Workflow Events In Reports
+
+### Completed
+
+- Added stable workflow names to the Damai web and Android example workflow
+  factories.
+- Made `ExampleWorkflow.run()` preserve workflow-provided events and emit
+  structured events for:
+  - workflow start,
+  - captured artifacts,
+  - workflow exceptions,
+  - workflow completion outcome.
+- Made `RunnerReport.events` serialize workflow event envelopes instead of
+  always returning an empty list.
+- Added report and CLI tests proving successful and failed runs include the
+  expected event sequence and payloads.
+- Updated the workflow guide to document report event semantics.
+
+### Verification
+
+Focused examples and runner tests:
+
+```bash
+.venv/bin/python -m pytest tests/examples tests/runner -q
+```
+
+Result:
+
+```text
+32 passed
+Coverage failure: total of 48.92 is less than fail-under=80.00
+```
+
+The focused tests passed; the coverage failure is expected when running only
+this subset without disabling the repository-wide coverage threshold.
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+107 passed
+Total coverage: 94.61%
+Required coverage: 80%
+```
+
+### Review
+
+Used `production-code-quality-review` required setup scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- report event serialization stays in `automation_runner`,
+- event creation uses generic `automation_core.events` primitives,
+- workflow-provided events are preserved,
+- failure reports include an `error` event and failed `task.end` outcome,
+- default tests remain offline and deterministic.
+
+### Next Phase
+
+Commit and push the event-report slice, then continue with the next basic
+usable skeleton phase.

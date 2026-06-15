@@ -3,7 +3,9 @@ from pathlib import Path
 import pytest
 
 from automation_core.drivers import ActionResult, ArtifactHandle, SessionInfo
+from automation_core.events import RetryAttemptEvent
 from examples.damai_web import create_workflow, run_smoke_workflow
+from examples.workflows import ExampleWorkflow, ExampleWorkflowResult
 
 
 class FakeSession:
@@ -53,8 +55,16 @@ def test_damai_web_smoke_workflow_factory_returns_runnable_workflow():
 
     result = workflow.run()
 
+    assert workflow.name == "damai-web-smoke"
     assert result.success is True
     assert session.actions == [("get", {"url": "https://example.test/damai"})]
+    assert [event.event_type for event in result.events] == [
+        "task.start",
+        "artifact",
+        "task.end",
+    ]
+    assert result.events[0].payload["task_name"] == "damai-web-smoke"
+    assert result.events[-1].payload["outcome"] == "succeeded"
 
 
 def test_damai_web_workflow_factory_returns_failure_result():
@@ -71,7 +81,43 @@ def test_damai_web_workflow_factory_returns_failure_result():
     assert result.error == "RuntimeError: navigation failed"
     assert result.actions == []
     assert result.artifacts == []
+    assert [event.event_type for event in result.events] == [
+        "task.start",
+        "error",
+        "task.end",
+    ]
+    assert result.events[1].payload["error_type"] == "RuntimeError"
     assert session.stopped is True
+
+
+def test_example_workflow_preserves_events_returned_by_run_function():
+    session = FakeSession()
+    workflow = ExampleWorkflow(
+        name="custom-workflow",
+        session_factory=lambda: session,
+        run_fn=lambda current_session: ExampleWorkflowResult(
+            session=current_session.info,
+            success=True,
+            actions=[],
+            artifacts=[],
+            events=[
+                RetryAttemptEvent(
+                    task_name="custom-workflow",
+                    task_id=current_session.info.identifier,
+                    attempt=1,
+                    elapsed=0.1,
+                ).to_envelope()
+            ],
+        ),
+    )
+
+    result = workflow.run()
+
+    assert [event.event_type for event in result.events] == [
+        "task.start",
+        "retry.attempt",
+        "task.end",
+    ]
 
 
 def test_damai_web_smoke_workflow_stops_session_when_action_fails():

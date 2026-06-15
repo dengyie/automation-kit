@@ -27,6 +27,7 @@ def create_workflow(
     url: str,
 ) -> ExampleWorkflow:
     return ExampleWorkflow(
+        name="damai-web-smoke",
         session_factory=session_factory,
         run_fn=lambda session: run_smoke_workflow(session, url=url),
     )

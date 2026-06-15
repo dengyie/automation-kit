@@ -77,6 +77,13 @@ JSON reports currently include:
 - `artifacts`
 - `error`
 
+`events` contains serialized `EventEnvelope` records. Example workflows emit:
+
+- `task.start` when the workflow session starts executing.
+- `artifact` for each captured artifact.
+- `error` when workflow execution raises an exception.
+- `task.end` with `outcome` set to `succeeded` or `failed`.
+
 Artifacts stay generic and are written by the runner layer.
 
 ## Adapter Rules
