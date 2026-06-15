@@ -186,3 +186,63 @@ Proceed to thin adapter and example shells:
 - `adapters/appium`
 - `examples/damai_web`
 - `examples/damai_android`
+
+## 2026-06-16: Thin Adapter And Example Shells
+
+### Completed
+
+- Added adapter shell packages:
+  - `adapters`
+  - `adapters.selenium`
+  - `adapters.appium`
+- Added example shell packages:
+  - `examples`
+  - `examples.damai_web`
+  - `examples.damai_android`
+- Added README boundary docs for:
+  - `examples/damai_web`
+  - `examples/damai_android`
+- Added structure tests proving:
+  - `automation_core` contains no business or concrete driver terms.
+  - example README files exist.
+  - adapter and example shell packages import successfully.
+
+### Verification
+
+Command:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+41 passed
+Total coverage: 94.74%
+Required coverage: 80%
+```
+
+### Review
+
+Used `production-code-quality-review` required setup scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- Phase 4 added only adapter/example shells and boundary docs.
+- No business workflow was migrated into `automation_core`.
+- No concrete browser/mobile driver dependency was added to `automation_core`.
+- The shell packages can be imported by default tests.
+
+### Next Phase
+
+The roadmap-defined basic usable state is now reached. The next development
+step should create the first real adapter implementation behind the existing
+driver contracts, starting with either a Selenium browser adapter or an Appium
+Android adapter.
