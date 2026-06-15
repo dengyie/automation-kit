@@ -146,6 +146,50 @@ def test_cli_validates_workflow_parameters_before_loading_factory(capsys):
     assert "--url" in captured.err
 
 
+def test_cli_rejects_invalid_factory_import_path(capsys):
+    fixtures.reset()
+
+    exit_code = main(
+        [
+            "run",
+            "damai-web-smoke",
+            "--live",
+            "--factory",
+            "tests.runner.fixtures.make_session",
+            "--url",
+            "https://example.test/damai",
+        ]
+    )
+
+    captured = capsys.readouterr()
+
+    assert exit_code == 2
+    assert "module:object" in captured.err
+    assert fixtures.CREATED_SESSIONS == []
+
+
+def test_cli_rejects_missing_factory_object(capsys):
+    fixtures.reset()
+
+    exit_code = main(
+        [
+            "run",
+            "damai-web-smoke",
+            "--live",
+            "--factory",
+            "tests.runner.fixtures:missing_factory",
+            "--url",
+            "https://example.test/damai",
+        ]
+    )
+
+    captured = capsys.readouterr()
+
+    assert exit_code == 2
+    assert "could not load factory" in captured.err
+    assert fixtures.CREATED_SESSIONS == []
+
+
 def test_cli_runs_live_damai_android_smoke_with_imported_factory(capsys):
     fixtures.reset()
 

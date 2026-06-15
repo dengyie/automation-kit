@@ -755,3 +755,65 @@ Proceed to stabilize the runner contract and workflow authoring API:
 - missing factory object handling,
 - stable JSON/report output,
 - dry workflow authoring documentation.
+
+## 2026-06-16: Runner Factory Error Handling
+
+### Completed
+
+- Wrapped runner factory import/lookup failures in a user-facing CLI error.
+- Kept workflow-parameter validation ahead of factory loading so missing
+  `--url` or `--app-id` still reports the correct argument error.
+- Added tests for:
+  - invalid `module:object` import paths,
+  - missing factory objects on an importable module.
+
+### Verification
+
+Focused runner CLI tests:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_cli.py --no-cov -q
+```
+
+Result:
+
+```text
+15 passed
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+94 passed
+Total coverage: 94.20%
+Required coverage: 80%
+```
+
+### Review
+
+Used `production-code-quality-review` required setup scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- the CLI still validates workflow-specific required arguments before factory
+  loading,
+- invalid factory paths now fail with a readable error instead of an unhandled
+  exception,
+- this behavior stays in the runner layer and does not leak into
+  `automation_core`.
+
+### Next Phase
+
+Proceed to the workflow authoring API and its documentation.

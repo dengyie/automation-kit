@@ -40,9 +40,12 @@ def load_object(import_path: str):
     if not separator or not module_name or not object_path:
         raise ValueError("import path must use module:object")
 
-    target = importlib.import_module(module_name)
-    for part in object_path.split("."):
-        target = getattr(target, part)
+    try:
+        target = importlib.import_module(module_name)
+        for part in object_path.split("."):
+            target = getattr(target, part)
+    except (ImportError, AttributeError) as exc:
+        raise ValueError(f"could not load factory: {import_path}") from exc
     return target
 
 
@@ -72,16 +75,20 @@ def main(argv: Optional[List[str]] = None) -> int:
         if args.workflow == "damai-web-smoke":
             if not args.url:
                 return _print_error("--url is required for damai-web-smoke")
+        else:
+            if not args.app_id:
+                return _print_error("--app-id is required for damai-android-smoke")
+        try:
             session_factory = load_object(args.factory)
+        except ValueError as exc:
+            return _print_error(str(exc))
+        if args.workflow == "damai-web-smoke":
             workflow = WORKFLOWS[args.workflow]
             runner = WorkflowRunner(
                 session_factory=session_factory,
                 workflow=lambda session: workflow(session, url=args.url),
             )
         else:
-            if not args.app_id:
-                return _print_error("--app-id is required for damai-android-smoke")
-            session_factory = load_object(args.factory)
             workflow = WORKFLOWS[args.workflow]
             runner = WorkflowRunner(
                 session_factory=session_factory,
