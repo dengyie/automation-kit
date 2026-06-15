@@ -439,3 +439,60 @@ Follow-up inspection confirmed:
 
 Proceed to a minimal CLI or Python runner facade that can execute example
 workflows from injected factories without making live-system access the default.
+
+## 2026-06-16: Minimal Runner Facade
+
+### Completed
+
+- Added `automation_runner.WorkflowRunner`.
+- Runner accepts either a callable session factory or a `DriverSessionFactory`
+  protocol object with `.create()`.
+- Added `automation_runner.cli.main` with an `examples --dry-run` command that
+  only lists example workflows and a dry-run notice.
+- Added `automation_runner.__main__` so the package can be executed with
+  `python -m automation_runner`.
+- Registered an `automation-runner` Poetry script.
+- Added tests for:
+  - lazy session creation,
+  - `DriverSessionFactory` compatibility,
+  - CLI dry-run output,
+  - Poetry script registration,
+  - module entrypoint execution.
+
+### Verification
+
+Command:
+
+```bash
+./.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+66 passed
+Total coverage: 92.57%
+Required coverage: 80%
+```
+
+### Review
+
+Used `production-code-quality-review` required setup scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- runner behavior lives outside `automation_core`.
+- the CLI defaults to dry-run listing, not live browser or device execution.
+- the runner works with existing `DriverSessionFactory` adapters and lazy
+  callables.
+
+### Next Phase
+
+Proceed to a thin command-line pathway for wiring real example factories into
+the runner, if needed, while keeping live execution opt-in.
