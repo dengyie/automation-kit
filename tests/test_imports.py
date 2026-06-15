@@ -26,6 +26,13 @@ def test_automation_core_task_runner_imports():
     assert TaskRunner
 
 
+def test_automation_core_state_imports():
+    from automation_core.state import RunState, RunStatus
+
+    assert RunState
+    assert RunStatus
+
+
 def test_example_workflow_factories_import_without_live_dependencies():
     from examples.damai_android import create_workflow as create_android_workflow
     from examples.damai_web import create_workflow as create_web_workflow

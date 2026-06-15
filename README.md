@@ -9,6 +9,7 @@ Android app workflows.
 
 - task lifecycle
 - deterministic task runner
+- run state
 - bounded retries
 - driver/session contracts
 - action requests and batches

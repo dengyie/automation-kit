@@ -1681,3 +1681,69 @@ Follow-up inspection confirmed:
 
 Commit and push the task-runner slice, then continue with the next roadmap
 slice.
+
+## 2026-06-16: Run State Transitions
+
+### Completed
+
+- Added lifecycle helpers to `automation_core.state.RunState`:
+  - `start()`,
+  - `succeed()`,
+  - `fail()`,
+  - `cancel()`.
+- `start()` now refreshes `started_at` when a run enters the running state.
+- Terminal helpers now set `finished_at` and default outcomes.
+- Added tests for running, successful, failed, and cancelled run states.
+- Added import coverage for `RunState` and `RunStatus`.
+- Updated README runtime primitive list to include run state.
+
+### Verification
+
+Focused state tests:
+
+```bash
+.venv/bin/python -m pytest tests/state tests/test_imports.py --no-cov -q
+```
+
+Result:
+
+```text
+10 passed
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+129 passed
+Total coverage: 94.68%
+Required coverage: 80%
+```
+
+### Review
+
+Used `production-code-quality-review` required setup scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- run state transitions stay inside `automation_core.state`.
+- `start()` refreshes `started_at` when execution begins.
+- terminal helpers set `finished_at` and default outcomes.
+- tests cover running, succeeded, failed, cancelled, and import behavior.
+- default tests remain offline and deterministic.
+
+### Next Phase
+
+Commit and push the run-state slice, then continue with the next roadmap
+slice.
