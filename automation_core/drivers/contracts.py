@@ -1,6 +1,6 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Optional, Protocol, runtime_checkable
+from typing import Any, Dict, Optional, Protocol, runtime_checkable
 
 
 @dataclass(frozen=True)
@@ -21,6 +21,7 @@ class ActionResult:
 class ArtifactHandle:
     artifact_type: str
     path: Path
+    metadata: Dict[str, str] = field(default_factory=dict)
 
 
 @runtime_checkable

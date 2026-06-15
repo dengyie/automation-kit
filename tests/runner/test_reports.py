@@ -27,6 +27,7 @@ def test_build_report_serializes_safe_workflow_summary():
             ArtifactHandle(
                 artifact_type="screenshot",
                 path=Path("artifacts/run-1/screenshot/home.png"),
+                metadata={"source": "driver"},
             ),
         ],
     )
@@ -69,6 +70,7 @@ def test_build_report_serializes_safe_workflow_summary():
         {
             "artifact_type": "screenshot",
             "path": "artifacts/run-1/screenshot/home.png",
+            "metadata": {"source": "driver"},
         },
     ]
     assert report["error"] is None
@@ -125,6 +127,43 @@ def test_build_report_serializes_run_state():
         "finished_at": 2.5,
         "outcome": "ok",
     }
+
+
+def test_build_report_serializes_artifact_metadata():
+    result = ExampleWorkflowResult(
+        session=SessionInfo(
+            driver_name="fake",
+            platform="web",
+            identifier="run-1",
+        ),
+        success=True,
+        actions=[],
+        artifacts=[
+            ArtifactHandle(
+                artifact_type="trace",
+                path=Path("artifacts/run-1/trace/trace.json"),
+                metadata={
+                    "source": "driver",
+                    "kind": "trace",
+                    "auth_token": "secret-token",
+                },
+            ),
+        ],
+    )
+
+    report = build_report("damai-web-smoke", result).to_dict()
+
+    assert report["artifacts"] == [
+        {
+            "artifact_type": "trace",
+            "path": "artifacts/run-1/trace/trace.json",
+            "metadata": {
+                "auth_token": "[redacted]",
+                "kind": "trace",
+                "source": "driver",
+            },
+        },
+    ]
 
 
 def test_build_report_serializes_workflow_events():

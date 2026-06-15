@@ -6,6 +6,15 @@ from automation_core.state import RunState
 from examples.workflows import ExampleWorkflowResult
 
 
+SENSITIVE_METADATA_TERMS = (
+    "authorization",
+    "cookie",
+    "password",
+    "secret",
+    "token",
+)
+
+
 @dataclass(frozen=True)
 class RunnerReport:
     workflow: str
@@ -19,7 +28,7 @@ class RunnerReport:
     events: List[Dict[str, object]]
     session: Dict[str, str]
     actions: List[Dict[str, object]]
-    artifacts: List[Dict[str, str]]
+    artifacts: List[Dict[str, object]]
     error: Optional[str] = None
 
     def to_dict(self) -> Dict[str, object]:
@@ -44,11 +53,23 @@ def _serialize_actions(actions: List[ActionResult]) -> List[Dict[str, object]]:
     ]
 
 
-def _serialize_artifacts(artifacts: List[ArtifactHandle]) -> List[Dict[str, str]]:
+def _serialize_metadata(metadata: Dict[str, str]) -> Dict[str, str]:
+    safe_metadata = {}
+    for key, value in metadata.items():
+        lowered = key.lower()
+        if any(term in lowered for term in SENSITIVE_METADATA_TERMS):
+            safe_metadata[key] = "[redacted]"
+        else:
+            safe_metadata[key] = value
+    return safe_metadata
+
+
+def _serialize_artifacts(artifacts: List[ArtifactHandle]) -> List[Dict[str, object]]:
     return [
         {
             "artifact_type": artifact.artifact_type,
             "path": str(artifact.path),
+            "metadata": _serialize_metadata(artifact.metadata),
         }
         for artifact in artifacts
     ]

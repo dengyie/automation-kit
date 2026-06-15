@@ -89,6 +89,12 @@ JSON reports currently include:
 - `artifacts`
 - `error`
 
+Each artifact entry contains:
+
+- `artifact_type`
+- `path`
+- `metadata`
+
 `events` contains serialized `EventEnvelope` records. Example workflows emit:
 
 - `task.start` when the workflow session starts executing.
@@ -108,6 +114,10 @@ rules, report attachment rules, and dry-run behavior.
 - JSON run reports should be written with `--report-file`.
 - JSON reports should contain artifact paths only, not raw screenshot bytes,
   page source text, tokens, cookies, or action `data`.
+- Artifact metadata should stay generic and small, such as source component,
+  capture mode, or content kind.
+- Report serialization redacts common sensitive metadata keys containing terms
+  such as `token`, `secret`, `password`, `cookie`, or `authorization`.
 - Dry workflows may return deterministic artifact paths without writing files.
 
 ## Adapter Rules

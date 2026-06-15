@@ -1813,3 +1813,71 @@ Follow-up inspection confirmed:
 
 Commit and push the report integration slice, then continue with the next
 roadmap slice.
+
+## 2026-06-16: Artifact Metadata In Reports
+
+### Completed
+
+- Added generic metadata support to `automation_core.drivers.ArtifactHandle`.
+- Runner reports now serialize artifact metadata together with artifact type
+  and path.
+- Report serialization redacts common sensitive artifact metadata keys.
+- Selenium and Appium adapter sessions pass artifact-record metadata through
+  returned artifact handles.
+- Updated workflow documentation to include the artifact metadata report
+  contract.
+- Added tests for artifact-handle metadata, report serialization, sensitive
+  metadata redaction, and CLI JSON artifact output.
+
+### Verification
+
+Focused driver, runner, adapter, and artifact tests:
+
+```bash
+.venv/bin/python -m pytest tests/drivers tests/runner tests/adapters tests/artifacts --no-cov -q
+```
+
+Result:
+
+```text
+61 passed
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+132 passed
+Total coverage: 95.02%
+Required coverage: 80%
+```
+
+### Review
+
+Used `production-code-quality-review` required setup scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- artifact metadata remains a generic `Dict[str, str]` on the driver contract.
+- report serialization redacts common sensitive metadata keys before JSON
+  output.
+- report serialization still omits action `data`.
+- Selenium and Appium adapters only pass through generic artifact-record
+  metadata.
+- `automation_core` remains business-agnostic and structure tests pass.
+
+### Next Phase
+
+Commit and push the artifact metadata slice, then continue with the next
+roadmap slice.

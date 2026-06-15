@@ -80,6 +80,17 @@ def test_artifact_handle_fields():
 
     assert handle.artifact_type == "screenshot"
     assert str(handle.path).endswith("screen.png")
+    assert handle.metadata == {}
+
+
+def test_artifact_handle_accepts_metadata():
+    handle = ArtifactHandle(
+        artifact_type="trace",
+        path=Path("/tmp/trace.json"),
+        metadata={"source": "driver"},
+    )
+
+    assert handle.metadata == {"source": "driver"}
 
 
 def test_fake_element_implements_element_handle_contract():

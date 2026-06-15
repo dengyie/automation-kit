@@ -62,7 +62,11 @@ class SeleniumSession:
             if isinstance(page_source, str):
                 record.path.parent.mkdir(parents=True, exist_ok=True)
                 record.path.write_text(page_source, encoding="utf-8")
-        return ArtifactHandle(artifact_type=artifact_type, path=record.path)
+        return ArtifactHandle(
+            artifact_type=artifact_type,
+            path=record.path,
+            metadata=record.metadata,
+        )
 
 
 class SeleniumSessionFactory:

@@ -317,7 +317,7 @@ def test_cli_can_emit_json_report_for_live_workflow(capsys):
         {"success": True, "message": "get"},
     ]
     assert report["artifacts"] == [
-        {"artifact_type": "screenshot", "path": "home.png"},
+        {"artifact_type": "screenshot", "path": "home.png", "metadata": {}},
     ]
     assert "data" not in report["actions"][0]
 
