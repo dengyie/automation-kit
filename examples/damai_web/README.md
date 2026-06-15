@@ -1,7 +1,7 @@
 # Damai Web Example Shell
 
-This directory will eventually show how a Damai web workflow composes
-`automation_core` primitives with a Selenium-based adapter.
+This directory shows how a Damai web workflow composes `automation_core`
+primitives with a Selenium-based adapter.
 
 ## Owns
 
@@ -18,4 +18,11 @@ This directory will eventually show how a Damai web workflow composes
 - core artifact storage rules
 - Android-specific behavior
 
-No business workflow is implemented in Phase 4.
+## Smoke Workflow
+
+`run_smoke_workflow(session, url)` starts an injected driver session, opens the
+provided URL through the session contract, captures a screenshot artifact, and
+then stops the session.
+
+The workflow is intentionally thin. It proves wiring without embedding ticket
+purchase decisions in `automation_core`.

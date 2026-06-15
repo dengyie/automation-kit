@@ -1,7 +1,7 @@
 # Damai Android Example Shell
 
-This directory will eventually show how a Damai Android workflow composes
-`automation_core` primitives with an Appium-based adapter.
+This directory shows how a Damai Android workflow composes `automation_core`
+primitives with an Appium-based adapter.
 
 ## Owns
 
@@ -18,4 +18,11 @@ This directory will eventually show how a Damai Android workflow composes
 - core artifact storage rules
 - web-specific behavior
 
-No business workflow is implemented in Phase 4.
+## Smoke Workflow
+
+`run_smoke_workflow(session, app_id)` starts an injected driver session,
+activates the provided app ID through the session contract, captures screenshot
+and page-source artifacts, and then stops the session.
+
+The workflow is intentionally thin. It proves wiring without embedding ticket
+purchase decisions in `automation_core`.

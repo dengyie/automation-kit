@@ -383,3 +383,59 @@ Follow-up inspection confirmed:
 
 Proceed to a first usable example workflow layer and any thin platform-specific
 entrypoints, keeping business rules outside `automation_core`.
+
+## 2026-06-16: Example Smoke Workflows
+
+### Completed
+
+- Added shared `ExampleWorkflowResult` for example-layer workflow output.
+- Added `examples.damai_web.run_smoke_workflow(session, url)`.
+- Added `examples.damai_android.run_smoke_workflow(session, app_id)`.
+- Kept both workflows thin:
+  - session is injected,
+  - driver actions go through `DriverSession`,
+  - artifacts go through the session contract,
+  - `stop()` runs in `finally`.
+- Added fake-session tests for web and Android smoke workflows, including
+  session cleanup when driver actions fail.
+- Updated example README files to describe smoke workflow scope.
+- Expanded Poetry packaging to include `examples`, so installed distributions
+  ship the documented example entrypoints.
+
+### Verification
+
+Command:
+
+```bash
+./.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+61 passed
+Total coverage: 94.74%
+Required coverage: 80%
+```
+
+### Review
+
+Used `production-code-quality-review` required setup scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- smoke workflows live under `examples`, not `automation_core`.
+- `automation_core` remains business-agnostic and driver-agnostic.
+- default tests still require no browser, Appium, ADB, Android device, or
+  network.
+
+### Next Phase
+
+Proceed to a minimal CLI or Python runner facade that can execute example
+workflows from injected factories without making live-system access the default.
