@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from automation_core.drivers import ActionResult, ArtifactHandle, SessionInfo
-from examples.damai_web import run_smoke_workflow
+from examples.damai_web import create_workflow, run_smoke_workflow
 
 
 class FakeSession:
@@ -45,6 +45,16 @@ def test_damai_web_smoke_workflow_opens_url_and_captures_screenshot():
     assert result.actions[0].message == "get"
     assert session.actions == [("get", {"url": "https://example.test/damai"})]
     assert session.artifacts == [("screenshot", "home.png")]
+
+
+def test_damai_web_smoke_workflow_factory_returns_runnable_workflow():
+    session = FakeSession()
+    workflow = create_workflow(session_factory=lambda: session, url="https://example.test/damai")
+
+    result = workflow.run()
+
+    assert result.success is True
+    assert session.actions == [("get", {"url": "https://example.test/damai"})]
 
 
 def test_damai_web_smoke_workflow_stops_session_when_action_fails():

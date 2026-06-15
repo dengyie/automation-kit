@@ -817,3 +817,77 @@ Follow-up inspection confirmed:
 ### Next Phase
 
 Proceed to the workflow authoring API and its documentation.
+
+## 2026-06-16: Example Workflow Authoring API
+
+### Completed
+
+- Added `examples.workflows.ExampleWorkflow` as a minimal runnable workflow
+  object.
+- Added `create_workflow(session_factory, url)` for Damai web examples.
+- Added `create_workflow(session_factory, app_id)` for Damai Android examples.
+- Kept the existing `run_smoke_workflow(...)` functions unchanged so direct
+  functional invocation still works.
+- Exported the new workflow factories from the example package `__init__.py`
+  files.
+- Updated README files to document:
+  - the example workflow shape,
+  - the runner dry-run command,
+  - the authoring API for web and Android examples.
+- Added tests proving:
+  - the workflow factories return runnable objects,
+  - the factories import cleanly without live browser/device dependencies,
+  - the previous smoke workflow behavior still works.
+
+### Verification
+
+Example and import tests:
+
+```bash
+.venv/bin/python -m pytest tests/examples tests/test_imports.py --no-cov -q
+```
+
+Result:
+
+```text
+8 passed
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+97 passed
+Total coverage: 94.20%
+Required coverage: 80%
+```
+
+### Review
+
+Used `production-code-quality-review` required setup scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- the new workflow authoring API stays outside `automation_core`,
+- example modules still keep Damai-specific concerns out of the core,
+- direct run helpers remain available for tests and other local callers,
+- default tests stay offline and deterministic.
+
+The authoring object type was tightened from an unstructured object to
+`DriverSession`-typed callables to keep the API boundary explicit.
+
+### Next Phase
+
+Proceed to any remaining runner/report polish or adapter shell work needed to
+keep the repo aligned with the development plan.

@@ -26,3 +26,9 @@ and page-source artifacts, and then stops the session.
 
 The workflow is intentionally thin. It proves wiring without embedding ticket
 purchase decisions in `automation_core`.
+
+## Workflow Factory
+
+`create_workflow(session_factory, app_id)` returns a small object with `run()`.
+That shape is the example authoring API for composing dry or live runs around
+an injected session factory.

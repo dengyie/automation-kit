@@ -25,3 +25,27 @@ poetry run pytest -q
 
 Default tests must not require Chrome, Appium, ADB, Android devices, or
 network.
+
+## Workflow Shape
+
+Business workflows live outside `automation_core`. A workflow factory should
+return an object with a `run()` method:
+
+```python
+from examples.damai_web import create_workflow
+
+workflow = create_workflow(
+    session_factory=make_session,
+    url="https://example.test/damai",
+)
+result = workflow.run()
+```
+
+The runner keeps live execution opt-in:
+
+```bash
+automation-runner examples --dry-run
+automation-runner run damai-web-smoke --live --json \
+  --factory tests.runner.fixtures:make_session \
+  --url https://example.test/damai
+```

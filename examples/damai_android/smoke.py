@@ -1,5 +1,7 @@
+from typing import Callable
+
 from automation_core.drivers import DriverSession
-from examples.workflows import ExampleWorkflowResult
+from examples.workflows import ExampleWorkflow, ExampleWorkflowResult
 
 
 def run_smoke_workflow(session: DriverSession, app_id: str) -> ExampleWorkflowResult:
@@ -19,3 +21,13 @@ def run_smoke_workflow(session: DriverSession, app_id: str) -> ExampleWorkflowRe
         )
     finally:
         session.stop()
+
+
+def create_workflow(
+    session_factory: Callable[[], DriverSession],
+    app_id: str,
+) -> ExampleWorkflow:
+    return ExampleWorkflow(
+        session_factory=session_factory,
+        run_fn=lambda session: run_smoke_workflow(session, app_id=app_id),
+    )

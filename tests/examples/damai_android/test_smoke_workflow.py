@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from automation_core.drivers import ActionResult, ArtifactHandle, SessionInfo
-from examples.damai_android import run_smoke_workflow
+from examples.damai_android import create_workflow, run_smoke_workflow
 
 
 class FakeSession:
@@ -48,6 +48,16 @@ def test_damai_android_smoke_workflow_starts_app_and_captures_artifacts():
         ("screenshot", "startup.png"),
         ("page_source", "startup.xml"),
     ]
+
+
+def test_damai_android_smoke_workflow_factory_returns_runnable_workflow():
+    session = FakeSession()
+    workflow = create_workflow(session_factory=lambda: session, app_id="cn.damai")
+
+    result = workflow.run()
+
+    assert result.success is True
+    assert session.actions == [("activate_app", {"app_id": "cn.damai"})]
 
 
 def test_damai_android_smoke_workflow_stops_session_when_action_fails():
