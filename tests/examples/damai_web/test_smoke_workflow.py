@@ -57,6 +57,23 @@ def test_damai_web_smoke_workflow_factory_returns_runnable_workflow():
     assert session.actions == [("get", {"url": "https://example.test/damai"})]
 
 
+def test_damai_web_workflow_factory_returns_failure_result():
+    class FailingSession(FakeSession):
+        def execute_action(self, action_name, **kwargs):
+            raise RuntimeError("navigation failed")
+
+    session = FailingSession()
+    workflow = create_workflow(session_factory=lambda: session, url="https://example.test/damai")
+
+    result = workflow.run()
+
+    assert result.success is False
+    assert result.error == "RuntimeError: navigation failed"
+    assert result.actions == []
+    assert result.artifacts == []
+    assert session.stopped is True
+
+
 def test_damai_web_smoke_workflow_stops_session_when_action_fails():
     class FailingSession(FakeSession):
         def execute_action(self, action_name, **kwargs):

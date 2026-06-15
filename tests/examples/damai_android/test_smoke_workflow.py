@@ -60,6 +60,23 @@ def test_damai_android_smoke_workflow_factory_returns_runnable_workflow():
     assert session.actions == [("activate_app", {"app_id": "cn.damai"})]
 
 
+def test_damai_android_workflow_factory_returns_failure_result():
+    class FailingSession(FakeSession):
+        def execute_action(self, action_name, **kwargs):
+            raise RuntimeError("activation failed")
+
+    session = FailingSession()
+    workflow = create_workflow(session_factory=lambda: session, app_id="cn.damai")
+
+    result = workflow.run()
+
+    assert result.success is False
+    assert result.error == "RuntimeError: activation failed"
+    assert result.actions == []
+    assert result.artifacts == []
+    assert session.stopped is True
+
+
 def test_damai_android_smoke_workflow_stops_session_when_action_fails():
     class FailingSession(FakeSession):
         def execute_action(self, action_name, **kwargs):

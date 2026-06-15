@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Callable, List
+from typing import Callable, List, Optional
 
 from automation_core.drivers import (
     ActionResult,
@@ -15,6 +15,7 @@ class ExampleWorkflowResult:
     success: bool
     actions: List[ActionResult]
     artifacts: List[ArtifactHandle]
+    error: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -24,4 +25,13 @@ class ExampleWorkflow:
 
     def run(self) -> ExampleWorkflowResult:
         session = self.session_factory()
-        return self.run_fn(session)
+        try:
+            return self.run_fn(session)
+        except Exception as exc:
+            return ExampleWorkflowResult(
+                session=session.info,
+                success=False,
+                actions=[],
+                artifacts=[],
+                error=f"{type(exc).__name__}: {exc}",
+            )

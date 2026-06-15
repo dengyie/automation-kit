@@ -8,13 +8,13 @@ from typing import List, Optional
 
 from automation_runner import WorkflowRunner
 from automation_runner.reports import build_report
-from examples.damai_android import run_smoke_workflow as run_damai_android_smoke
-from examples.damai_web import run_smoke_workflow as run_damai_web_smoke
+from examples.damai_android import create_workflow as create_damai_android_workflow
+from examples.damai_web import create_workflow as create_damai_web_workflow
 
 
 WORKFLOWS = {
-    "damai-web-smoke": run_damai_web_smoke,
-    "damai-android-smoke": run_damai_android_smoke,
+    "damai-web-smoke": create_damai_web_workflow,
+    "damai-android-smoke": create_damai_android_workflow,
 }
 
 
@@ -84,16 +84,22 @@ def main(argv: Optional[List[str]] = None) -> int:
         except ValueError as exc:
             return _print_error(str(exc))
         if args.workflow == "damai-web-smoke":
-            workflow = WORKFLOWS[args.workflow]
+            create_workflow = WORKFLOWS[args.workflow]
             runner = WorkflowRunner(
-                session_factory=session_factory,
-                workflow=lambda session: workflow(session, url=args.url),
+                session_factory=lambda: create_workflow(
+                    session_factory=session_factory,
+                    url=args.url,
+                ),
+                workflow=lambda workflow: workflow.run(),
             )
         else:
-            workflow = WORKFLOWS[args.workflow]
+            create_workflow = WORKFLOWS[args.workflow]
             runner = WorkflowRunner(
-                session_factory=session_factory,
-                workflow=lambda session: workflow(session, app_id=args.app_id),
+                session_factory=lambda: create_workflow(
+                    session_factory=session_factory,
+                    app_id=args.app_id,
+                ),
+                workflow=lambda workflow: workflow.run(),
             )
 
         started_at = time.monotonic()
@@ -113,10 +119,11 @@ def main(argv: Optional[List[str]] = None) -> int:
                 report_path = Path(args.report_file)
                 report_path.parent.mkdir(parents=True, exist_ok=True)
                 report_path.write_text(payload, encoding="utf-8")
+            return 0 if result.success else 1
         else:
             if args.report_file:
                 return _print_error("--report-file requires --json")
             print(f"{args.workflow} success={result.success}")
-        return 0
+        return 0 if result.success else 1
 
     return 1

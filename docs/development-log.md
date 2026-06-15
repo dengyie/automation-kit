@@ -1032,3 +1032,76 @@ Follow-up inspection confirmed:
 ### Next Phase
 
 Proceed to final verification against the basic usable skeleton plan.
+
+## 2026-06-16: Runner Failure Reports
+
+### Completed
+
+- Switched `automation_runner.cli` to run example workflow objects created by
+  `create_workflow(...)` instead of calling the smoke helpers directly.
+- Added `ExampleWorkflowResult.error` for structured failure summaries.
+- Made `ExampleWorkflow.run()` convert workflow exceptions into failed results
+  while still allowing non-`Exception` interruptions to propagate.
+- Made JSON/report-file output include failed workflow reports with:
+  - `success: false`
+  - `status: failed`
+  - `run_id`
+  - `workflow_factory`
+  - `error`
+- Returned exit code `1` for failed workflow results.
+- Added tests proving:
+  - example workflow objects return failed results when actions fail,
+  - CLI emits and writes JSON failure reports,
+  - failed workflow sessions still stop through the smoke workflow `finally`
+    blocks.
+
+### Verification
+
+Focused examples and runner tests:
+
+```bash
+.venv/bin/python -m pytest tests/examples tests/runner --no-cov -q
+```
+
+Result:
+
+```text
+30 passed
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+104 passed
+Total coverage: 94.36%
+Required coverage: 80%
+```
+
+### Review
+
+Used `production-code-quality-review` required setup scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- failure-report behavior stays in examples and `automation_runner`, not
+  `automation_core`,
+- raw action data remains excluded from reports,
+- workflow failures now produce machine-readable diagnostics,
+- default tests remain offline and deterministic.
+
+### Next Phase
+
+Proceed to final basic-usable-state verification and identify the next
+development roadmap slice.

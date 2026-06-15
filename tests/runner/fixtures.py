@@ -18,6 +18,7 @@ class CliFakeSession:
         self.stopped = False
         self.actions = []
         self.artifacts = []
+        self.fail_actions = set()
 
     def start(self):
         self.started = True
@@ -26,6 +27,8 @@ class CliFakeSession:
         self.stopped = True
 
     def execute_action(self, action_name, **kwargs):
+        if action_name in self.fail_actions:
+            raise RuntimeError(f"{action_name} failed")
         self.actions.append((action_name, kwargs))
         return ActionResult(success=True, message=action_name, data=kwargs)
 
@@ -37,6 +40,13 @@ class CliFakeSession:
 def make_session():
     session = CliFakeSession()
     CREATED_SESSIONS.append(session)
+    return session
+
+
+def make_failing_session():
+    session = CliFakeSession()
+    CREATED_SESSIONS.append(session)
+    session.fail_actions.add("get")
     return session
 
 

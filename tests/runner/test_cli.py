@@ -291,6 +291,42 @@ def test_cli_can_write_json_report_to_file(tmp_path, capsys):
     assert "damai-web-smoke" in captured.out
 
 
+def test_cli_emits_json_report_when_workflow_fails(tmp_path, capsys):
+    fixtures.reset()
+    report_path = tmp_path / "failed.json"
+
+    exit_code = main(
+        [
+            "run",
+            "damai-web-smoke",
+            "--live",
+            "--json",
+            "--report-file",
+            str(report_path),
+            "--factory",
+            "tests.runner.fixtures:make_failing_session",
+            "--url",
+            "https://example.test/damai",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    report = json.loads(captured.out)
+
+    assert exit_code == 1
+    assert report_path.read_text(encoding="utf-8") == captured.out.strip()
+    assert report["workflow"] == "damai-web-smoke"
+    assert report["workflow_factory"] == "tests.runner.fixtures:make_failing_session"
+    assert report["success"] is False
+    assert report["status"] == "failed"
+    assert report["run_id"] == "cli-run"
+    assert report["live"] is True
+    assert report["error"] == "RuntimeError: get failed"
+    assert report["actions"] == []
+    assert report["artifacts"] == []
+    assert fixtures.CREATED_SESSIONS[0].stopped is True
+
+
 def test_cli_creates_report_file_parent_directories(tmp_path, capsys):
     fixtures.reset()
     report_path = tmp_path / "nested" / "reports" / "report.json"

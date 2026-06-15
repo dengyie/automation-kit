@@ -72,5 +72,5 @@ def build_report(
         session=_serialize_session(result.session),
         actions=_serialize_actions(result.actions),
         artifacts=_serialize_artifacts(result.artifacts),
-        error=error,
+        error=error if error is not None else result.error,
     )
