@@ -312,3 +312,74 @@ Proceed to the Appium adapter with the same constraints:
 - no live device in default tests,
 - artifacts routed through `ArtifactStore`,
 - no business workflow in the adapter.
+
+## 2026-06-16: Appium Adapter
+
+### Completed
+
+- Added `adapters.appium.AppiumSession`.
+- Added `adapters.appium.AppiumSessionFactory`.
+- Kept Appium optional by injecting a driver factory instead of importing
+  Appium in default code paths.
+- Implemented driver lifecycle methods:
+  - `start()`
+  - `stop()`
+  - `execute_action()`
+  - `capture_artifact()`
+- Routed adapter artifacts through `ArtifactStore` for the same sanitization
+  and namespacing rules used by core artifacts.
+- Added fake-driver tests for supported driver actions, `mobile:*` script
+  execution, screenshot capture, page source capture, invalid artifact names,
+  shutdown, and factory creation.
+- Added test-package `__init__.py` files under `tests/adapters` so Selenium and
+  Appium test modules can coexist without pytest import-name collisions.
+- Expanded Poetry packaging to include `adapters`, so installed distributions
+  ship the new adapter modules instead of only `automation_core`.
+
+### Verification
+
+Command:
+
+```bash
+./.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+57 passed
+Total coverage: 94.74%
+Required coverage: 80%
+```
+
+### Review
+
+Used `production-code-quality-review` required setup scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection found and fixed two issues:
+
+- `tests/adapters/appium/test_session.py` and
+  `tests/adapters/selenium/test_session.py` collided because pytest imported
+  them as the same top-level module name. Added package markers under
+  `tests/adapters` to isolate the modules.
+- `pyproject.toml` initially packaged only `automation_core`, which would have
+  omitted adapter modules from installed distributions. Added `adapters` to
+  the Poetry package list.
+
+Follow-up inspection confirmed:
+
+- `automation_core` remains business-agnostic.
+- Appium-specific code stays confined to `adapters.appium`.
+- Default tests still require no browser, Appium, ADB, Android device, or
+  network.
+
+### Next Phase
+
+Proceed to a first usable example workflow layer and any thin platform-specific
+entrypoints, keeping business rules outside `automation_core`.

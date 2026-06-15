@@ -5,7 +5,8 @@ description = "Python-first automation application toolkit for website and Andro
 authors = ["mango"]
 readme = "README.md"
 packages = [
-    { include = "automation_core" }
+    { include = "automation_core" },
+    { include = "adapters" },
 ]
 
 [tool.poetry.dependencies]

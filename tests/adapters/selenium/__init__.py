@@ -1,0 +1,1 @@
+"""Selenium adapter tests."""
