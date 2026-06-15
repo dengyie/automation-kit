@@ -3,6 +3,7 @@ import importlib
 import json
 from pathlib import Path
 import sys
+import time
 from typing import List, Optional
 
 from automation_runner import WorkflowRunner
@@ -95,9 +96,17 @@ def main(argv: Optional[List[str]] = None) -> int:
                 workflow=lambda session: workflow(session, app_id=args.app_id),
             )
 
+        started_at = time.monotonic()
         result = runner.run()
+        elapsed_seconds = time.monotonic() - started_at
         if args.json:
-            report = build_report(args.workflow, result)
+            report = build_report(
+                args.workflow,
+                result,
+                live=args.live,
+                workflow_factory=args.factory,
+                elapsed_seconds=elapsed_seconds,
+            )
             payload = json.dumps(report.to_dict(), sort_keys=True)
             print(payload)
             if args.report_file:

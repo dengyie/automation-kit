@@ -241,7 +241,15 @@ def test_cli_can_emit_json_report_for_live_workflow(capsys):
 
     assert exit_code == 0
     assert report["workflow"] == "damai-web-smoke"
+    assert report["workflow_factory"] == "tests.runner.fixtures:make_session"
     assert report["success"] is True
+    assert report["status"] == "succeeded"
+    assert report["run_id"] == "cli-run"
+    assert report["live"] is True
+    assert isinstance(report["elapsed_seconds"], float)
+    assert report["elapsed_seconds"] >= 0
+    assert report["events"] == []
+    assert report["error"] is None
     assert report["session"] == {
         "driver_name": "fake-cli",
         "platform": "web",

@@ -49,3 +49,6 @@ automation-runner run damai-web-smoke --live --json \
   --factory tests.runner.fixtures:make_session \
   --url https://example.test/damai
 ```
+
+See `docs/adding-a-workflow.md` for package boundaries, report fields, and
+adapter rules.

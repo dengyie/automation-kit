@@ -958,3 +958,77 @@ Follow-up inspection confirmed:
 
 Proceed to any remaining runner/report or adapter polish only if it advances
 the documented basic usable state.
+
+## 2026-06-16: Runner Report Metadata And Workflow Docs
+
+### Completed
+
+- Expanded `RunnerReport` with:
+  - `workflow_factory`
+  - `status`
+  - `run_id`
+  - `live`
+  - `elapsed_seconds`
+  - `events`
+  - `error`
+- Kept action serialization safe by continuing to omit raw action `data`.
+- Passed the CLI factory import path and elapsed run time into JSON reports.
+- Added report tests for:
+  - live flag serialization,
+  - non-live defaults,
+  - failed status,
+  - factory path,
+  - elapsed seconds,
+  - error summary field.
+- Added `docs/adding-a-workflow.md` with:
+  - package boundaries,
+  - workflow factory shape,
+  - dry-run and live-run commands,
+  - report fields,
+  - adapter rules.
+- Linked the workflow guide from `README.md`.
+
+### Verification
+
+Runner tests:
+
+```bash
+.venv/bin/python -m pytest tests/runner --no-cov -q
+```
+
+Result:
+
+```text
+21 passed
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+101 passed
+Total coverage: 94.34%
+Required coverage: 80%
+```
+
+### Review
+
+Used `production-code-quality-review` required setup scripts against
+`/Users/mango/project/codex/automation-kit`.
+
+Follow-up inspection confirmed:
+
+- report changes stay in `automation_runner`,
+- raw action data remains excluded from reports,
+- the workflow guide explicitly keeps business logic out of `automation_core`,
+- default tests still require no browser, Appium, ADB, Android device, or
+  network.
+
+### Next Phase
+
+Proceed to final verification against the basic usable skeleton plan.
