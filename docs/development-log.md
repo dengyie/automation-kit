@@ -2077,3 +2077,73 @@ Follow-up inspection confirmed:
 
 Commit and push the report metadata refinement slice, then continue with the
 next roadmap slice.
+
+## 2026-06-16: Workflow Context For Custom Factories
+
+### Completed
+
+- Added `automation_runner.context.WorkflowContext`.
+- Added `automation_runner.context.WorkflowOptions`.
+- Exported both context models from `automation_runner`.
+- Added custom workflow factory support for:
+  - legacy `create_workflow(session_factory)`.
+  - typed `create_workflow(session_factory, context, options)`.
+  - keyword-extensible `create_workflow(session_factory, **kwargs)`.
+- Kept built-in Damai workflow signatures unchanged.
+- Added design and implementation plan docs under `docs/superpowers/`.
+- Updated README and workflow extension docs with supported custom factory
+  signatures.
+- Added tests for context model values and custom factory context/options
+  delivery.
+
+### Verification
+
+Focused runner tests:
+
+```bash
+.venv/bin/python -m pytest tests/runner -q --no-cov
+```
+
+Result:
+
+```text
+44 passed
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+150 passed
+Total coverage: 94.97%
+Required coverage: 80%
+```
+
+### Review
+
+Used `production-code-quality-review` required setup scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- workflow context and options stay in `automation_runner`, not
+  `automation_core`.
+- default tests remain offline and deterministic.
+- existing one-argument custom workflow factories still work.
+- keyword-extensible custom workflow factories receive context and options.
+- report serialization still omits raw action `data`.
+
+### Next Phase
+
+Commit and push the workflow context slice, then continue with the next roadmap
+slice.

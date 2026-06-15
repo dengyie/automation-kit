@@ -69,6 +69,52 @@ def create_custom_workflow(session_factory):
     )
 
 
+def create_context_workflow(session_factory, context, options):
+    return ExampleWorkflow(
+        name=context.workflow_name,
+        session_factory=session_factory,
+        run_fn=lambda session: ExampleWorkflowResult(
+            session=session.info,
+            success=True,
+            actions=[
+                session.execute_action(
+                    "context_action",
+                    workflow=context.workflow_name,
+                    live=context.live,
+                    workflow_factory=context.workflow_factory,
+                    session_factory=context.session_factory,
+                    url=options.url,
+                    app_id=options.app_id,
+                    emit_json=options.emit_json,
+                    report_file=options.report_file,
+                )
+            ],
+            artifacts=[],
+        ),
+    )
+
+
+def create_kwargs_context_workflow(session_factory, **kwargs):
+    context = kwargs["context"]
+    options = kwargs["options"]
+    return ExampleWorkflow(
+        name=context.workflow_name,
+        session_factory=session_factory,
+        run_fn=lambda session: ExampleWorkflowResult(
+            session=session.info,
+            success=True,
+            actions=[
+                session.execute_action(
+                    "kwargs_context_action",
+                    workflow=context.workflow_name,
+                    url=options.url,
+                )
+            ],
+            artifacts=[],
+        ),
+    )
+
+
 def reset():
     CREATED_SESSIONS.clear()
     IMPORT_ATTEMPTS.clear()

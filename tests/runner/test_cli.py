@@ -146,6 +146,85 @@ def test_cli_runs_custom_workflow_factory_in_dry_mode(capsys):
     assert fixtures.CREATED_SESSIONS == []
 
 
+def test_cli_passes_context_and_options_to_custom_workflow_factory(tmp_path, capsys):
+    fixtures.reset()
+    report_path = tmp_path / "reports" / "run.json"
+
+    exit_code = main(
+        [
+            "run",
+            "--workflow-factory",
+            "tests.runner.fixtures:create_context_workflow",
+            "--live",
+            "--json",
+            "--factory",
+            "tests.runner.fixtures:make_session",
+            "--url",
+            "https://example.test/damai",
+            "--app-id",
+            "cn.damai",
+            "--report-file",
+            str(report_path),
+        ]
+    )
+
+    captured = capsys.readouterr()
+    report = json.loads(captured.out)
+
+    assert exit_code == 0
+    assert report["workflow"] == "tests.runner.fixtures:create_context_workflow"
+    assert report["workflow_factory"] == "tests.runner.fixtures:create_context_workflow"
+    assert report["session_factory"] == "tests.runner.fixtures:make_session"
+    assert report["actions"] == [
+        {
+            "success": True,
+            "message": "context_action",
+        },
+    ]
+    assert "data" not in report["actions"][0]
+    assert fixtures.CREATED_SESSIONS[0].actions == [
+        (
+            "context_action",
+            {
+                "workflow": "tests.runner.fixtures:create_context_workflow",
+                "live": True,
+                "workflow_factory": "tests.runner.fixtures:create_context_workflow",
+                "session_factory": "tests.runner.fixtures:make_session",
+                "url": "https://example.test/damai",
+                "app_id": "cn.damai",
+                "emit_json": True,
+                "report_file": str(report_path),
+            },
+        )
+    ]
+
+
+def test_cli_passes_context_to_custom_workflow_factory_with_kwargs(capsys):
+    fixtures.reset()
+
+    exit_code = main(
+        [
+            "run",
+            "--workflow-factory",
+            "tests.runner.fixtures:create_kwargs_context_workflow",
+            "--json",
+            "--url",
+            "https://example.test/damai",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    report = json.loads(captured.out)
+
+    assert exit_code == 0
+    assert report["actions"] == [
+        {
+            "success": True,
+            "message": "kwargs_context_action",
+        },
+    ]
+
+
 def test_cli_reads_custom_workflow_factory_from_config(capsys):
     fixtures.reset()
 

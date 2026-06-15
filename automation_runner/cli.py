@@ -1,4 +1,5 @@
 import argparse
+import inspect
 import importlib
 import json
 import os
@@ -9,6 +10,7 @@ from typing import List, Optional
 
 from automation_core.config import ConfigSource, EnvConfigSource
 from automation_core.state import RunState
+from automation_runner.context import WorkflowContext, WorkflowOptions
 from automation_runner import WorkflowRunner
 from automation_runner.config import RunnerConfig, load_runner_config
 from automation_runner.dry_run import DryRunSession
@@ -80,6 +82,58 @@ def _workflow_name(args: argparse.Namespace, config: RunnerConfig) -> str:
     raise ValueError("workflow or --workflow-factory is required")
 
 
+def _workflow_context(
+    workflow_name: str,
+    config: RunnerConfig,
+    session_factory_name: Optional[str],
+) -> WorkflowContext:
+    return WorkflowContext(
+        workflow_name=workflow_name,
+        live=config.live,
+        workflow_factory=config.workflow_factory,
+        session_factory=session_factory_name,
+    )
+
+
+def _workflow_options(config: RunnerConfig, args: argparse.Namespace) -> WorkflowOptions:
+    return WorkflowOptions(
+        url=config.url,
+        app_id=config.app_id,
+        emit_json=config.emit_json,
+        report_file=args.report_file,
+    )
+
+
+def _call_custom_workflow_factory(
+    create_workflow,
+    session_factory,
+    context: WorkflowContext,
+    options: WorkflowOptions,
+):
+    try:
+        signature = inspect.signature(create_workflow)
+    except (TypeError, ValueError):
+        signature = None
+    if signature is not None:
+        parameters = signature.parameters
+        accepts_keywords = any(
+            parameter.kind is inspect.Parameter.VAR_KEYWORD
+            for parameter in parameters.values()
+        )
+        if "context" in parameters or "options" in parameters or accepts_keywords:
+            return create_workflow(
+                session_factory=session_factory,
+                context=context,
+                options=options,
+            )
+        return create_workflow(session_factory=session_factory)
+    return create_workflow(
+        session_factory=session_factory,
+        context=context,
+        options=options,
+    )
+
+
 def main(
     argv: Optional[List[str]] = None,
     config_source: Optional[ConfigSource] = None,
@@ -127,9 +181,18 @@ def main(
                 create_workflow = load_object(config.workflow_factory)
             except ValueError as exc:
                 return _print_error(str(exc))
+            context = _workflow_context(
+                workflow_name=workflow_name,
+                config=config,
+                session_factory_name=config.factory if config.live else None,
+            )
+            options = _workflow_options(config, args)
             runner = WorkflowRunner(
-                session_factory=lambda: create_workflow(
-                    session_factory=session_factory,
+                session_factory=lambda: _call_custom_workflow_factory(
+                    create_workflow,
+                    session_factory,
+                    context,
+                    options,
                 ),
                 workflow=lambda workflow: workflow.run(),
             )

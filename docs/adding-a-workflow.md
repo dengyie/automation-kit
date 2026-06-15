@@ -98,10 +98,23 @@ Supported runner environment keys are:
 
 CLI arguments take precedence over environment values.
 
-Custom workflow factories receive `session_factory` and should return a
-runnable workflow object. Built-in Damai examples still use `--url` or
-`--app-id`; custom workflows own their own parameters outside
-`automation_core`.
+Custom workflow factories may use either of these signatures:
+
+```python
+def create_workflow(session_factory):
+    ...
+
+
+def create_workflow(session_factory, context, options):
+    ...
+```
+
+`context` carries runner metadata such as workflow name and live mode.
+`options` carries runner inputs such as `url`, `app_id`, `emit_json`, and
+`report_file`.
+
+Built-in Damai examples still use `--url` or `--app-id`; custom workflows own
+their own parameters outside `automation_core`.
 
 ## Report Contract
 

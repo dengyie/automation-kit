@@ -65,6 +65,18 @@ AUTOMATION_RUNNER_URL=https://example.test/damai \
 automation-runner run damai-web-smoke
 ```
 
+Custom workflow factories can accept either the legacy `session_factory`
+signature or the typed runner context:
+
+```python
+def create_workflow(session_factory):
+    ...
+
+
+def create_workflow(session_factory, context, options):
+    ...
+```
+
 See `docs/adding-a-workflow.md` for package boundaries, report fields, and
 adapter rules. See `docs/artifacts.md` for screenshot, page-source, UI-tree,
 trace, and log artifact conventions.
