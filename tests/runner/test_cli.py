@@ -56,6 +56,7 @@ def test_cli_runs_dry_workflow_without_live_flag(capsys):
     assert report["success"] is True
     assert report["live"] is False
     assert report["workflow_factory"] is None
+    assert report["session_factory"] is None
     assert report["session"] == {
         "driver_name": "dry-run",
         "platform": "dry",
@@ -133,6 +134,7 @@ def test_cli_runs_custom_workflow_factory_in_dry_mode(capsys):
     assert exit_code == 0
     assert report["workflow"] == "tests.runner.fixtures:create_custom_workflow"
     assert report["workflow_factory"] == "tests.runner.fixtures:create_custom_workflow"
+    assert report["session_factory"] is None
     assert report["session"] == {
         "driver_name": "dry-run",
         "platform": "dry",
@@ -209,7 +211,8 @@ def test_cli_uses_config_source_for_live_workflow(capsys):
 
     assert exit_code == 0
     assert report["live"] is True
-    assert report["workflow_factory"] == "tests.runner.fixtures:make_session"
+    assert report["workflow_factory"] is None
+    assert report["session_factory"] == "tests.runner.fixtures:make_session"
     assert len(fixtures.CREATED_SESSIONS) == 1
 
 
@@ -477,7 +480,8 @@ def test_cli_can_emit_json_report_for_live_workflow(capsys):
 
     assert exit_code == 0
     assert report["workflow"] == "damai-web-smoke"
-    assert report["workflow_factory"] == "tests.runner.fixtures:make_session"
+    assert report["workflow_factory"] is None
+    assert report["session_factory"] == "tests.runner.fixtures:make_session"
     assert report["success"] is True
     assert report["status"] == "succeeded"
     assert report["run_id"] == "cli-run"
@@ -594,7 +598,8 @@ def test_cli_emits_json_report_when_workflow_fails(tmp_path, capsys):
     assert exit_code == 1
     assert report_path.read_text(encoding="utf-8") == captured.out
     assert report["workflow"] == "damai-web-smoke"
-    assert report["workflow_factory"] == "tests.runner.fixtures:make_failing_session"
+    assert report["workflow_factory"] is None
+    assert report["session_factory"] == "tests.runner.fixtures:make_failing_session"
     assert report["success"] is False
     assert report["status"] == "failed"
     assert report["run_id"] == "cli-run"

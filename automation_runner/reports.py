@@ -19,6 +19,7 @@ SENSITIVE_METADATA_TERMS = (
 class RunnerReport:
     workflow: str
     workflow_factory: Optional[str]
+    session_factory: Optional[str]
     success: bool
     status: str
     run_id: str
@@ -81,6 +82,7 @@ def build_report(
     run_state: Optional[RunState] = None,
     live: bool = False,
     workflow_factory: Optional[str] = None,
+    session_factory: Optional[str] = None,
     elapsed_seconds: Optional[float] = None,
     error: Optional[str] = None,
 ) -> RunnerReport:
@@ -93,6 +95,7 @@ def build_report(
     return RunnerReport(
         workflow=workflow,
         workflow_factory=workflow_factory,
+        session_factory=session_factory,
         success=result.success,
         status="succeeded" if result.success else "failed",
         run_id=result.session.identifier,

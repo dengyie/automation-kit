@@ -2015,3 +2015,65 @@ Follow-up inspection confirmed:
 
 Commit and push the custom workflow factory slice, then continue with the next
 roadmap slice.
+
+## 2026-06-16: Runner Report Factory Field Split
+
+### Completed
+
+- Split runner report factory metadata into:
+  - `workflow_factory` for custom workflow factory import paths.
+  - `session_factory` for live session factory import paths.
+- Kept built-in Damai workflow behavior unchanged.
+- Updated CLI report construction to preserve both fields independently.
+- Updated runner tests to assert the distinct report contract for dry, live,
+  success, and failure paths.
+- Updated workflow docs to describe the two factory fields separately.
+
+### Verification
+
+Focused runner tests:
+
+```bash
+.venv/bin/python -m pytest tests/runner -q --no-cov
+```
+
+Result:
+
+```text
+40 passed
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+146 passed
+Total coverage: 95.30%
+Required coverage: 80%
+```
+
+### Review
+
+Used `production-code-quality-review` required setup scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- `workflow_factory` and `session_factory` now have distinct meanings.
+- live execution still requires an explicit live path and factory import.
+- default tests remain offline and deterministic.
+
+### Next Phase
+
+Commit and push the report metadata refinement slice, then continue with the
+next roadmap slice.

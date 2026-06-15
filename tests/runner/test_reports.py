@@ -209,11 +209,13 @@ def test_build_report_records_factory_elapsed_and_error_summary():
     report = build_report(
         "damai-web-smoke",
         result,
-        workflow_factory="tests.runner.fixtures:make_session",
+        workflow_factory="tests.runner.fixtures:create_workflow",
+        session_factory="tests.runner.fixtures:make_session",
         elapsed_seconds=0.25,
         error="workflow failed",
     ).to_dict()
 
-    assert report["workflow_factory"] == "tests.runner.fixtures:make_session"
+    assert report["workflow_factory"] == "tests.runner.fixtures:create_workflow"
+    assert report["session_factory"] == "tests.runner.fixtures:make_session"
     assert report["elapsed_seconds"] == 0.25
     assert report["error"] == "workflow failed"

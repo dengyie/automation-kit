@@ -169,8 +169,8 @@ def main(
                 result,
                 run_state=run_state,
                 live=config.live,
-                workflow_factory=config.workflow_factory
-                or (config.factory if config.live else None),
+                workflow_factory=config.workflow_factory,
+                session_factory=config.factory if config.live else None,
                 elapsed_seconds=elapsed_seconds,
             )
             payload = json.dumps(report.to_dict(), sort_keys=True)

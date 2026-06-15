@@ -109,6 +109,7 @@ JSON reports currently include:
 
 - `workflow`
 - `workflow_factory`
+- `session_factory`
 - `success`
 - `status`
 - `run_id`
@@ -131,6 +132,10 @@ Each artifact entry contains:
 `workflow` records the workflow identifier that was executed. For built-in
 examples it is the workflow name; for custom factory runs it is the custom
 factory import path.
+
+`workflow_factory` records the workflow factory import path when a custom
+workflow factory is used. `session_factory` records the live session factory
+import path when the runner is using a live adapter factory.
 
 - `task.start` when the workflow session starts executing.
 - `artifact` for each captured artifact.
