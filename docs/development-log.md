@@ -554,3 +554,59 @@ Follow-up inspection confirmed:
 
 Proceed to structured runner output or run reports so command-line execution can
 emit machine-readable results and artifact references.
+
+## 2026-06-16: Structured Runner Output
+
+### Completed
+
+- Added `automation_runner.reports.RunnerReport`.
+- Added `automation_runner.reports.build_report()` to serialize safe workflow
+  summaries.
+- Added `automation-runner run ... --json` for machine-readable output.
+- Kept the default human-readable summary unchanged when `--json` is absent.
+- Preserved the live execution guard rails:
+  - `--live` required,
+  - `--factory` required,
+  - workflow-specific args validated before factory import.
+- Added tests covering:
+  - JSON output shape,
+  - report serialization without leaking raw action data,
+  - runner report helper behavior.
+
+### Verification
+
+Command:
+
+```bash
+./.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+75 passed
+Total coverage: 93.12%
+Required coverage: 80%
+```
+
+### Review
+
+Used `production-code-quality-review` required setup scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- JSON output stays in the runner layer, not `automation_core`.
+- default behavior remains non-live unless explicitly opted in.
+- structured output only includes summary fields and artifact paths, not raw
+  action payloads.
+
+### Next Phase
+
+Proceed to any final runner/report polish only if it serves command-line
+automation use cases; otherwise move on to the next roadmap phase.

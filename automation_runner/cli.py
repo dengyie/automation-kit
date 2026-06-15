@@ -1,9 +1,11 @@
 import argparse
 import importlib
+import json
 import sys
 from typing import List, Optional
 
 from automation_runner import WorkflowRunner
+from automation_runner.reports import build_report
 from examples.damai_android import run_smoke_workflow as run_damai_android_smoke
 from examples.damai_web import run_smoke_workflow as run_damai_web_smoke
 
@@ -27,6 +29,7 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--factory", help="session factory import path")
     run.add_argument("--url", help="URL for web workflows")
     run.add_argument("--app-id", help="app ID for Android workflows")
+    run.add_argument("--json", action="store_true", help="emit JSON report")
     return parser
 
 
@@ -84,7 +87,11 @@ def main(argv: Optional[List[str]] = None) -> int:
             )
 
         result = runner.run()
-        print(f"{args.workflow} success={result.success}")
+        if args.json:
+            report = build_report(args.workflow, result)
+            print(json.dumps(report.to_dict(), sort_keys=True))
+        else:
+            print(f"{args.workflow} success={result.success}")
         return 0
 
     return 1

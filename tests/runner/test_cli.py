@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 from automation_runner.cli import main
@@ -173,3 +174,39 @@ def test_cli_runs_live_damai_android_smoke_with_imported_factory(capsys):
         ("screenshot", "startup.png"),
         ("page_source", "startup.xml"),
     ]
+
+
+def test_cli_can_emit_json_report_for_live_workflow(capsys):
+    fixtures.reset()
+
+    exit_code = main(
+        [
+            "run",
+            "damai-web-smoke",
+            "--live",
+            "--json",
+            "--factory",
+            "tests.runner.fixtures:make_session",
+            "--url",
+            "https://example.test/damai",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    report = json.loads(captured.out)
+
+    assert exit_code == 0
+    assert report["workflow"] == "damai-web-smoke"
+    assert report["success"] is True
+    assert report["session"] == {
+        "driver_name": "fake-cli",
+        "platform": "web",
+        "identifier": "cli-run",
+    }
+    assert report["actions"] == [
+        {"success": True, "message": "get"},
+    ]
+    assert report["artifacts"] == [
+        {"artifact_type": "screenshot", "path": "home.png"},
+    ]
+    assert "data" not in report["actions"][0]
