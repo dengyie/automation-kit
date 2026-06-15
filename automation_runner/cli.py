@@ -1,6 +1,7 @@
 import argparse
 import importlib
 import json
+from pathlib import Path
 import sys
 from typing import List, Optional
 
@@ -30,6 +31,7 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--url", help="URL for web workflows")
     run.add_argument("--app-id", help="app ID for Android workflows")
     run.add_argument("--json", action="store_true", help="emit JSON report")
+    run.add_argument("--report-file", help="write JSON report to file")
     return parser
 
 
@@ -89,8 +91,15 @@ def main(argv: Optional[List[str]] = None) -> int:
         result = runner.run()
         if args.json:
             report = build_report(args.workflow, result)
-            print(json.dumps(report.to_dict(), sort_keys=True))
+            payload = json.dumps(report.to_dict(), sort_keys=True)
+            print(payload)
+            if args.report_file:
+                report_path = Path(args.report_file)
+                report_path.parent.mkdir(parents=True, exist_ok=True)
+                report_path.write_text(payload, encoding="utf-8")
         else:
+            if args.report_file:
+                return _print_error("--report-file requires --json")
             print(f"{args.workflow} success={result.success}")
         return 0
 

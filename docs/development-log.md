@@ -610,3 +610,59 @@ Follow-up inspection confirmed:
 
 Proceed to any final runner/report polish only if it serves command-line
 automation use cases; otherwise move on to the next roadmap phase.
+
+## 2026-06-16: Runner Report File Output
+
+### Completed
+
+- Added `automation-runner run ... --report-file <path>`.
+- Required `--json` when `--report-file` is used so saved reports always match
+  the structured output contract.
+- Wrote the same JSON payload to stdout and the report file.
+- Created report parent directories automatically.
+- Added tests covering:
+  - report file writing,
+  - parent directory creation,
+  - rejecting `--report-file` without `--json`.
+
+### Verification
+
+Command:
+
+```bash
+./.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+78 passed
+Total coverage: 93.37%
+Required coverage: 80%
+```
+
+### Review
+
+Used `production-code-quality-review` required setup scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Review follow-up found and fixed one issue:
+
+- `--report-file nested/report.json` initially failed when parent directories
+  did not exist. The CLI now creates parent directories before writing.
+
+Follow-up inspection confirmed:
+
+- report file output remains in the runner layer.
+- saved reports use the same payload as `--json` stdout.
+- default and non-live behavior remain unchanged.
+
+### Next Phase
+
+Move to the next roadmap phase: configuration contracts or opt-in integration
+fixtures, while keeping live browser/device access outside default tests.

@@ -210,3 +210,76 @@ def test_cli_can_emit_json_report_for_live_workflow(capsys):
         {"artifact_type": "screenshot", "path": "home.png"},
     ]
     assert "data" not in report["actions"][0]
+
+
+def test_cli_can_write_json_report_to_file(tmp_path, capsys):
+    fixtures.reset()
+    report_path = tmp_path / "report.json"
+
+    exit_code = main(
+        [
+            "run",
+            "damai-web-smoke",
+            "--live",
+            "--json",
+            "--report-file",
+            str(report_path),
+            "--factory",
+            "tests.runner.fixtures:make_session",
+            "--url",
+            "https://example.test/damai",
+        ]
+    )
+
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    assert report_path.exists()
+    assert report_path.read_text(encoding="utf-8") == captured.out.strip()
+    assert "damai-web-smoke" in captured.out
+
+
+def test_cli_creates_report_file_parent_directories(tmp_path, capsys):
+    fixtures.reset()
+    report_path = tmp_path / "nested" / "reports" / "report.json"
+
+    exit_code = main(
+        [
+            "run",
+            "damai-web-smoke",
+            "--live",
+            "--json",
+            "--report-file",
+            str(report_path),
+            "--factory",
+            "tests.runner.fixtures:make_session",
+            "--url",
+            "https://example.test/damai",
+        ]
+    )
+
+    capsys.readouterr()
+
+    assert exit_code == 0
+    assert report_path.exists()
+
+
+def test_cli_rejects_report_file_without_json(capsys):
+    exit_code = main(
+        [
+            "run",
+            "damai-web-smoke",
+            "--live",
+            "--report-file",
+            "report.json",
+            "--factory",
+            "tests.runner.fixtures:make_session",
+            "--url",
+            "https://example.test/damai",
+        ]
+    )
+
+    captured = capsys.readouterr()
+
+    assert exit_code == 2
+    assert "--report-file requires --json" in captured.err
