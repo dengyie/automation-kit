@@ -20,23 +20,35 @@ class RunState:
     finished_at: Optional[float] = None
     outcome: Optional[str] = None
 
-    def start(self) -> None:
+    def start(self, started_at: Optional[float] = None) -> None:
         self.status = RunStatus.RUNNING
-        self.started_at = time()
+        self.started_at = time() if started_at is None else started_at
         self.finished_at = None
         self.outcome = None
 
-    def succeed(self, outcome: str = "succeeded") -> None:
+    def succeed(
+        self,
+        outcome: str = "succeeded",
+        finished_at: Optional[float] = None,
+    ) -> None:
         self.status = RunStatus.SUCCEEDED
-        self.finished_at = time()
+        self.finished_at = time() if finished_at is None else finished_at
         self.outcome = outcome
 
-    def fail(self, outcome: str = "failed") -> None:
+    def fail(
+        self,
+        outcome: str = "failed",
+        finished_at: Optional[float] = None,
+    ) -> None:
         self.status = RunStatus.FAILED
-        self.finished_at = time()
+        self.finished_at = time() if finished_at is None else finished_at
         self.outcome = outcome
 
-    def cancel(self, outcome: str = "cancelled") -> None:
+    def cancel(
+        self,
+        outcome: str = "cancelled",
+        finished_at: Optional[float] = None,
+    ) -> None:
         self.status = RunStatus.CANCELLED
-        self.finished_at = time()
+        self.finished_at = time() if finished_at is None else finished_at
         self.outcome = outcome

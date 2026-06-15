@@ -2,6 +2,7 @@ from dataclasses import asdict, dataclass
 from typing import Dict, List, Optional
 
 from automation_core.drivers import ActionResult, ArtifactHandle, SessionInfo
+from automation_core.state import RunState
 from examples.workflows import ExampleWorkflowResult
 
 
@@ -12,6 +13,7 @@ class RunnerReport:
     success: bool
     status: str
     run_id: str
+    run_state: Dict[str, object]
     live: bool
     elapsed_seconds: Optional[float]
     events: List[Dict[str, object]]
@@ -55,17 +57,31 @@ def _serialize_artifacts(artifacts: List[ArtifactHandle]) -> List[Dict[str, str]
 def build_report(
     workflow: str,
     result: ExampleWorkflowResult,
+    run_state: Optional[RunState] = None,
     live: bool = False,
     workflow_factory: Optional[str] = None,
     elapsed_seconds: Optional[float] = None,
     error: Optional[str] = None,
 ) -> RunnerReport:
+    state = run_state or RunState(run_id=result.session.identifier)
+    if run_state is None:
+        if result.success:
+            state.succeed()
+        else:
+            state.fail()
     return RunnerReport(
         workflow=workflow,
         workflow_factory=workflow_factory,
         success=result.success,
         status="succeeded" if result.success else "failed",
         run_id=result.session.identifier,
+        run_state={
+            "run_id": state.run_id,
+            "status": state.status.value,
+            "started_at": state.started_at,
+            "finished_at": state.finished_at,
+            "outcome": state.outcome,
+        },
         live=live,
         elapsed_seconds=elapsed_seconds,
         events=[envelope.to_dict() for envelope in result.events],

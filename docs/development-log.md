@@ -1747,3 +1747,69 @@ Follow-up inspection confirmed:
 
 Commit and push the run-state slice, then continue with the next roadmap
 slice.
+
+## 2026-06-16: Run State Report Integration
+
+### Completed
+
+- Connected `automation_core.state.RunState` into the CLI runner flow.
+- CLI now records run lifecycle timestamps and terminal outcomes during
+  execution.
+- Runner reports now include a structured `run_state` payload alongside the
+  existing status summary.
+- Added tests covering serialized run state in reports and CLI JSON output for
+  success and failure paths.
+
+### Verification
+
+Focused state and runner tests:
+
+```bash
+.venv/bin/python -m pytest tests/state tests/runner --no-cov -q
+```
+
+Result:
+
+```text
+29 passed
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+130 passed
+Total coverage: 94.89%
+Required coverage: 80%
+```
+
+### Review
+
+Used `production-code-quality-review` required setup scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- `RunState` remains in `automation_core.state` and stays business-agnostic.
+- runner reports serialize a terminal `run_state` instead of a stale pending
+  state.
+- top-level `run_id` and `run_state.run_id` both use the session run
+  identifier.
+- elapsed duration still uses `time.monotonic()` while run lifecycle
+  timestamps use wall-clock time.
+- success and failure JSON paths both cover `run_state` output.
+
+### Next Phase
+
+Commit and push the report integration slice, then continue with the next
+roadmap slice.

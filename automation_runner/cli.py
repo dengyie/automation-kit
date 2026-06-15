@@ -9,6 +9,7 @@ from typing import List, Optional
 from automation_runner import WorkflowRunner
 from automation_runner.dry_run import DryRunSession
 from automation_runner.reports import build_report
+from automation_core.state import RunState
 from examples.damai_android import create_workflow as create_damai_android_workflow
 from examples.damai_web import create_workflow as create_damai_web_workflow
 
@@ -105,12 +106,21 @@ def main(argv: Optional[List[str]] = None) -> int:
             )
 
         started_at = time.monotonic()
+        wall_started_at = time.time()
         result = runner.run()
+        wall_finished_at = time.time()
         elapsed_seconds = time.monotonic() - started_at
+        run_state = RunState(run_id=result.session.identifier)
+        run_state.start(started_at=wall_started_at)
+        if result.success:
+            run_state.succeed(finished_at=wall_finished_at)
+        else:
+            run_state.fail(finished_at=wall_finished_at)
         if args.json:
             report = build_report(
                 args.workflow,
                 result,
+                run_state=run_state,
                 live=args.live,
                 workflow_factory=args.factory if args.live else None,
                 elapsed_seconds=elapsed_seconds,

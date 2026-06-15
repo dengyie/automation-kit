@@ -286,6 +286,10 @@ def test_cli_can_emit_json_report_for_live_workflow(capsys):
     assert report["success"] is True
     assert report["status"] == "succeeded"
     assert report["run_id"] == "cli-run"
+    assert report["run_state"]["run_id"] == "cli-run"
+    assert report["run_state"]["status"] == "succeeded"
+    assert report["run_state"]["finished_at"] is not None
+    assert report["run_state"]["outcome"] == "succeeded"
     assert report["live"] is True
     assert isinstance(report["elapsed_seconds"], float)
     assert report["elapsed_seconds"] >= 0
@@ -374,6 +378,10 @@ def test_cli_emits_json_report_when_workflow_fails(tmp_path, capsys):
     assert report["success"] is False
     assert report["status"] == "failed"
     assert report["run_id"] == "cli-run"
+    assert report["run_state"]["run_id"] == "cli-run"
+    assert report["run_state"]["status"] == "failed"
+    assert report["run_state"]["finished_at"] is not None
+    assert report["run_state"]["outcome"] == "failed"
     assert report["live"] is True
     assert report["error"] == "RuntimeError: get failed"
     assert [event["event_type"] for event in report["events"]] == [
