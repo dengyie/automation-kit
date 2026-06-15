@@ -666,3 +666,92 @@ Follow-up inspection confirmed:
 
 Move to the next roadmap phase: configuration contracts or opt-in integration
 fixtures, while keeping live browser/device access outside default tests.
+
+## 2026-06-16: Generic Config Sources
+
+### Completed
+
+- Added `automation_core.config` with:
+  - `ConfigError`
+  - `ConfigSource`
+  - `ConfigValue`
+  - `DictConfigSource`
+  - `EnvConfigSource`
+- Added `EnvConfigSource` to read logical config keys from prefixed environment
+  mappings or plain dictionaries.
+- Preserved logical keys in returned `ConfigValue` objects while resolving
+  prefix-based environment names.
+- Copied config input mappings on construction so later external mutations do
+  not affect source behavior.
+- Reused the existing type validation path for dictionary and environment
+  values.
+- Added tests for:
+  - typed config values,
+  - dictionary required/default values,
+  - environment required/default values,
+  - prefixed and unprefixed environment lookup,
+  - wrong-type rejection,
+  - immutable input mappings.
+- Added the basic usable skeleton implementation plan under
+  `docs/superpowers/plans/`.
+
+### Verification
+
+Focused config tests:
+
+```bash
+.venv/bin/python -m pytest tests/config --no-cov -q
+```
+
+Result:
+
+```text
+14 passed
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+92 passed
+Total coverage: 93.62%
+Required coverage: 80%
+```
+
+### Review
+
+Used `production-code-quality-review` required setup scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- config sources remain standard-library only.
+- `automation_core.config` has no Damai, Dianping, Selenium, Appium, browser,
+  Android, ticketing, order, or review coupling.
+- env config values reuse the same type validation contract as dictionary
+  config values.
+- default tests require no browser, Appium, ADB, Android device, or network.
+
+Review follow-up improved test coverage by adding explicit cases for:
+
+- unprefixed environment lookup,
+- wrong-type environment value rejection.
+
+### Next Phase
+
+Proceed to stabilize the runner contract and workflow authoring API:
+
+- invalid factory string handling,
+- missing factory object handling,
+- stable JSON/report output,
+- dry workflow authoring documentation.
