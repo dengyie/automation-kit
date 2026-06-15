@@ -1105,3 +1105,71 @@ Follow-up inspection confirmed:
 
 Proceed to final basic-usable-state verification and identify the next
 development roadmap slice.
+
+## 2026-06-16: Basic Dry Workflow Execution
+
+### Completed
+
+- Added `automation_runner.dry_run.DryRunSession` for offline workflow runs.
+- Allowed `automation-runner run` to execute without `--live` using the dry-run
+  session and the same example workflow composition path.
+- Kept live runs on the explicit `--live` path with `--factory` still required.
+- Preserved dry-run report output as JSON with:
+  - `live: false`
+  - synthetic dry-run session metadata
+  - workflow actions and artifact paths
+- Added tests proving:
+  - dry-run execution works without a live factory,
+  - dry-run ignores invalid factory import paths,
+  - live execution remains explicit and unchanged.
+- Updated README and workflow guide examples to show the dry-run command.
+
+### Verification
+
+Runner tests:
+
+```bash
+.venv/bin/python -m pytest tests/runner --no-cov -q
+```
+
+Result:
+
+```text
+23 passed
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+105 passed
+Total coverage: 94.61%
+Required coverage: 80%
+```
+
+### Review
+
+Used `production-code-quality-review` required setup scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- the dry-run path stays in the runner layer,
+- live factory loading still only happens on explicit live runs,
+- default tests remain offline and deterministic,
+- workflow reports stay machine-readable.
+
+### Next Phase
+
+Proceed to the next development slice after validating whether additional
+report/event polish is required.

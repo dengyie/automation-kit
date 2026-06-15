@@ -37,6 +37,13 @@ Dry listing:
 automation-runner examples --dry-run
 ```
 
+Dry workflow run:
+
+```bash
+automation-runner run damai-web-smoke --json \
+  --url https://example.test/damai
+```
+
 Live Damai web smoke run:
 
 ```bash

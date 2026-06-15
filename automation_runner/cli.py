@@ -7,6 +7,7 @@ import time
 from typing import List, Optional
 
 from automation_runner import WorkflowRunner
+from automation_runner.dry_run import DryRunSession
 from automation_runner.reports import build_report
 from examples.damai_android import create_workflow as create_damai_android_workflow
 from examples.damai_web import create_workflow as create_damai_web_workflow
@@ -69,9 +70,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         return 0
 
     if args.command == "run":
-        if not args.live:
-            return _print_error("--live is required to run workflows")
-        if not args.factory:
+        if args.live and not args.factory:
             return _print_error("--factory is required for live workflows")
         if args.workflow == "damai-web-smoke":
             if not args.url:
@@ -79,10 +78,13 @@ def main(argv: Optional[List[str]] = None) -> int:
         else:
             if not args.app_id:
                 return _print_error("--app-id is required for damai-android-smoke")
-        try:
-            session_factory = load_object(args.factory)
-        except ValueError as exc:
-            return _print_error(str(exc))
+        if args.live:
+            try:
+                session_factory = load_object(args.factory)
+            except ValueError as exc:
+                return _print_error(str(exc))
+        else:
+            session_factory = lambda: DryRunSession(args.workflow)
         if args.workflow == "damai-web-smoke":
             create_workflow = WORKFLOWS[args.workflow]
             runner = WorkflowRunner(
@@ -110,7 +112,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                 args.workflow,
                 result,
                 live=args.live,
-                workflow_factory=args.factory,
+                workflow_factory=args.factory if args.live else None,
                 elapsed_seconds=elapsed_seconds,
             )
             payload = json.dumps(report.to_dict(), sort_keys=True)

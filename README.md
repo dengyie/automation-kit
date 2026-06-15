@@ -45,6 +45,8 @@ The runner keeps live execution opt-in:
 
 ```bash
 automation-runner examples --dry-run
+automation-runner run damai-web-smoke --json \
+  --url https://example.test/damai
 automation-runner run damai-web-smoke --live --json \
   --factory tests.runner.fixtures:make_session \
   --url https://example.test/damai

@@ -22,24 +22,58 @@ def test_pyproject_exposes_runner_script():
     assert 'automation-runner = "automation_runner.cli:main"' in content
 
 
-def test_cli_refuses_live_workflow_without_live_flag(capsys):
+def test_cli_runs_dry_workflow_without_live_flag(capsys):
     fixtures.reset()
 
     exit_code = main(
         [
             "run",
             "damai-web-smoke",
-            "--factory",
-            "tests.runner.fixtures:make_session",
+            "--json",
             "--url",
             "https://example.test/damai",
         ]
     )
 
     captured = capsys.readouterr()
+    report = json.loads(captured.out)
 
-    assert exit_code == 2
-    assert "--live" in captured.err
+    assert exit_code == 0
+    assert report["workflow"] == "damai-web-smoke"
+    assert report["success"] is True
+    assert report["live"] is False
+    assert report["workflow_factory"] is None
+    assert report["session"] == {
+        "driver_name": "dry-run",
+        "platform": "dry",
+        "identifier": "damai-web-smoke-dry-run",
+    }
+    assert report["actions"] == [
+        {"success": True, "message": "get"},
+    ]
+    assert fixtures.CREATED_SESSIONS == []
+
+
+def test_cli_dry_workflow_does_not_load_factory(capsys):
+    fixtures.reset()
+
+    exit_code = main(
+        [
+            "run",
+            "damai-web-smoke",
+            "--json",
+            "--factory",
+            "missing.runner.module:make_session",
+            "--url",
+            "https://example.test/damai",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    report = json.loads(captured.out)
+
+    assert exit_code == 0
+    assert report["live"] is False
     assert fixtures.CREATED_SESSIONS == []
 
 
