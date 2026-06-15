@@ -1358,3 +1358,69 @@ is `.venv/bin/python -m pytest -q`.
 
 Commit and push the skeleton verification slice, then start the next roadmap
 slice on top of the verified baseline.
+
+## 2026-06-16: Artifact Guide And Snapshot Support
+
+### Completed
+
+- Added `docs/artifacts.md` to define artifact storage layout, naming rules,
+  report attachment rules, adapter responsibilities, and dry-run behavior.
+- Linked the artifact guide from `README.md` and `docs/adding-a-workflow.md`.
+- Clarified that screenshots, page source, UI trees, traces, and logs belong
+  in artifact storage rather than in JSON reports.
+- Added Selenium adapter support for `page_source` and `ui_tree` text
+  artifacts when the driver exposes `page_source`.
+- Added Appium adapter support for `ui_tree` text artifacts alongside existing
+  screenshot and page-source support.
+- Added a namespace regression test for artifact paths to preserve
+  `<run-id>/<artifact-type>/<artifact-name>` structure.
+
+### Verification
+
+Adapter and artifact tests:
+
+```bash
+.venv/bin/python -m pytest tests/adapters tests/artifacts --no-cov -q
+```
+
+Result:
+
+```text
+25 passed
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+111 passed
+Total coverage: 94.61%
+Required coverage: 80%
+```
+
+### Review
+
+Used `production-code-quality-review` required setup scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- artifact conventions are documented outside `automation_core`,
+- report guidance continues to exclude raw artifact bytes and action `data`,
+- the new path test fixes the run/type/name namespace convention,
+- default tests remain offline and deterministic.
+
+### Next Phase
+
+Commit and push the artifact-guidance slice, then continue with the next
+roadmap slice.

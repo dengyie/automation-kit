@@ -57,6 +57,11 @@ class SeleniumSession:
             if callable(screenshot):
                 record.path.parent.mkdir(parents=True, exist_ok=True)
                 screenshot(str(record.path))
+        elif artifact_type in {"page_source", "ui_tree"}:
+            page_source = getattr(self.driver, "page_source", None)
+            if isinstance(page_source, str):
+                record.path.parent.mkdir(parents=True, exist_ok=True)
+                record.path.write_text(page_source, encoding="utf-8")
         return ArtifactHandle(artifact_type=artifact_type, path=record.path)
 
 

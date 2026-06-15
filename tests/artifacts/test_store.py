@@ -35,3 +35,11 @@ def test_artifact_store_normalizes_name():
     path = store.build_path("run-1", "screenshot", "home screen.png")
 
     assert str(path) == "/artifacts/run-1/screenshot/home_screen.png"
+
+
+def test_artifact_store_uses_run_and_type_namespaces():
+    store = ArtifactStore(Path("/artifacts"))
+
+    path = store.build_path("run-42", "ui_tree", "startup.json")
+
+    assert str(path) == "/artifacts/run-42/ui_tree/startup.json"

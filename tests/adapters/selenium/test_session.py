@@ -12,6 +12,7 @@ class FakeDriver:
         self.closed = False
         self.visited = []
         self.screenshots = []
+        self.page_source = "<html />"
 
     def get(self, url):
         self.visited.append(url)
@@ -74,6 +75,36 @@ def test_selenium_session_captures_screenshot(tmp_path):
     assert handle.path.exists()
     assert handle.path.read_text(encoding="utf-8") == "fake image"
     assert driver.screenshots == [str(handle.path)]
+
+
+def test_selenium_session_captures_page_source(tmp_path):
+    driver = FakeDriver()
+    session = SeleniumSession(
+        driver=driver,
+        identifier="browser-1",
+        artifact_root=tmp_path,
+    )
+
+    handle = session.capture_artifact("page_source", "source.html")
+
+    assert handle.artifact_type == "page_source"
+    assert handle.path.exists()
+    assert handle.path.read_text(encoding="utf-8") == "<html />"
+
+
+def test_selenium_session_captures_ui_tree_alias(tmp_path):
+    driver = FakeDriver()
+    session = SeleniumSession(
+        driver=driver,
+        identifier="browser-1",
+        artifact_root=tmp_path,
+    )
+
+    handle = session.capture_artifact("ui_tree", "tree.xml")
+
+    assert handle.artifact_type == "ui_tree"
+    assert handle.path.exists()
+    assert handle.path.read_text(encoding="utf-8") == "<html />"
 
 
 def test_selenium_session_rejects_invalid_artifact_name(tmp_path):

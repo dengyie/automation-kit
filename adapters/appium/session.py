@@ -67,7 +67,7 @@ class AppiumSession:
             if callable(screenshot):
                 record.path.parent.mkdir(parents=True, exist_ok=True)
                 screenshot(str(record.path))
-        elif artifact_type == "page_source":
+        elif artifact_type in {"page_source", "ui_tree"}:
             page_source = getattr(self.driver, "page_source", None)
             if isinstance(page_source, str):
                 record.path.parent.mkdir(parents=True, exist_ok=True)

@@ -108,6 +108,20 @@ def test_appium_session_captures_page_source(tmp_path):
     assert handle.path.read_text(encoding="utf-8") == "<hierarchy />"
 
 
+def test_appium_session_captures_ui_tree_alias(tmp_path):
+    driver = FakeMobileDriver()
+    session = AppiumSession(
+        driver=driver,
+        identifier="device-1",
+        artifact_root=tmp_path,
+    )
+
+    handle = session.capture_artifact("ui_tree", "tree.xml")
+
+    assert handle.artifact_type == "ui_tree"
+    assert handle.path.read_text(encoding="utf-8") == "<hierarchy />"
+
+
 def test_appium_session_rejects_invalid_artifact_name(tmp_path):
     session = AppiumSession(
         driver=FakeMobileDriver(),

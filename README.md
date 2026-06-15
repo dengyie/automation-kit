@@ -53,4 +53,5 @@ automation-runner run damai-web-smoke --live --json \
 ```
 
 See `docs/adding-a-workflow.md` for package boundaries, report fields, and
-adapter rules.
+adapter rules. See `docs/artifacts.md` for screenshot, page-source, UI-tree,
+trace, and log artifact conventions.

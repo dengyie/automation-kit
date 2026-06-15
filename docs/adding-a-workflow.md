@@ -84,11 +84,14 @@ JSON reports currently include:
 - `error` when workflow execution raises an exception.
 - `task.end` with `outcome` set to `succeeded` or `failed`.
 
-Artifacts stay generic and are written by the runner layer.
+Artifacts stay generic. See `docs/artifacts.md` for storage layout, naming
+rules, report attachment rules, and dry-run behavior.
 
 ## Adapter Rules
 
 - Keep Selenium/Appium startup concerns in `adapters`.
 - Surface startup failures as `AdapterStartupError`.
 - Do not move selectors, URLs, or business flow into `automation_core`.
+- Capture screenshots, page source, UI trees, traces, and logs as artifacts
+  rather than embedding raw data in JSON reports.
 - Keep default tests offline and deterministic.
