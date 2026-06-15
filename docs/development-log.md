@@ -246,3 +246,69 @@ The roadmap-defined basic usable state is now reached. The next development
 step should create the first real adapter implementation behind the existing
 driver contracts, starting with either a Selenium browser adapter or an Appium
 Android adapter.
+
+## 2026-06-16: Selenium Adapter
+
+### Completed
+
+- Added `adapters.selenium.SeleniumSession`.
+- Added `adapters.selenium.SeleniumSessionFactory`.
+- Kept Selenium as an optional adapter dependency by injecting a driver factory
+  instead of importing Selenium in default code paths.
+- Implemented driver lifecycle methods:
+  - `start()`
+  - `stop()`
+  - `execute_action()`
+  - `capture_artifact()`
+- Reused `ArtifactStore` for screenshot artifact paths so adapter artifacts use
+  the same path sanitization and namespacing rules as core artifacts.
+- Added fake-driver tests so default verification does not require a real
+  browser or Selenium package.
+
+### Verification
+
+Command:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+48 passed
+Total coverage: 94.74%
+Required coverage: 80%
+```
+
+### Review
+
+Used `production-code-quality-review` required setup scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Review follow-up found and fixed one issue:
+
+- `SeleniumSession.capture_artifact()` initially built paths directly. It now
+  delegates to `ArtifactStore`, preserving artifact path sanitization and
+  invalid-name rejection.
+
+Follow-up inspection confirmed:
+
+- `automation_core` still has no Selenium/Appium/WebDriver dependency.
+- Selenium-specific code is confined to `adapters.selenium`.
+- default tests still require no browser, Appium, ADB, Android device, or
+  network.
+
+### Next Phase
+
+Proceed to the Appium adapter with the same constraints:
+
+- optional dependency through injected factories,
+- no live device in default tests,
+- artifacts routed through `ArtifactStore`,
+- no business workflow in the adapter.
