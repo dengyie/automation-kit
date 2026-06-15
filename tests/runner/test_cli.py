@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 
+from automation_core.config import DictConfigSource
 from automation_runner.cli import main
 from tests.runner import fixtures
 
@@ -14,6 +15,18 @@ def test_cli_lists_example_workflows_without_live_execution(capsys):
     assert "damai-web-smoke" in captured.out
     assert "damai-android-smoke" in captured.out
     assert "dry-run" in captured.out
+
+
+def test_cli_examples_does_not_validate_run_config(capsys):
+    exit_code = main(
+        ["examples", "--dry-run"],
+        config_source=DictConfigSource({"live": "maybe"}),
+    )
+
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    assert "damai-web-smoke" in captured.out
 
 
 def test_pyproject_exposes_runner_script():
@@ -59,6 +72,114 @@ def test_cli_runs_dry_workflow_without_live_flag(capsys):
         {"success": True, "message": "get"},
     ]
     assert fixtures.CREATED_SESSIONS == []
+
+
+def test_cli_uses_config_source_for_dry_workflow_defaults(capsys):
+    fixtures.reset()
+
+    exit_code = main(
+        ["run", "damai-web-smoke"],
+        config_source=DictConfigSource(
+            {
+                "json": "true",
+                "url": "https://example.test/damai",
+            }
+        ),
+    )
+
+    captured = capsys.readouterr()
+    report = json.loads(captured.out)
+
+    assert exit_code == 0
+    assert report["workflow"] == "damai-web-smoke"
+    assert report["live"] is False
+    assert report["actions"] == [
+        {"success": True, "message": "get"},
+    ]
+    assert fixtures.CREATED_SESSIONS == []
+
+
+def test_cli_reads_runner_environment_defaults(monkeypatch, capsys):
+    fixtures.reset()
+    monkeypatch.setenv("AUTOMATION_RUNNER_JSON", "true")
+    monkeypatch.setenv("AUTOMATION_RUNNER_URL", "https://example.test/damai")
+
+    exit_code = main(["run", "damai-web-smoke"])
+
+    captured = capsys.readouterr()
+    report = json.loads(captured.out)
+
+    assert exit_code == 0
+    assert report["workflow"] == "damai-web-smoke"
+    assert report["live"] is False
+    assert fixtures.CREATED_SESSIONS == []
+
+
+def test_cli_uses_config_source_for_live_workflow(capsys):
+    fixtures.reset()
+
+    exit_code = main(
+        ["run", "damai-web-smoke"],
+        config_source=DictConfigSource(
+            {
+                "live": "true",
+                "json": "true",
+                "factory": "tests.runner.fixtures:make_session",
+                "url": "https://example.test/damai",
+            }
+        ),
+    )
+
+    captured = capsys.readouterr()
+    report = json.loads(captured.out)
+
+    assert exit_code == 0
+    assert report["live"] is True
+    assert report["workflow_factory"] == "tests.runner.fixtures:make_session"
+    assert len(fixtures.CREATED_SESSIONS) == 1
+
+
+def test_cli_arguments_override_config_source(capsys):
+    fixtures.reset()
+
+    exit_code = main(
+        [
+            "run",
+            "damai-web-smoke",
+            "--live",
+            "--json",
+            "--factory",
+            "tests.runner.fixtures:make_session",
+            "--url",
+            "https://example.test/cli",
+        ],
+        config_source=DictConfigSource(
+            {
+                "factory": "tests.runner.fixtures:make_failing_session",
+                "url": "https://example.test/config",
+            }
+        ),
+    )
+
+    captured = capsys.readouterr()
+    json.loads(captured.out)
+
+    assert exit_code == 0
+    assert fixtures.CREATED_SESSIONS[0].actions == [
+        ("get", {"url": "https://example.test/cli"})
+    ]
+
+
+def test_cli_rejects_invalid_config_bool(capsys):
+    exit_code = main(
+        ["run", "damai-web-smoke"],
+        config_source=DictConfigSource({"live": "maybe"}),
+    )
+
+    captured = capsys.readouterr()
+
+    assert exit_code == 2
+    assert "config live expected bool" in captured.err
 
 
 def test_cli_dry_workflow_does_not_load_factory(capsys):
@@ -347,6 +468,31 @@ def test_cli_can_write_json_report_to_file(tmp_path, capsys):
     assert report_path.exists()
     assert report_path.read_text(encoding="utf-8") == captured.out
     assert "damai-web-smoke" in captured.out
+
+
+def test_cli_can_write_report_file_when_json_comes_from_config(tmp_path, capsys):
+    fixtures.reset()
+    report_path = tmp_path / "report.json"
+
+    exit_code = main(
+        [
+            "run",
+            "damai-web-smoke",
+            "--report-file",
+            str(report_path),
+        ],
+        config_source=DictConfigSource(
+            {
+                "json": "true",
+                "url": "https://example.test/damai",
+            }
+        ),
+    )
+
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    assert report_path.read_text(encoding="utf-8") == captured.out
 
 
 def test_cli_emits_json_report_when_workflow_fails(tmp_path, capsys):

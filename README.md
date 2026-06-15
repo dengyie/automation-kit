@@ -55,6 +55,15 @@ automation-runner run damai-web-smoke --live --json \
   --url https://example.test/damai
 ```
 
+Runner options can also come from environment variables. Explicit CLI
+arguments take precedence:
+
+```bash
+AUTOMATION_RUNNER_JSON=true \
+AUTOMATION_RUNNER_URL=https://example.test/damai \
+automation-runner run damai-web-smoke
+```
+
 See `docs/adding-a-workflow.md` for package boundaries, report fields, and
 adapter rules. See `docs/artifacts.md` for screenshot, page-source, UI-tree,
 trace, and log artifact conventions.

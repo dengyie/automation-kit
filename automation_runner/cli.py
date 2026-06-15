@@ -1,15 +1,18 @@
 import argparse
 import importlib
 import json
+import os
 from pathlib import Path
 import sys
 import time
 from typing import List, Optional
 
+from automation_core.config import ConfigSource, EnvConfigSource
+from automation_core.state import RunState
 from automation_runner import WorkflowRunner
+from automation_runner.config import RunnerConfig, load_runner_config
 from automation_runner.dry_run import DryRunSession
 from automation_runner.reports import build_report
-from automation_core.state import RunState
 from examples.damai_android import create_workflow as create_damai_android_workflow
 from examples.damai_web import create_workflow as create_damai_web_workflow
 
@@ -57,7 +60,20 @@ def _print_error(message: str) -> int:
     return 2
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def _merge_config(args: argparse.Namespace, config: RunnerConfig) -> RunnerConfig:
+    return RunnerConfig(
+        live=args.live or config.live,
+        emit_json=args.json or config.emit_json,
+        factory=args.factory or config.factory,
+        url=args.url or config.url,
+        app_id=args.app_id or config.app_id,
+    )
+
+
+def main(
+    argv: Optional[List[str]] = None,
+    config_source: Optional[ConfigSource] = None,
+) -> int:
     try:
         args = build_parser().parse_args(argv)
     except SystemExit as exc:
@@ -71,17 +87,23 @@ def main(argv: Optional[List[str]] = None) -> int:
         return 0
 
     if args.command == "run":
-        if args.live and not args.factory:
+        source = config_source or EnvConfigSource(os.environ, prefix="AUTOMATION_RUNNER_")
+        try:
+            config = load_runner_config(source)
+        except ValueError as exc:
+            return _print_error(str(exc))
+        config = _merge_config(args, config)
+        if config.live and not config.factory:
             return _print_error("--factory is required for live workflows")
         if args.workflow == "damai-web-smoke":
-            if not args.url:
+            if not config.url:
                 return _print_error("--url is required for damai-web-smoke")
         else:
-            if not args.app_id:
+            if not config.app_id:
                 return _print_error("--app-id is required for damai-android-smoke")
-        if args.live:
+        if config.live:
             try:
-                session_factory = load_object(args.factory)
+                session_factory = load_object(config.factory)
             except ValueError as exc:
                 return _print_error(str(exc))
         else:
@@ -91,7 +113,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             runner = WorkflowRunner(
                 session_factory=lambda: create_workflow(
                     session_factory=session_factory,
-                    url=args.url,
+                    url=config.url,
                 ),
                 workflow=lambda workflow: workflow.run(),
             )
@@ -100,7 +122,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             runner = WorkflowRunner(
                 session_factory=lambda: create_workflow(
                     session_factory=session_factory,
-                    app_id=args.app_id,
+                    app_id=config.app_id,
                 ),
                 workflow=lambda workflow: workflow.run(),
             )
@@ -116,13 +138,13 @@ def main(argv: Optional[List[str]] = None) -> int:
             run_state.succeed(finished_at=wall_finished_at)
         else:
             run_state.fail(finished_at=wall_finished_at)
-        if args.json:
+        if config.emit_json:
             report = build_report(
                 args.workflow,
                 result,
                 run_state=run_state,
-                live=args.live,
-                workflow_factory=args.factory if args.live else None,
+                live=config.live,
+                workflow_factory=config.factory if config.live else None,
                 elapsed_seconds=elapsed_seconds,
             )
             payload = json.dumps(report.to_dict(), sort_keys=True)

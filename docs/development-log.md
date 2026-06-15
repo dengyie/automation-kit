@@ -1881,3 +1881,71 @@ Follow-up inspection confirmed:
 
 Commit and push the artifact metadata slice, then continue with the next
 roadmap slice.
+
+## 2026-06-16: Runner Environment Configuration
+
+### Completed
+
+- Added `automation_runner.config.RunnerConfig`.
+- Added runner config loading from generic `ConfigSource` values.
+- CLI `run` can now read defaults from `AUTOMATION_RUNNER_*` environment
+  variables.
+- CLI arguments take precedence over configured defaults.
+- Config validation is limited to the `run` command so `examples --dry-run`
+  remains independent of run-specific environment values.
+- Updated README and workflow docs with supported runner environment keys.
+- Added tests for config defaults, live/dry runs from config, argument
+  precedence, report-file output, and invalid boolean values.
+
+### Verification
+
+Focused runner and config tests:
+
+```bash
+.venv/bin/python -m pytest tests/runner tests/config --no-cov -q
+```
+
+Result:
+
+```text
+50 passed
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+142 passed
+Total coverage: 95.10%
+Required coverage: 80%
+```
+
+### Review
+
+Used `production-code-quality-review` required setup scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- runner environment configuration stays in `automation_runner`, not
+  `automation_core`.
+- live execution still requires an explicit live setting and a session factory.
+- CLI arguments take precedence over configured defaults.
+- `examples --dry-run` does not validate or depend on run-specific
+  configuration.
+- default tests remain offline and deterministic.
+
+### Next Phase
+
+Commit and push the runner environment configuration slice, then continue with
+the next roadmap slice.

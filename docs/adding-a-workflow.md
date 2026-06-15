@@ -72,6 +72,24 @@ automation-runner run damai-android-smoke --live --json \
   --app-id cn.damai
 ```
 
+Runner defaults can also come from environment variables:
+
+```bash
+AUTOMATION_RUNNER_JSON=true \
+AUTOMATION_RUNNER_URL=https://example.test/damai \
+automation-runner run damai-web-smoke
+```
+
+Supported runner environment keys are:
+
+- `AUTOMATION_RUNNER_LIVE`
+- `AUTOMATION_RUNNER_JSON`
+- `AUTOMATION_RUNNER_FACTORY`
+- `AUTOMATION_RUNNER_URL`
+- `AUTOMATION_RUNNER_APP_ID`
+
+CLI arguments take precedence over environment values.
+
 ## Report Contract
 
 JSON reports currently include:
