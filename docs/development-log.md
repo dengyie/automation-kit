@@ -1424,3 +1424,54 @@ Follow-up inspection confirmed:
 
 Commit and push the artifact-guidance slice, then continue with the next
 roadmap slice.
+
+## 2026-06-16: Workflow Extension Documentation Closure
+
+### Completed
+
+- Expanded `docs/adding-a-workflow.md` with concrete steps for creating a new
+  workflow package outside `automation_core`.
+- Documented artifact and report attachment conventions directly in the
+  workflow guide.
+- Updated the basic usable skeleton plan status to point at `docs/artifacts.md`
+  for screenshots, page dumps, UI dumps, traces, logs, and JSON reports.
+- Removed duplicate Selenium screenshot wording from `docs/artifacts.md`.
+
+### Verification
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+111 passed
+Total coverage: 94.61%
+Required coverage: 80%
+```
+
+### Review
+
+Used `production-code-quality-review` required setup scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- workflow extension steps keep business code outside `automation_core`,
+- artifact/report attachment guidance matches the current report contract,
+- JSON reports continue to exclude raw artifact bytes, tokens, cookies, and
+  action `data`,
+- default tests remain offline and deterministic.
+
+### Next Phase
+
+Commit and push this documentation-closure slice, then continue with the next
+roadmap slice.

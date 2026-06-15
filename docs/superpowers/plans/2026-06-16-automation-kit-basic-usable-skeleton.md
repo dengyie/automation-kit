@@ -23,6 +23,8 @@ Status update on 2026-06-16:
 - Selenium/Appium adapters are dependency-injectable and business-free.
 - `README.md` and `docs/adding-a-workflow.md` document extension boundaries
   and runnable commands.
+- `docs/artifacts.md` documents where screenshots, page dumps, UI dumps,
+  traces, logs, and JSON reports should be attached.
 - The remaining work after this plan should build the next roadmap slice on
   top of the verified skeleton instead of redoing these phases.
 

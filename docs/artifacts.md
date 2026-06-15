@@ -48,7 +48,6 @@ must not be embedded in JSON reports.
 
 Adapters own how artifact bytes are captured:
 
-- Selenium sessions may write screenshots through `save_screenshot`.
 - Selenium sessions may write screenshots, page source, and `ui_tree`
   snapshots when the driver exposes `page_source`.
 - Appium sessions may write screenshots, page source, and `ui_tree`

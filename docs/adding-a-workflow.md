@@ -29,6 +29,18 @@ The lower-level helper remains available when you want direct function calls:
 from examples.damai_web import run_smoke_workflow
 ```
 
+## Creating A New Workflow
+
+1. Put business-specific code under `examples/<domain>_<platform>/` or another
+   package outside `automation_core`.
+2. Accept an injected `session_factory` instead of constructing Selenium,
+   Appium, or other live clients during import.
+3. Start and stop the session inside the workflow helper with `try/finally`.
+4. Return `ExampleWorkflowResult` with generic actions, artifacts, and optional
+   structured events.
+5. Expose `create_workflow(...)` so the runner can construct the workflow.
+6. Add tests with fake sessions so default tests stay offline.
+
 ## Runner Commands
 
 Dry listing:
@@ -86,6 +98,17 @@ JSON reports currently include:
 
 Artifacts stay generic. See `docs/artifacts.md` for storage layout, naming
 rules, report attachment rules, and dry-run behavior.
+
+## Artifact And Report Attachments
+
+- Screenshots should use artifact type `screenshot`.
+- HTML, XML, or mobile page dumps should use `page_source`.
+- Structured UI dumps should use `ui_tree`.
+- Traces and logs should use `trace` or `log`.
+- JSON run reports should be written with `--report-file`.
+- JSON reports should contain artifact paths only, not raw screenshot bytes,
+  page source text, tokens, cookies, or action `data`.
+- Dry workflows may return deterministic artifact paths without writing files.
 
 ## Adapter Rules
 
