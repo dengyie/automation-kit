@@ -1606,3 +1606,78 @@ Follow-up inspection confirmed:
 
 Commit and push the element-contract slice, then continue with the next
 roadmap slice.
+
+## 2026-06-16: Deterministic Task Runner
+
+### Completed
+
+- Added `automation_core.tasks.TaskRunner` for deterministic callable task
+  execution.
+- Added `automation_core.tasks.TaskResult` with:
+  - task ID,
+  - task name,
+  - success flag,
+  - returned value,
+  - error summary,
+  - structured event envelopes.
+- Wired task execution to existing lifecycle and event primitives:
+  - `task.start`,
+  - `error`,
+  - `task.end`.
+- Kept interruption behavior safe by not swallowing `KeyboardInterrupt`.
+- Added task runner import coverage and focused unit tests for success,
+  failure, and interruption behavior.
+- Updated README runtime primitive list to include the deterministic task
+  runner.
+
+### Verification
+
+Focused task tests:
+
+```bash
+.venv/bin/python -m pytest tests/tasks tests/test_imports.py --no-cov -q
+```
+
+Result:
+
+```text
+15 passed
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+126 passed
+Total coverage: 94.54%
+Required coverage: 80%
+```
+
+### Review
+
+Used `production-code-quality-review` required setup scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- task runner behavior stays in `automation_core.tasks`,
+- task execution emits structured events without depending on adapters or
+  business workflows,
+- task failures return machine-readable results while `KeyboardInterrupt`
+  still propagates,
+- default tests remain offline and deterministic.
+
+### Next Phase
+
+Commit and push the task-runner slice, then continue with the next roadmap
+slice.

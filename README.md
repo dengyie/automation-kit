@@ -8,6 +8,7 @@ Android app workflows.
 `automation-kit` provides deterministic runtime primitives first:
 
 - task lifecycle
+- deterministic task runner
 - bounded retries
 - driver/session contracts
 - action requests and batches
