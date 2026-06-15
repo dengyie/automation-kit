@@ -10,6 +10,7 @@ Android app workflows.
 - task lifecycle
 - bounded retries
 - driver/session contracts
+- action requests and batches
 - structured events
 - artifacts
 

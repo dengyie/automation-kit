@@ -4,6 +4,14 @@ def test_automation_core_imports():
     assert automation_core.__version__ == "0.1.0"
 
 
+def test_automation_core_actions_imports():
+    from automation_core.actions import ActionBatch, ActionExecutor, ActionRequest
+
+    assert ActionBatch
+    assert ActionExecutor
+    assert ActionRequest
+
+
 def test_example_workflow_factories_import_without_live_dependencies():
     from examples.damai_android import create_workflow as create_android_workflow
     from examples.damai_web import create_workflow as create_web_workflow

@@ -32,6 +32,23 @@ def test_core_has_no_business_or_concrete_driver_terms():
         assert term not in core_text
 
 
+def test_core_actions_are_generic():
+    core_actions = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in (ROOT / "automation_core" / "actions").rglob("*.py")
+    ).lower()
+
+    for term in [
+        "damai",
+        "dianping",
+        "selenium",
+        "appium",
+        "target_url",
+        "webdriver",
+    ]:
+        assert term not in core_actions
+
+
 def test_example_shell_readmes_exist():
     assert (ROOT / "examples" / "damai_web" / "README.md").exists()
     assert (ROOT / "examples" / "damai_android" / "README.md").exists()

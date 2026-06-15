@@ -1475,3 +1475,69 @@ Follow-up inspection confirmed:
 
 Commit and push this documentation-closure slice, then continue with the next
 roadmap slice.
+
+## 2026-06-16: Generic Action Primitives
+
+### Completed
+
+- Added `automation_core.actions` with:
+  - `ActionRequest`
+  - `ActionBatch`
+  - `ActionExecutor`
+- Kept actions business-agnostic and driver-backed through the existing
+  `DriverSession.execute_action(...)` contract.
+- Added stable dictionary serialization for action requests and batches.
+- Added batch execution with `stop_on_failure` defaulting to fail-fast and an
+  opt-out for continuing after failed actions.
+- Added import coverage for the new core actions package.
+- Updated README runtime primitive list to include action requests and batches.
+
+### Verification
+
+Focused action tests:
+
+```bash
+.venv/bin/python -m pytest tests/actions tests/test_imports.py --no-cov -q
+```
+
+Result:
+
+```text
+9 passed
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+118 passed
+Total coverage: 94.94%
+Required coverage: 80%
+```
+
+### Review
+
+Used `production-code-quality-review` required setup scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- action primitives stay business-agnostic in `automation_core`,
+- `ActionExecutor` is only a thin bridge over `DriverSession.execute_action`,
+- batch fail-fast behavior is explicit and covered by tests,
+- default tests remain offline and deterministic.
+
+### Next Phase
+
+Commit and push the action-primitives slice, then continue with the next
+roadmap slice.
