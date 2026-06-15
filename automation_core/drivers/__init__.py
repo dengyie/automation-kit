@@ -5,6 +5,8 @@ from automation_core.drivers.contracts import (
     ArtifactHandle,
     DriverSession,
     DriverSessionFactory,
+    ElementHandle,
+    ElementLookupSession,
     SessionInfo,
 )
 
@@ -13,5 +15,7 @@ __all__ = [
     "ArtifactHandle",
     "DriverSession",
     "DriverSessionFactory",
+    "ElementHandle",
+    "ElementLookupSession",
     "SessionInfo",
 ]

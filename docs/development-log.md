@@ -1541,3 +1541,68 @@ Follow-up inspection confirmed:
 
 Commit and push the action-primitives slice, then continue with the next
 roadmap slice.
+
+## 2026-06-16: Element Contract Primitives
+
+### Completed
+
+- Added `automation_core.drivers.ElementHandle` as a runtime-checkable
+  protocol for UI element interactions.
+- Added `automation_core.drivers.ElementLookupSession` to model driver
+  sessions that can resolve elements by selector.
+- Kept the new element contracts business-agnostic and separate from concrete
+  Selenium/Appium adapter behavior.
+- Added tests proving fake element and lookup sessions satisfy the new
+  contracts.
+- Extended import coverage so the new contracts are part of the package API.
+
+### Verification
+
+Focused driver/import/boundary tests:
+
+```bash
+.venv/bin/python -m pytest tests/drivers tests/test_imports.py tests/structure/test_boundaries.py --no-cov -q
+```
+
+Result:
+
+```text
+17 passed
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+122 passed
+Total coverage: 94.27%
+Required coverage: 80%
+```
+
+### Review
+
+Used `production-code-quality-review` required setup scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- the new element contracts stay in `automation_core.drivers`,
+- runtime-checkable protocols keep the boundary explicit without coupling to
+  concrete Selenium/Appium implementations,
+- tests cover both the new protocol shapes and the import surface,
+- default tests remain offline and deterministic.
+
+### Next Phase
+
+Commit and push the element-contract slice, then continue with the next
+roadmap slice.

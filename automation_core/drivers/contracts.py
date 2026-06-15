@@ -24,6 +24,20 @@ class ArtifactHandle:
 
 
 @runtime_checkable
+class ElementHandle(Protocol):
+    identifier: str
+
+    def click(self) -> ActionResult:
+        ...
+
+    def input_text(self, text: str) -> ActionResult:
+        ...
+
+    def text(self) -> str:
+        ...
+
+
+@runtime_checkable
 class DriverSession(Protocol):
     info: SessionInfo
 
@@ -37,6 +51,12 @@ class DriverSession(Protocol):
         ...
 
     def capture_artifact(self, artifact_type: str, name: str) -> ArtifactHandle:
+        ...
+
+
+@runtime_checkable
+class ElementLookupSession(DriverSession, Protocol):
+    def find_element(self, selector: str) -> ElementHandle:
         ...
 
 

@@ -5,6 +5,8 @@ from automation_core.drivers import (
     ArtifactHandle,
     DriverSession,
     DriverSessionFactory,
+    ElementHandle,
+    ElementLookupSession,
     SessionInfo,
 )
 
@@ -33,6 +35,30 @@ class FakeFactory:
         return FakeSession()
 
 
+class FakeElement:
+    def __init__(self):
+        self.identifier = "login-button"
+        self.clicked = False
+        self.inputs = []
+
+    def click(self):
+        self.clicked = True
+        return ActionResult(success=True, message="click")
+
+    def input_text(self, text: str):
+        self.inputs.append(text)
+        return ActionResult(success=True, message="input_text")
+
+    def text(self):
+        return "Login"
+
+
+class FakeLookupSession(FakeSession):
+    def find_element(self, selector: str):
+        self.selector = selector
+        return FakeElement()
+
+
 def test_session_info_fields():
     info = SessionInfo(driver_name="fake", platform="android", identifier="device-1")
 
@@ -54,6 +80,29 @@ def test_artifact_handle_fields():
 
     assert handle.artifact_type == "screenshot"
     assert str(handle.path).endswith("screen.png")
+
+
+def test_fake_element_implements_element_handle_contract():
+    element = FakeElement()
+
+    assert isinstance(element, ElementHandle)
+    assert element.identifier == "login-button"
+    assert element.text() == "Login"
+    assert element.click().success is True
+    assert element.input_text("hello").success is True
+    assert element.clicked is True
+    assert element.inputs == ["hello"]
+
+
+def test_lookup_session_extends_driver_contract():
+    session = FakeLookupSession()
+
+    assert isinstance(session, DriverSession)
+    assert isinstance(session, ElementLookupSession)
+    element = session.find_element("button.login")
+
+    assert isinstance(element, ElementHandle)
+    assert session.selector == "button.login"
 
 
 def test_fake_session_implements_driver_contract():

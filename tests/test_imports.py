@@ -12,6 +12,13 @@ def test_automation_core_actions_imports():
     assert ActionRequest
 
 
+def test_automation_core_driver_element_imports():
+    from automation_core.drivers import ElementHandle, ElementLookupSession
+
+    assert ElementHandle
+    assert ElementLookupSession
+
+
 def test_example_workflow_factories_import_without_live_dependencies():
     from examples.damai_android import create_workflow as create_android_workflow
     from examples.damai_web import create_workflow as create_web_workflow
