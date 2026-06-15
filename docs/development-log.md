@@ -496,3 +496,61 @@ Follow-up inspection confirmed:
 
 Proceed to a thin command-line pathway for wiring real example factories into
 the runner, if needed, while keeping live execution opt-in.
+
+## 2026-06-16: Live CLI Wiring
+
+### Completed
+
+- Added `automation-runner run <workflow>` for example smoke workflows.
+- Kept live execution explicitly opt-in with `--live`.
+- Required `--factory module:object` before any live session factory is loaded.
+- Added import-path loading for session factories.
+- Wired CLI execution through `WorkflowRunner`.
+- Added workflow-specific parameters:
+  - `--url` for `damai-web-smoke`
+  - `--app-id` for `damai-android-smoke`
+- Preserved the existing `examples --dry-run` listing behavior.
+- Added tests proving:
+  - live execution is refused without `--live`,
+  - live execution requires `--factory`,
+  - workflow-specific parameters are validated before factory loading,
+  - web and Android smoke workflows can run through imported fake factories.
+
+### Verification
+
+Command:
+
+```bash
+./.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+73 passed
+Total coverage: 92.77%
+Required coverage: 80%
+```
+
+### Review
+
+Used `production-code-quality-review` required setup scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- live execution requires an explicit `--live` flag.
+- missing workflow-specific parameters fail before importing the factory.
+- imported factories are only used by the runner layer, not `automation_core`.
+- default tests still require no browser, Appium, ADB, Android device, or
+  network.
+
+### Next Phase
+
+Proceed to structured runner output or run reports so command-line execution can
+emit machine-readable results and artifact references.

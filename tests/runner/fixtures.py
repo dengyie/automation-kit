@@ -1,0 +1,50 @@
+from pathlib import Path
+
+from automation_core.drivers import ActionResult, ArtifactHandle, SessionInfo
+
+
+CREATED_SESSIONS = []
+IMPORT_ATTEMPTS = []
+
+
+class CliFakeSession:
+    def __init__(self):
+        self.info = SessionInfo(
+            driver_name="fake-cli",
+            platform="web",
+            identifier="cli-run",
+        )
+        self.started = False
+        self.stopped = False
+        self.actions = []
+        self.artifacts = []
+
+    def start(self):
+        self.started = True
+
+    def stop(self):
+        self.stopped = True
+
+    def execute_action(self, action_name, **kwargs):
+        self.actions.append((action_name, kwargs))
+        return ActionResult(success=True, message=action_name, data=kwargs)
+
+    def capture_artifact(self, artifact_type, name):
+        self.artifacts.append((artifact_type, name))
+        return ArtifactHandle(artifact_type=artifact_type, path=Path(name))
+
+
+def make_session():
+    session = CliFakeSession()
+    CREATED_SESSIONS.append(session)
+    return session
+
+
+def record_import():
+    IMPORT_ATTEMPTS.append("loaded")
+    return make_session
+
+
+def reset():
+    CREATED_SESSIONS.clear()
+    IMPORT_ATTEMPTS.clear()
