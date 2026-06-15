@@ -121,3 +121,68 @@ Proceed to driver contracts and artifacts:
 - `automation_core.drivers`
 - `automation_core.artifacts`
 - tests proving driver contracts do not import concrete browser/mobile drivers
+
+## 2026-06-16: Driver Contracts And Artifacts
+
+### Completed
+
+- Added `automation_core.drivers` with:
+  - `SessionInfo`
+  - `ActionResult`
+  - `ArtifactHandle`
+  - `DriverSession`
+  - `DriverSessionFactory`
+- Added runtime-checkable protocol contracts for future browser and Android
+  adapters.
+- Added `automation_core.artifacts` with:
+  - `ArtifactRecord`
+  - `ArtifactStore`
+- Added namespaced artifact path building by run ID and artifact type.
+- Added artifact name normalization and rejection of invalid names such as
+  `..`.
+- Added metadata dictionary and stable JSON serialization for artifacts.
+- Added tests for driver protocol compatibility and artifact store behavior.
+
+### Verification
+
+Command:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+38 passed
+Total coverage: 94.74%
+Required coverage: 80%
+```
+
+### Review
+
+Used `production-code-quality-review` required setup scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- `automation_core.drivers` imports no Selenium, Appium, WebDriver, browser, or
+  Android libraries.
+- driver contracts are pure standard-library protocols and data classes.
+- artifact paths are namespaced by run ID and artifact type.
+- artifact names reject invalid traversal-like values.
+- default tests require no browser, Appium, ADB, Android device, or network.
+
+### Next Phase
+
+Proceed to thin adapter and example shells:
+
+- `adapters/selenium`
+- `adapters/appium`
+- `examples/damai_web`
+- `examples/damai_android`
