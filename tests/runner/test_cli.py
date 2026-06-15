@@ -341,7 +341,7 @@ def test_cli_can_write_json_report_to_file(tmp_path, capsys):
 
     assert exit_code == 0
     assert report_path.exists()
-    assert report_path.read_text(encoding="utf-8") == captured.out.strip()
+    assert report_path.read_text(encoding="utf-8") == captured.out
     assert "damai-web-smoke" in captured.out
 
 
@@ -368,7 +368,7 @@ def test_cli_emits_json_report_when_workflow_fails(tmp_path, capsys):
     report = json.loads(captured.out)
 
     assert exit_code == 1
-    assert report_path.read_text(encoding="utf-8") == captured.out.strip()
+    assert report_path.read_text(encoding="utf-8") == captured.out
     assert report["workflow"] == "damai-web-smoke"
     assert report["workflow_factory"] == "tests.runner.fixtures:make_failing_session"
     assert report["success"] is False

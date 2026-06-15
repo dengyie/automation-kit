@@ -12,6 +12,20 @@
 
 ## Current Baseline
 
+Status update on 2026-06-16:
+
+- The basic usable skeleton phases below have been implemented and verified.
+- `EnvConfigSource` is implemented and exported.
+- The runner supports dry execution by default, live execution behind
+  `--live`, JSON stdout reports, and `--report-file` output.
+- Reports include run metadata, actions, artifacts, structured events, and
+  failure summaries.
+- Selenium/Appium adapters are dependency-injectable and business-free.
+- `README.md` and `docs/adding-a-workflow.md` document extension boundaries
+  and runnable commands.
+- The remaining work after this plan should build the next roadmap slice on
+  top of the verified skeleton instead of redoing these phases.
+
 Repository:
 
 ```text
@@ -29,11 +43,8 @@ Already established:
 - `adapters.selenium` and `adapters.appium`: thin adapter shells.
 - `examples.damai_web` and `examples.damai_android`: smoke workflow examples.
 - `automation_runner`: minimal CLI runner with JSON output and report file support.
-- `automation_core.config`: in-progress generic config source primitives.
-
-Unfinished current slice:
-
-- `EnvConfigSource` tests exist, but implementation/export still need to be completed.
+- `automation_core.config`: generic dictionary and environment config source
+  primitives.
 
 ## Target Basic Usable State
 

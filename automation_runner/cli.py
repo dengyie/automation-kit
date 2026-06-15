@@ -120,7 +120,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             if args.report_file:
                 report_path = Path(args.report_file)
                 report_path.parent.mkdir(parents=True, exist_ok=True)
-                report_path.write_text(payload, encoding="utf-8")
+                report_path.write_text(payload + "\n", encoding="utf-8")
             return 0 if result.success else 1
         else:
             if args.report_file:

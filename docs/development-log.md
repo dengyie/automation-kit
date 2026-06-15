@@ -1246,3 +1246,115 @@ Follow-up inspection confirmed:
 
 Commit and push the event-report slice, then continue with the next basic
 usable skeleton phase.
+
+## 2026-06-16: Basic Usable Skeleton Verification
+
+### Completed
+
+- Audited the basic usable skeleton plan against the current repository.
+- Updated the plan status to reflect that the earlier phases are now
+  implemented and verified.
+- Tightened the CLI report-file contract so `--report-file` writes the exact
+  JSON line emitted to stdout, including the trailing newline.
+- Added tests covering byte-for-byte report-file/stdout parity for success and
+  failure JSON reports.
+- Re-ran the documented dry workflow and report-file commands.
+
+### Verification
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+107 passed
+Total coverage: 94.61%
+Required coverage: 80%
+```
+
+Boundary test without coverage threshold:
+
+```bash
+.venv/bin/python -m pytest tests/structure/test_boundaries.py --no-cov -q
+```
+
+Result:
+
+```text
+3 passed
+```
+
+Dry workflow listing:
+
+```bash
+.venv/bin/python -m automation_runner examples --dry-run
+```
+
+Result:
+
+```text
+damai-android-smoke
+damai-web-smoke
+dry-run: no live browser, Appium, ADB, or device session started
+```
+
+Dry workflow JSON run:
+
+```bash
+.venv/bin/python -m automation_runner run damai-web-smoke --json \
+  --url https://example.test/damai
+```
+
+Result:
+
+```text
+success=true, live=false, status=succeeded, workflow=damai-web-smoke
+```
+
+Report-file parity:
+
+```bash
+.venv/bin/python -m automation_runner run damai-web-smoke --json \
+  --report-file /tmp/automation-kit-report-check.json \
+  --url https://example.test/damai \
+  >/tmp/automation-kit-report-check.stdout
+cmp -s /tmp/automation-kit-report-check.json \
+  /tmp/automation-kit-report-check.stdout
+```
+
+Result:
+
+```text
+ok
+```
+
+### Review
+
+Used `production-code-quality-review` required setup scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- report-file newline handling is confined to `automation_runner.cli`,
+- success and failure report-file parity are covered by runner tests,
+- the basic usable skeleton plan no longer contains stale implementation
+  status,
+- default tests remain offline and deterministic.
+
+The helper's suggested `python3 -m unittest discover` is not the authoritative
+test command for this pytest/Poetry project; the project verification command
+is `.venv/bin/python -m pytest -q`.
+
+### Next Phase
+
+Commit and push the skeleton verification slice, then start the next roadmap
+slice on top of the verified baseline.
