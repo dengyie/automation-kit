@@ -54,8 +54,10 @@ class AppiumSession:
                     success=False,
                     message="driver does not support mobile script execution",
                 )
-            result = execute_script(action_name, kwargs)
-            return ActionResult(success=True, message=action_name, data=result)
+            return self._run_action(
+                action_name,
+                lambda: execute_script(action_name, kwargs),
+            )
 
         action = getattr(self.driver, action_name, None)
         if not callable(action):
@@ -63,8 +65,7 @@ class AppiumSession:
                 success=False,
                 message=f"unsupported appium action: {action_name}",
             )
-        result = action(**kwargs)
-        return ActionResult(success=True, message=action_name, data=result)
+        return self._run_action(action_name, lambda: action(**kwargs))
 
     def _launch_app(self, **kwargs: Any) -> ActionResult:
         app_id = kwargs.get("app_id")
@@ -73,8 +74,7 @@ class AppiumSession:
         activate_app = getattr(self.driver, "activate_app", None)
         if not callable(activate_app):
             return ActionResult(False, "driver does not support app launch")
-        result = activate_app(app_id)
-        return ActionResult(success=True, message="launch_app", data=result)
+        return self._run_action("launch_app", lambda: activate_app(app_id))
 
     def _tap(self, **kwargs: Any) -> ActionResult:
         selector = kwargs.get("selector")
@@ -82,8 +82,7 @@ class AppiumSession:
             element, error = self._resolve_element(selector=selector, by=kwargs.get("by"))
             if error is not None:
                 return error
-            result = element.click()
-            return ActionResult(success=True, message="tap", data=result)
+            return self._run_action("tap", element.click)
 
         x = kwargs.get("x")
         y = kwargs.get("y")
@@ -95,8 +94,10 @@ class AppiumSession:
                 success=False,
                 message="driver does not support mobile script execution",
             )
-        result = execute_script("mobile: clickGesture", {"x": x, "y": y})
-        return ActionResult(success=True, message="tap", data=result)
+        return self._run_action(
+            "tap",
+            lambda: execute_script("mobile: clickGesture", {"x": x, "y": y}),
+        )
 
     def _type_text(self, **kwargs: Any) -> ActionResult:
         selector = kwargs.get("selector")
@@ -110,10 +111,13 @@ class AppiumSession:
             return error
         clear = kwargs.get("clear", True)
         clear_method = getattr(element, "clear", None)
-        if clear and callable(clear_method):
-            clear_method()
-        result = element.send_keys(text)
-        return ActionResult(success=True, message="type_text", data=result)
+
+        def type_into_element():
+            if clear and callable(clear_method):
+                clear_method()
+            return element.send_keys(text)
+
+        return self._run_action("type_text", type_into_element)
 
     def _wait_for_element(self, **kwargs: Any) -> ActionResult:
         selector = kwargs.get("selector")
@@ -176,6 +180,13 @@ class AppiumSession:
                 False,
                 f"element lookup failed: {selector}",
             )
+
+    def _run_action(self, action_name: str, action: Callable[[], Any]) -> ActionResult:
+        try:
+            result = action()
+        except Exception as exc:
+            return ActionResult(False, f"{action_name} failed: {exc}")
+        return ActionResult(success=True, message=action_name, data=result)
 
     def capture_artifact(self, artifact_type: str, name: str) -> ArtifactHandle:
         record = self.artifact_store.record(

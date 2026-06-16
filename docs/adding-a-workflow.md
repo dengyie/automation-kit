@@ -188,6 +188,10 @@ Adapter sessions also expose a small common action vocabulary:
 These aliases stay in the adapter layer. Raw driver methods remain available
 for framework-specific behavior.
 
+Adapter aliases return failed `ActionResult` values for lookup and execution
+failures. `wait_for_element` remains the retrying primitive for wait-style
+flows.
+
 For multi-step workflows, `automation_core.actions.ActionExecutor` can execute
 an `ActionBatch` and returns an `ActionBatchResult`. The batch result separates
 executed `results` from `skipped` actions when a `stop_on_failure` action fails.

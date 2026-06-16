@@ -8,17 +8,20 @@ from automation_core.drivers import DriverSession
 
 
 class FakeMobileDriver:
-    def __init__(self, lookup_failures=0):
+    def __init__(self, lookup_failures=0, failures=None):
         self.closed = False
         self.activated = []
         self.lookups = []
         self.lookup_failures = lookup_failures
+        self.failures = failures or {}
         self.scripts = []
         self.screenshots = []
         self.page_source = "<hierarchy />"
-        self.element = FakeMobileElement()
+        self.element = FakeMobileElement(failures=self.failures)
 
     def activate_app(self, app_id):
+        if "activate_app" in self.failures:
+            raise RuntimeError(self.failures["activate_app"])
         self.activated.append(app_id)
         return "activated"
 
@@ -29,6 +32,8 @@ class FakeMobileDriver:
         return self.element
 
     def execute_script(self, script, args):
+        if "execute_script" in self.failures:
+            raise RuntimeError(self.failures["execute_script"])
         self.scripts.append((script, args))
         return {"script": script, "args": args}
 
@@ -42,19 +47,26 @@ class FakeMobileDriver:
 
 
 class FakeMobileElement:
-    def __init__(self):
+    def __init__(self, failures=None):
         self.clicked = False
         self.cleared = False
         self.keys = []
+        self.failures = failures or {}
 
     def click(self):
+        if "click" in self.failures:
+            raise RuntimeError(self.failures["click"])
         self.clicked = True
         return "clicked"
 
     def clear(self):
+        if "clear" in self.failures:
+            raise RuntimeError(self.failures["clear"])
         self.cleared = True
 
     def send_keys(self, text):
+        if "send_keys" in self.failures:
+            raise RuntimeError(self.failures["send_keys"])
         self.keys.append(text)
         return "typed"
 
@@ -96,6 +108,17 @@ def test_appium_session_launch_app_alias_activates_app():
     assert driver.activated == ["example.app"]
 
 
+def test_appium_session_launch_app_reports_driver_failure():
+    session = AppiumSession(
+        driver=FakeMobileDriver(failures={"activate_app": "app unavailable"})
+    )
+
+    result = session.execute_action("launch_app", app_id="example.app")
+
+    assert result.success is False
+    assert result.message == "launch_app failed: app unavailable"
+
+
 def test_appium_session_launch_app_alias_requires_app_id():
     session = AppiumSession(driver=FakeMobileDriver())
 
@@ -117,6 +140,17 @@ def test_appium_session_executes_mobile_script_action():
     assert driver.scripts == [("mobile: clickGesture", {"x": 1, "y": 2})]
 
 
+def test_appium_session_reports_mobile_script_failure():
+    session = AppiumSession(
+        driver=FakeMobileDriver(failures={"execute_script": "scroll failed"})
+    )
+
+    result = session.execute_action("mobile: scrollGesture", direction="down")
+
+    assert result.success is False
+    assert result.message == "mobile: scrollGesture failed: scroll failed"
+
+
 def test_appium_session_tap_alias_executes_coordinate_tap():
     driver = FakeMobileDriver()
     session = AppiumSession(driver=driver)
@@ -127,6 +161,17 @@ def test_appium_session_tap_alias_executes_coordinate_tap():
     assert result.message == "tap"
     assert result.data == {"script": "mobile: clickGesture", "args": {"x": 1, "y": 2}}
     assert driver.scripts == [("mobile: clickGesture", {"x": 1, "y": 2})]
+
+
+def test_appium_session_coordinate_tap_reports_script_failure():
+    session = AppiumSession(
+        driver=FakeMobileDriver(failures={"execute_script": "gesture failed"})
+    )
+
+    result = session.execute_action("tap", x=1, y=2)
+
+    assert result.success is False
+    assert result.message == "tap failed: gesture failed"
 
 
 def test_appium_session_tap_alias_finds_and_clicks_element():
@@ -142,6 +187,15 @@ def test_appium_session_tap_alias_finds_and_clicks_element():
     assert driver.element.clicked is True
 
 
+def test_appium_session_element_tap_reports_element_action_failure():
+    session = AppiumSession(driver=FakeMobileDriver(failures={"click": "tap failed"}))
+
+    result = session.execute_action("tap", selector="buy")
+
+    assert result.success is False
+    assert result.message == "tap failed: tap failed"
+
+
 def test_appium_session_type_text_alias_clears_and_sends_keys():
     driver = FakeMobileDriver()
     session = AppiumSession(driver=driver)
@@ -154,6 +208,28 @@ def test_appium_session_type_text_alias_clears_and_sends_keys():
     assert driver.lookups == [("accessibility id", "search")]
     assert driver.element.cleared is True
     assert driver.element.keys == ["concert"]
+
+
+def test_appium_session_type_text_reports_clear_failure():
+    driver = FakeMobileDriver(failures={"clear": "clear failed"})
+    session = AppiumSession(driver=driver)
+
+    result = session.execute_action("type_text", selector="search", text="concert")
+
+    assert result.success is False
+    assert result.message == "type_text failed: clear failed"
+    assert driver.element.keys == []
+
+
+def test_appium_session_type_text_reports_send_keys_failure():
+    driver = FakeMobileDriver(failures={"send_keys": "keyboard failed"})
+    session = AppiumSession(driver=driver)
+
+    result = session.execute_action("type_text", selector="search", text="concert")
+
+    assert result.success is False
+    assert result.message == "type_text failed: keyboard failed"
+    assert driver.element.cleared is True
 
 
 def test_appium_session_type_text_alias_can_skip_clear():
@@ -331,6 +407,17 @@ def test_appium_session_reports_unsupported_action():
 
     assert result.success is False
     assert "unsupported appium action" in result.message
+
+
+def test_appium_session_reports_raw_driver_action_failure():
+    session = AppiumSession(
+        driver=FakeMobileDriver(failures={"activate_app": "device offline"})
+    )
+
+    result = session.execute_action("activate_app", app_id="example.app")
+
+    assert result.success is False
+    assert result.message == "activate_app failed: device offline"
 
 
 def test_appium_session_captures_screenshot(tmp_path):

@@ -8,18 +8,26 @@ from automation_core.drivers import DriverSession
 
 
 class FakeDriver:
-    def __init__(self, lookup_failures=0):
+    def __init__(self, lookup_failures=0, failures=None):
         self.closed = False
         self.visited = []
         self.lookups = []
         self.lookup_failures = lookup_failures
+        self.failures = failures or {}
         self.screenshots = []
         self.page_source = "<html />"
-        self.element = FakeElement()
+        self.element = FakeElement(failures=self.failures)
 
     def get(self, url):
+        if "get" in self.failures:
+            raise RuntimeError(self.failures["get"])
         self.visited.append(url)
         return "loaded"
+
+    def refresh(self):
+        if "refresh" in self.failures:
+            raise RuntimeError(self.failures["refresh"])
+        return "refreshed"
 
     def find_element(self, by, selector):
         self.lookups.append((by, selector))
@@ -37,19 +45,26 @@ class FakeDriver:
 
 
 class FakeElement:
-    def __init__(self):
+    def __init__(self, failures=None):
         self.clicked = False
         self.cleared = False
         self.keys = []
+        self.failures = failures or {}
 
     def click(self):
+        if "click" in self.failures:
+            raise RuntimeError(self.failures["click"])
         self.clicked = True
         return "clicked"
 
     def clear(self):
+        if "clear" in self.failures:
+            raise RuntimeError(self.failures["clear"])
         self.cleared = True
 
     def send_keys(self, text):
+        if "send_keys" in self.failures:
+            raise RuntimeError(self.failures["send_keys"])
         self.keys.append(text)
         return "typed"
 
@@ -91,6 +106,15 @@ def test_selenium_session_open_alias_loads_url():
     assert driver.visited == ["https://example.test"]
 
 
+def test_selenium_session_open_reports_driver_failure():
+    session = SeleniumSession(driver=FakeDriver(failures={"get": "navigation failed"}))
+
+    result = session.execute_action("open", url="https://example.test")
+
+    assert result.success is False
+    assert result.message == "open failed: navigation failed"
+
+
 def test_selenium_session_click_alias_finds_and_clicks_element():
     driver = FakeDriver()
     session = SeleniumSession(driver=driver)
@@ -102,6 +126,15 @@ def test_selenium_session_click_alias_finds_and_clicks_element():
     assert result.data == "clicked"
     assert driver.lookups == [("css selector", "#buy")]
     assert driver.element.clicked is True
+
+
+def test_selenium_session_click_reports_element_action_failure():
+    session = SeleniumSession(driver=FakeDriver(failures={"click": "click intercepted"}))
+
+    result = session.execute_action("click", selector="#buy")
+
+    assert result.success is False
+    assert result.message == "click failed: click intercepted"
 
 
 def test_selenium_session_type_text_alias_clears_and_sends_keys():
@@ -116,6 +149,28 @@ def test_selenium_session_type_text_alias_clears_and_sends_keys():
     assert driver.lookups == [("css selector", "#kw")]
     assert driver.element.cleared is True
     assert driver.element.keys == ["concert"]
+
+
+def test_selenium_session_type_text_reports_clear_failure():
+    driver = FakeDriver(failures={"clear": "clear failed"})
+    session = SeleniumSession(driver=driver)
+
+    result = session.execute_action("type_text", selector="#kw", text="concert")
+
+    assert result.success is False
+    assert result.message == "type_text failed: clear failed"
+    assert driver.element.keys == []
+
+
+def test_selenium_session_type_text_reports_send_keys_failure():
+    driver = FakeDriver(failures={"send_keys": "keyboard failed"})
+    session = SeleniumSession(driver=driver)
+
+    result = session.execute_action("type_text", selector="#kw", text="concert")
+
+    assert result.success is False
+    assert result.message == "type_text failed: keyboard failed"
+    assert driver.element.cleared is True
 
 
 def test_selenium_session_type_text_alias_can_skip_clear():
@@ -293,6 +348,15 @@ def test_selenium_session_reports_unsupported_action():
 
     assert result.success is False
     assert "unsupported selenium action" in result.message
+
+
+def test_selenium_session_reports_raw_driver_action_failure():
+    session = SeleniumSession(driver=FakeDriver(failures={"refresh": "browser closed"}))
+
+    result = session.execute_action("refresh")
+
+    assert result.success is False
+    assert result.message == "refresh failed: browser closed"
 
 
 def test_selenium_session_captures_screenshot(tmp_path):

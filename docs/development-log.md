@@ -2530,6 +2530,97 @@ and the report contract remains backward compatible.
 
 Stage, commit, and push the finished slice.
 
+## 2026-06-17: Adapter Action Execution Failure Handling
+
+### Completed
+
+- Added a design note and implementation plan for adapter action execution
+  failure handling.
+- Extended Selenium adapter tests for driver navigation, element click, text
+  clear, text send, and raw driver action failures.
+- Extended Appium adapter tests for app launch, mobile script, coordinate tap,
+  element tap, text clear, text send, and raw driver action failures.
+- Added small per-adapter `_run_action(...)` helpers so aliased and raw supported
+  actions return failed `ActionResult` values when the underlying driver or
+  element operation raises.
+- Kept required-parameter validation, unsupported-action behavior, element
+  lookup semantics, and `wait_for_element` retry semantics unchanged.
+- Documented the adapter execution-failure contract in
+  `docs/adding-a-workflow.md`.
+- Left `automation_core` unchanged and business-agnostic.
+
+### Verification
+
+Focused red run before implementation:
+
+```bash
+.venv/bin/python -m pytest tests/adapters/selenium/test_session.py tests/adapters/appium/test_session.py --no-cov -q
+```
+
+Initial result:
+
+```text
+12 failed, 55 passed
+```
+
+Focused green run after implementation:
+
+```bash
+.venv/bin/python -m pytest tests/adapters/selenium/test_session.py tests/adapters/appium/test_session.py --no-cov -q
+```
+
+Result:
+
+```text
+67 passed
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+247 passed
+Total coverage: 96.03%
+Required coverage: 80%
+```
+
+Whitespace check:
+
+```bash
+git diff --check
+```
+
+Result: no output.
+
+### Review
+
+Ran the required production code quality review scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- action execution failures are normalized only inside concrete adapters.
+- successful action messages and `data` payloads remain unchanged.
+- parameter validation and lookup failures still return their existing messages.
+- `wait_for_element` still uses retry semantics and timeout messaging.
+- no auth or access-control logic was changed; the review risk flag was
+  triggered by adapter terminology rather than a security path.
+- `automation_core` remains unchanged.
+
+### Next Phase
+
+Stage, commit, and push the finished slice.
+
 ## 2026-06-16: Retry Snapshot Event Bridge
 
 ### Completed

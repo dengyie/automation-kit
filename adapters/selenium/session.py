@@ -53,15 +53,13 @@ class SeleniumSession:
                 success=False,
                 message=f"unsupported selenium action: {action_name}",
             )
-        result = action(**kwargs)
-        return ActionResult(success=True, message=action_name, data=result)
+        return self._run_action(action_name, lambda: action(**kwargs))
 
     def _open(self, **kwargs: Any) -> ActionResult:
         url = kwargs.get("url")
         if url is None:
             return ActionResult(False, "missing required parameter: url")
-        result = self.driver.get(url)
-        return ActionResult(success=True, message="open", data=result)
+        return self._run_action("open", lambda: self.driver.get(url))
 
     def _click(self, **kwargs: Any) -> ActionResult:
         selector = kwargs.get("selector")
@@ -70,8 +68,7 @@ class SeleniumSession:
         element, error = self._resolve_element(selector=selector, by=kwargs.get("by"))
         if error is not None:
             return error
-        result = element.click()
-        return ActionResult(success=True, message="click", data=result)
+        return self._run_action("click", element.click)
 
     def _type_text(self, **kwargs: Any) -> ActionResult:
         selector = kwargs.get("selector")
@@ -85,10 +82,13 @@ class SeleniumSession:
             return error
         clear = kwargs.get("clear", True)
         clear_method = getattr(element, "clear", None)
-        if clear and callable(clear_method):
-            clear_method()
-        result = element.send_keys(text)
-        return ActionResult(success=True, message="type_text", data=result)
+
+        def type_into_element():
+            if clear and callable(clear_method):
+                clear_method()
+            return element.send_keys(text)
+
+        return self._run_action("type_text", type_into_element)
 
     def _wait_for_element(self, **kwargs: Any) -> ActionResult:
         selector = kwargs.get("selector")
@@ -151,6 +151,13 @@ class SeleniumSession:
                 False,
                 f"element lookup failed: {selector}",
             )
+
+    def _run_action(self, action_name: str, action: Callable[[], Any]) -> ActionResult:
+        try:
+            result = action()
+        except Exception as exc:
+            return ActionResult(False, f"{action_name} failed: {exc}")
+        return ActionResult(success=True, message=action_name, data=result)
 
     def capture_artifact(self, artifact_type: str, name: str) -> ArtifactHandle:
         record = self.artifact_store.record(
