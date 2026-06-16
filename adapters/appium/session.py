@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, Tuple
 
 from adapters.errors import AdapterStartupError
 from automation_core.artifacts import ArtifactStore
@@ -37,6 +37,11 @@ class AppiumSession:
         self._started = False
 
     def execute_action(self, action_name: str, **kwargs: Any) -> ActionResult:
+        if action_name == "tap":
+            return self._tap(**kwargs)
+        if action_name == "type_text":
+            return self._type_text(**kwargs)
+
         if action_name.startswith("mobile:"):
             execute_script = getattr(self.driver, "execute_script", None)
             if not callable(execute_script):
@@ -55,6 +60,53 @@ class AppiumSession:
             )
         result = action(**kwargs)
         return ActionResult(success=True, message=action_name, data=result)
+
+    def _tap(self, **kwargs: Any) -> ActionResult:
+        selector = kwargs.get("selector")
+        if selector is not None:
+            element, error = self._resolve_element(selector=selector, by=kwargs.get("by"))
+            if error is not None:
+                return error
+            result = element.click()
+            return ActionResult(success=True, message="tap", data=result)
+
+        x = kwargs.get("x")
+        y = kwargs.get("y")
+        if x is None or y is None:
+            return ActionResult(False, "missing required parameter: selector or x/y")
+        execute_script = getattr(self.driver, "execute_script", None)
+        if not callable(execute_script):
+            return ActionResult(
+                success=False,
+                message="driver does not support mobile script execution",
+            )
+        result = execute_script("mobile: clickGesture", {"x": x, "y": y})
+        return ActionResult(success=True, message="tap", data=result)
+
+    def _type_text(self, **kwargs: Any) -> ActionResult:
+        selector = kwargs.get("selector")
+        text = kwargs.get("text")
+        if selector is None:
+            return ActionResult(False, "missing required parameter: selector")
+        if text is None:
+            return ActionResult(False, "missing required parameter: text")
+        element, error = self._resolve_element(selector=selector, by=kwargs.get("by"))
+        if error is not None:
+            return error
+        clear = kwargs.get("clear", True)
+        clear_method = getattr(element, "clear", None)
+        if clear and callable(clear_method):
+            clear_method()
+        result = element.send_keys(text)
+        return ActionResult(success=True, message="type_text", data=result)
+
+    def _resolve_element(
+        self, selector: str, by: Optional[str]
+    ) -> Tuple[Optional[Any], Optional[ActionResult]]:
+        find_element = getattr(self.driver, "find_element", None)
+        if not callable(find_element):
+            return None, ActionResult(False, "driver does not support element lookup")
+        return find_element(by or "accessibility id", selector), None
 
     def capture_artifact(self, artifact_type: str, name: str) -> ArtifactHandle:
         record = self.artifact_store.record(

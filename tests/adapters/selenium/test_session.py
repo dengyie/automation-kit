@@ -11,12 +11,18 @@ class FakeDriver:
     def __init__(self):
         self.closed = False
         self.visited = []
+        self.lookups = []
         self.screenshots = []
         self.page_source = "<html />"
+        self.element = FakeElement()
 
     def get(self, url):
         self.visited.append(url)
         return "loaded"
+
+    def find_element(self, by, selector):
+        self.lookups.append((by, selector))
+        return self.element
 
     def save_screenshot(self, path):
         self.screenshots.append(path)
@@ -25,6 +31,24 @@ class FakeDriver:
 
     def quit(self):
         self.closed = True
+
+
+class FakeElement:
+    def __init__(self):
+        self.clicked = False
+        self.cleared = False
+        self.keys = []
+
+    def click(self):
+        self.clicked = True
+        return "clicked"
+
+    def clear(self):
+        self.cleared = True
+
+    def send_keys(self, text):
+        self.keys.append(text)
+        return "typed"
 
 
 def test_selenium_session_implements_driver_contract(tmp_path):
@@ -50,6 +74,82 @@ def test_selenium_session_executes_supported_driver_action():
     assert result.message == "get"
     assert result.data == "loaded"
     assert driver.visited == ["https://example.test"]
+
+
+def test_selenium_session_open_alias_loads_url():
+    driver = FakeDriver()
+    session = SeleniumSession(driver=driver)
+
+    result = session.execute_action("open", url="https://example.test")
+
+    assert result.success is True
+    assert result.message == "open"
+    assert result.data == "loaded"
+    assert driver.visited == ["https://example.test"]
+
+
+def test_selenium_session_click_alias_finds_and_clicks_element():
+    driver = FakeDriver()
+    session = SeleniumSession(driver=driver)
+
+    result = session.execute_action("click", selector="#buy")
+
+    assert result.success is True
+    assert result.message == "click"
+    assert result.data == "clicked"
+    assert driver.lookups == [("css selector", "#buy")]
+    assert driver.element.clicked is True
+
+
+def test_selenium_session_type_text_alias_clears_and_sends_keys():
+    driver = FakeDriver()
+    session = SeleniumSession(driver=driver)
+
+    result = session.execute_action("type_text", selector="#kw", text="concert")
+
+    assert result.success is True
+    assert result.message == "type_text"
+    assert result.data == "typed"
+    assert driver.lookups == [("css selector", "#kw")]
+    assert driver.element.cleared is True
+    assert driver.element.keys == ["concert"]
+
+
+def test_selenium_session_type_text_alias_can_skip_clear():
+    driver = FakeDriver()
+    session = SeleniumSession(driver=driver)
+
+    result = session.execute_action(
+        "type_text",
+        selector="#kw",
+        text="concert",
+        clear=False,
+    )
+
+    assert result.success is True
+    assert driver.element.cleared is False
+    assert driver.element.keys == ["concert"]
+
+
+def test_selenium_session_alias_reports_missing_required_parameter():
+    session = SeleniumSession(driver=FakeDriver())
+
+    result = session.execute_action("open")
+
+    assert result.success is False
+    assert "missing required parameter: url" in result.message
+
+
+def test_selenium_session_element_alias_reports_missing_lookup_support():
+    class NoLookupDriver:
+        pass
+
+    session = SeleniumSession(driver=NoLookupDriver())
+
+    result = session.execute_action("click", selector="#buy")
+
+    assert result.success is False
+    assert result.message == "driver does not support element lookup"
 
 
 def test_selenium_session_reports_unsupported_action():

@@ -2271,3 +2271,73 @@ Follow-up inspection confirmed:
 
 Commit and push the context serialization slice, then continue with the next
 roadmap slice.
+
+## 2026-06-16: Adapter Action Aliases
+
+### Completed
+
+- Added adapter-layer action aliases for common workflow operations:
+  - Selenium: `open`, `click`, `type_text`
+  - Appium: `tap`, `type_text`
+- Kept the aliases inside `adapters` so `automation_core` stays business
+  agnostic.
+- Preserved raw driver-method fallback behavior for framework-specific use
+  cases.
+- Added focused adapter tests for:
+  - Selenium URL loading, element clicks, and text entry
+  - Appium coordinate taps, element taps, and text entry
+  - missing-parameter failures for the new aliases
+- Updated workflow docs to describe the adapter action vocabulary.
+
+### Verification
+
+Focused adapter tests:
+
+```bash
+.venv/bin/python -m pytest tests/adapters/selenium/test_session.py --no-cov -q
+.venv/bin/python -m pytest tests/adapters/appium/test_session.py --no-cov -q
+```
+
+Result:
+
+```text
+16 passed
+17 passed
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+163 passed
+Total coverage: 95.02%
+Required coverage: 80%
+```
+
+### Review
+
+Used `production-code-quality-review` required setup scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- adapter aliases stay in `adapters`, not `automation_core`.
+- the aliases add no Damai or Dianping business coupling.
+- raw driver-method fallback behavior remains available.
+- missing element-lookup support returns failed `ActionResult` values instead
+  of uncaught adapter exceptions.
+- default tests remain offline and deterministic.
+
+### Next Phase
+
+Push the adapter alias slice, then continue with the next roadmap phase.

@@ -116,6 +116,14 @@ def create_workflow(session_factory, context, options):
 Built-in Damai examples still use `--url` or `--app-id`; custom workflows own
 their own parameters outside `automation_core`.
 
+Adapter sessions also expose a small common action vocabulary:
+
+- Selenium: `open`, `click`, `type_text`
+- Appium: `tap`, `type_text`
+
+These aliases stay in the adapter layer. Raw driver methods remain available
+for framework-specific behavior.
+
 ## Report Contract
 
 JSON reports currently include:
