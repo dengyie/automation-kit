@@ -7,6 +7,7 @@ Predicate = Callable[[Any], bool]
 Operation = Callable[[], Any]
 Sleep = Callable[[float], None]
 Clock = Callable[[], float]
+AttemptObserver = Callable[["RetryAttemptSnapshot"], None]
 
 
 @dataclass(frozen=True)
@@ -50,6 +51,17 @@ class RetryResult:
     last_exception: Optional[Exception] = None
 
 
+@dataclass(frozen=True)
+class RetryAttemptSnapshot:
+    """Observed state after a handled retry attempt."""
+
+    attempt: int
+    elapsed: float
+    value: Any
+    exception: Optional[Exception]
+    will_retry: bool
+
+
 def retry_until(
     operation: Operation,
     *,
@@ -57,6 +69,7 @@ def retry_until(
     policy: RetryPolicy,
     sleep: Sleep = time.sleep,
     monotonic: Clock = time.monotonic,
+    on_attempt: Optional[AttemptObserver] = None,
 ) -> RetryResult:
     """Run ``operation`` until ``predicate`` accepts its value or policy ends."""
 
@@ -82,15 +95,33 @@ def retry_until(
             last_value = None
         else:
             if predicate(last_value):
+                elapsed = monotonic() - start
+                _observe_attempt(
+                    on_attempt,
+                    attempt=attempts,
+                    elapsed=elapsed,
+                    value=last_value,
+                    exception=None,
+                    will_retry=False,
+                )
                 return RetryResult(
                     success=True,
                     value=last_value,
                     attempts=attempts,
-                    elapsed=monotonic() - start,
+                    elapsed=elapsed,
                 )
 
         elapsed = monotonic() - start
-        if not policy.can_retry(attempts, elapsed):
+        will_retry = policy.can_retry(attempts, elapsed)
+        _observe_attempt(
+            on_attempt,
+            attempt=attempts,
+            elapsed=elapsed,
+            value=last_value,
+            exception=last_exception,
+            will_retry=will_retry,
+        )
+        if not will_retry:
             return RetryResult(
                 success=False,
                 value=last_value,
@@ -100,3 +131,25 @@ def retry_until(
             )
 
         sleep(policy.interval)
+
+
+def _observe_attempt(
+    observer: Optional[AttemptObserver],
+    *,
+    attempt: int,
+    elapsed: float,
+    value: Any,
+    exception: Optional[Exception],
+    will_retry: bool,
+) -> None:
+    if observer is None:
+        return
+    observer(
+        RetryAttemptSnapshot(
+            attempt=attempt,
+            elapsed=elapsed,
+            value=value,
+            exception=exception,
+            will_retry=will_retry,
+        )
+    )

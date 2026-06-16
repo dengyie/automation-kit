@@ -2530,6 +2530,91 @@ and the report contract remains backward compatible.
 
 Stage, commit, and push the finished slice.
 
+## 2026-06-16: Retry Attempt Observer
+
+### Completed
+
+- Added a design note and implementation plan for retry attempt observability.
+- Added `RetryAttemptSnapshot` as an immutable retry-attempt state object.
+- Added optional `on_attempt` support to `retry_until(...)`.
+- Kept retry observability inside `automation_core.retries` without importing
+  event, runner, adapter, or business modules.
+- Exported `RetryAttemptSnapshot` from `automation_core.retries`.
+- Documented that higher layers own conversion from retry snapshots into
+  task events, logs, and reports.
+
+### Verification
+
+Focused red run before implementation:
+
+```bash
+.venv/bin/python -m pytest tests/retries/test_policy.py --no-cov -q
+```
+
+Initial result:
+
+```text
+1 error
+ImportError: cannot import name 'RetryAttemptSnapshot'
+```
+
+Focused green run after implementation:
+
+```bash
+.venv/bin/python -m pytest tests/retries/test_policy.py --no-cov -q
+```
+
+Result:
+
+```text
+14 passed
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+213 passed
+Total coverage: 95.01%
+Required coverage: 80%
+```
+
+Whitespace check:
+
+```bash
+git diff --check
+```
+
+Result: no output.
+
+### Review
+
+Ran the required production code quality review scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- retry attempt snapshots stay in `automation_core.retries`.
+- the retry package still does not import event, runner, adapter, or business
+  modules.
+- existing retry callers remain compatible because `on_attempt` is optional.
+- snapshots cover predicate misses, retryable exceptions, terminal failure, and
+  final success.
+
+### Next Phase
+
+Stage, commit, and push the finished slice.
+
 ## 2026-06-16: Adapter Wait For Element Alias
 
 ### Completed

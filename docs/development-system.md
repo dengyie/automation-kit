@@ -115,6 +115,8 @@ Keep these documents distinct:
 4. Make live browser/device tests opt-in.
 5. Keep diffs small and phase work so each change has one clear consumer.
 6. Prefer deterministic artifacts and logs over hidden automation state.
+7. Keep retry observability generic: retry primitives may expose attempt
+   snapshots, but higher layers own task events, logs, and reports.
 
 ## Phase Roadmap
 
@@ -164,4 +166,3 @@ Before any implementation phase:
 - confirm the first consumer path
 - confirm live-system test policy
 - confirm the retry contract boundary
-

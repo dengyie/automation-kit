@@ -1,6 +1,6 @@
 import pytest
 
-from automation_core.retries import RetryPolicy, retry_until
+from automation_core.retries import RetryAttemptSnapshot, RetryPolicy, retry_until
 
 
 def test_policy_requires_a_boundary():
@@ -152,3 +152,83 @@ def test_retry_until_stops_at_max_duration():
     assert result.success is False
     assert result.attempts == 3
     assert result.elapsed >= 1.0
+
+
+def test_retry_attempt_snapshot_is_importable():
+    snapshot = RetryAttemptSnapshot(
+        attempt=1,
+        elapsed=0.0,
+        value="not-ready",
+        exception=None,
+        will_retry=True,
+    )
+
+    assert snapshot.attempt == 1
+    assert snapshot.value == "not-ready"
+    assert snapshot.exception is None
+    assert snapshot.will_retry is True
+
+
+def test_retry_until_observes_predicate_miss_and_final_success():
+    values = iter(["not-ready", "ready"])
+    snapshots = []
+
+    result = retry_until(
+        lambda: next(values),
+        predicate=lambda value: value == "ready",
+        policy=RetryPolicy(max_attempts=3, interval=0),
+        sleep=lambda _: None,
+        on_attempt=snapshots.append,
+    )
+
+    assert result.success is True
+    assert [snapshot.attempt for snapshot in snapshots] == [1, 2]
+    assert [snapshot.value for snapshot in snapshots] == ["not-ready", "ready"]
+    assert [snapshot.exception for snapshot in snapshots] == [None, None]
+    assert [snapshot.will_retry for snapshot in snapshots] == [True, False]
+
+
+def test_retry_until_observes_terminal_predicate_miss():
+    snapshots = []
+
+    result = retry_until(
+        lambda: "not-ready",
+        predicate=lambda value: value == "ready",
+        policy=RetryPolicy(max_attempts=2, interval=0),
+        sleep=lambda _: None,
+        on_attempt=snapshots.append,
+    )
+
+    assert result.success is False
+    assert [snapshot.attempt for snapshot in snapshots] == [1, 2]
+    assert [snapshot.value for snapshot in snapshots] == [
+        "not-ready",
+        "not-ready",
+    ]
+    assert [snapshot.exception for snapshot in snapshots] == [None, None]
+    assert [snapshot.will_retry for snapshot in snapshots] == [True, False]
+
+
+def test_retry_until_observes_retryable_exception():
+    snapshots = []
+
+    result = retry_until(
+        lambda: (_ for _ in ()).throw(TimeoutError("not ready")),
+        predicate=bool,
+        policy=RetryPolicy(
+            max_attempts=2,
+            interval=0,
+            retry_on=(TimeoutError,),
+        ),
+        sleep=lambda _: None,
+        on_attempt=snapshots.append,
+    )
+
+    assert result.success is False
+    assert [snapshot.attempt for snapshot in snapshots] == [1, 2]
+    assert [snapshot.value for snapshot in snapshots] == [None, None]
+    assert [type(snapshot.exception) for snapshot in snapshots] == [
+        TimeoutError,
+        TimeoutError,
+    ]
+    assert [snapshot.will_retry for snapshot in snapshots] == [True, False]
