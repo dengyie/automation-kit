@@ -1,4 +1,5 @@
 import argparse
+from dataclasses import replace
 import inspect
 import importlib
 import json
@@ -144,6 +145,17 @@ def _merge_config(args: argparse.Namespace, config: RunnerConfig) -> RunnerConfi
     )
 
 
+def _resolve_workflow_selection(
+    args: argparse.Namespace,
+    config: RunnerConfig,
+) -> RunnerConfig:
+    if args.workflow and args.workflow_factory:
+        raise ValueError("workflow and --workflow-factory are mutually exclusive")
+    if args.workflow and config.workflow_factory:
+        return replace(config, workflow_factory=None)
+    return config
+
+
 def _workflow_name(args: argparse.Namespace, config: RunnerConfig) -> str:
     if args.workflow:
         return args.workflow
@@ -258,6 +270,10 @@ def main(
         except ValueError as exc:
             return _print_error(str(exc))
         config = _merge_config(args, config)
+        try:
+            config = _resolve_workflow_selection(args, config)
+        except ValueError as exc:
+            return _print_error(str(exc))
         try:
             workflow_name = _workflow_name(args, config)
         except ValueError as exc:

@@ -114,6 +114,10 @@ automation-runner run --workflow-factory my_package.workflow:create_workflow \
   --param city=shanghai
 ```
 
+Use either a built-in workflow name or `--workflow-factory`, not both. A
+positional workflow name overrides a config-provided workflow factory because
+CLI arguments take precedence over environment defaults.
+
 Runner defaults can also come from environment variables:
 
 ```bash

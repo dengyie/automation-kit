@@ -3870,3 +3870,100 @@ Follow-up inspection confirmed:
 ### Next Phase
 
 Stage, commit, and push the finished slice.
+
+## 2026-06-17: Runner Workflow Factory Selection
+
+### Completed
+
+- Added a design note and implementation plan for workflow source selection.
+- Added regression coverage for explicit `workflow + --workflow-factory`
+  conflicts.
+- Added coverage proving a positional workflow name overrides a
+  config-provided workflow factory, matching the documented CLI precedence
+  rule.
+- Added `_resolve_workflow_selection(...)` in `automation_runner.cli` to keep
+  selection validation in the runner layer.
+- Documented the workflow source rule in `README.md` and
+  `docs/adding-a-workflow.md`.
+- Left `automation_core` untouched and business-agnostic.
+
+### Verification
+
+Focused red run before implementation:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_cli.py::test_cli_rejects_workflow_name_with_explicit_workflow_factory tests/runner/test_cli.py::test_cli_workflow_name_overrides_config_workflow_factory --no-cov -q
+```
+
+Initial result:
+
+```text
+2 failed
+```
+
+Focused green run after implementation:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_cli.py::test_cli_rejects_workflow_name_with_explicit_workflow_factory tests/runner/test_cli.py::test_cli_workflow_name_overrides_config_workflow_factory --no-cov -q
+```
+
+Result:
+
+```text
+2 passed
+```
+
+Runner CLI test suite:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_cli.py --no-cov -q
+```
+
+Result:
+
+```text
+43 passed
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+222 passed
+Total coverage: 95.96%
+Required coverage: 80%
+```
+
+Whitespace check:
+
+```bash
+git diff --check
+```
+
+Result: no output.
+
+### Review
+
+Ran the required production code quality review scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- workflow source selection remains in `automation_runner.cli`.
+- explicit built-in/custom workflow conflicts fail before execution.
+- CLI positional workflows override config-provided workflow factories.
+- `automation_core` remains untouched.
+
+### Next Phase
+
+Stage, commit, and push the finished slice.

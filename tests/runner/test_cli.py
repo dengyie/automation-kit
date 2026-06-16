@@ -328,6 +328,36 @@ def test_cli_reads_custom_workflow_factory_from_config(capsys):
     assert report["workflow"] == "tests.runner.fixtures:create_custom_workflow"
 
 
+def test_cli_workflow_name_overrides_config_workflow_factory(capsys):
+    fixtures.reset()
+
+    exit_code = main(
+        [
+            "run",
+            "damai-web-smoke",
+            "--json",
+            "--url",
+            "https://example.test/damai",
+        ],
+        config_source=DictConfigSource(
+            {
+                "workflow_factory": "tests.runner.fixtures:create_custom_workflow",
+            }
+        ),
+    )
+
+    captured = capsys.readouterr()
+    report = json.loads(captured.out)
+
+    assert exit_code == 0
+    assert report["workflow"] == "damai-web-smoke"
+    assert report["workflow_factory"] is None
+    assert report["actions"] == [
+        {"success": True, "message": "open"},
+    ]
+    assert fixtures.CREATED_SESSIONS == []
+
+
 def test_cli_passes_config_parameters_to_custom_workflow_factory(capsys):
     fixtures.reset()
 
@@ -413,6 +443,29 @@ def test_cli_rejects_missing_workflow_factory(capsys):
 
     assert exit_code == 2
     assert "could not load factory" in captured.err
+
+
+def test_cli_rejects_workflow_name_with_explicit_workflow_factory(capsys):
+    fixtures.reset()
+
+    exit_code = main(
+        [
+            "run",
+            "damai-web-smoke",
+            "--workflow-factory",
+            "tests.runner.fixtures:create_custom_workflow",
+            "--json",
+            "--url",
+            "https://example.test/damai",
+        ]
+    )
+
+    captured = capsys.readouterr()
+
+    assert exit_code == 2
+    assert captured.out == ""
+    assert "workflow and --workflow-factory are mutually exclusive" in captured.err
+    assert fixtures.CREATED_SESSIONS == []
 
 
 def test_cli_uses_config_source_for_live_workflow(capsys):

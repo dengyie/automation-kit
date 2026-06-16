@@ -97,6 +97,9 @@ JSON reports include a safe `workflow_context` summary for runner metadata.
 Custom workflow inputs can use repeated `--param KEY=VALUE` flags. The runner
 passes those strings through as `options.parameters` and leaves workflow-specific
 validation to the workflow package.
+Use either a built-in workflow name or `--workflow-factory`, not both. A
+positional workflow name overrides a config-provided workflow factory because
+CLI arguments take precedence over environment defaults.
 
 See `docs/adding-a-workflow.md` for package boundaries, report fields, and
 adapter rules. `automation-runner report-schema --version 1` prints the
