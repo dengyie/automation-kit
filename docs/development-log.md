@@ -2530,6 +2530,113 @@ and the report contract remains backward compatible.
 
 Stage, commit, and push the finished slice.
 
+## 2026-06-17: Workflow Artifact Failure Reporting
+
+### Completed
+
+- Added a design note and implementation plan for workflow artifact failure
+  reporting.
+- Added web example workflow coverage for artifact capture failures after prior
+  actions and artifacts have already completed.
+- Added `ExampleWorkflow` coverage for returned failed results that need an
+  `error` event.
+- Added coverage proving caller-provided `error` events are not duplicated.
+- Updated `run_workflow_steps(...)` so artifact capture failures return a
+  failed `ExampleWorkflowResult` that preserves prior actions, prior artifacts,
+  and the current action batch summary.
+- Updated `ExampleWorkflow.run(...)` so returned failed results with `error`
+  produce a task-level `error` event before `task.end` when one is not already
+  present.
+- Documented the artifact-step failure behavior in
+  `docs/adding-a-workflow.md`.
+- Left `automation_core` unchanged and business-agnostic.
+
+### Verification
+
+Focused red run before implementation:
+
+```bash
+.venv/bin/python -m pytest tests/examples/damai_web/test_smoke_workflow.py --no-cov -q
+```
+
+Initial result:
+
+```text
+2 failed, 9 passed
+```
+
+Error-event deduplication red run before final adjustment:
+
+```bash
+.venv/bin/python -m pytest tests/examples/damai_web/test_smoke_workflow.py --no-cov -q
+```
+
+Result:
+
+```text
+1 failed, 11 passed
+```
+
+Focused green run after implementation:
+
+```bash
+.venv/bin/python -m pytest tests/examples/damai_web/test_smoke_workflow.py tests/examples/damai_android/test_smoke_workflow.py --no-cov -q
+```
+
+Result:
+
+```text
+16 passed
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+250 passed
+Total coverage: 96.03%
+Required coverage: 80%
+```
+
+Whitespace check:
+
+```bash
+git diff --check
+```
+
+Result: no output.
+
+### Review
+
+Ran the required production code quality review scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- artifact failure reporting remains in `examples.workflows`.
+- already executed actions and already captured artifacts are preserved when a
+  later artifact step fails.
+- returned failed workflow results emit one task-level `error` event before
+  `task.end`.
+- caller-provided `error` events are not duplicated.
+- Python type annotations remain compatible with the project's `python = "^3.8"`
+  declaration.
+- `automation_core` remains unchanged.
+
+### Next Phase
+
+Stage, commit, and push the finished slice.
+
 ## 2026-06-17: Adapter Action Execution Failure Handling
 
 ### Completed

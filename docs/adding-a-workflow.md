@@ -52,6 +52,10 @@ def run_smoke_workflow(session, url):
 and it does not move URLs, selectors, package names, or business flow into
 `automation_core`.
 
+If an artifact step fails after earlier actions or artifacts completed,
+`run_workflow_steps(...)` returns a failed result that preserves the evidence
+captured before the failure.
+
 ## Creating A New Workflow
 
 1. Put business-specific code under `examples/<domain>_<platform>/` or another

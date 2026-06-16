@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Callable, Dict, List, Optional
+from typing import Callable, Dict, List, Optional, Tuple
 
 from automation_core.actions import ActionBatch, ActionBatchResult, ActionExecutor, ActionRequest
 from automation_core.drivers import (
@@ -37,6 +37,17 @@ class ExampleWorkflowResult:
     events: List[EventEnvelope] = field(default_factory=list)
 
 
+def _format_error(exc: Exception) -> str:
+    return f"{type(exc).__name__}: {exc}"
+
+
+def _split_error(error: str) -> Tuple[str, str]:
+    error_type, separator, message = error.partition(": ")
+    if separator:
+        return error_type, message
+    return "Error", error
+
+
 def run_workflow_steps(
     session: DriverSession,
     steps: List[WorkflowStep],
@@ -59,6 +70,11 @@ def run_workflow_steps(
         skipped.extend(batch_result.skipped)
         return batch_result.success
 
+    def current_batch_result() -> Optional[ActionBatchResult]:
+        if ran_action_batch:
+            return ActionBatchResult(results=actions, skipped=skipped)
+        return None
+
     try:
         session.start()
         for step in steps:
@@ -70,21 +86,26 @@ def run_workflow_steps(
 
             if not flush_actions():
                 break
-            artifacts.append(
-                session.capture_artifact(
+            try:
+                artifact = session.capture_artifact(
                     step.name,
                     str(step.parameters["name"]),
                 )
-            )
+            except Exception as exc:
+                return ExampleWorkflowResult(
+                    session=session.info,
+                    success=False,
+                    actions=actions,
+                    artifacts=artifacts,
+                    batch_result=current_batch_result(),
+                    error=_format_error(exc),
+                )
+            artifacts.append(artifact)
 
         if not skipped:
             flush_actions()
 
-        batch_result = (
-            ActionBatchResult(results=actions, skipped=skipped)
-            if ran_action_batch
-            else None
-        )
+        batch_result = current_batch_result()
         return ExampleWorkflowResult(
             session=session.info,
             success=(batch_result.success if batch_result is not None else True),
@@ -125,6 +146,19 @@ class ExampleWorkflow:
                     for artifact in result.artifacts
                 )
             )
+            has_error_event = any(
+                event.event_type == "error" for event in result.events
+            )
+            if result.error is not None and not has_error_event:
+                error_type, message = _split_error(result.error)
+                events.append(
+                    ErrorEvent(
+                        task_name=self.name,
+                        task_id=session.info.identifier,
+                        message=message,
+                        error_type=error_type,
+                    ).to_envelope()
+                )
             events.append(
                 TaskEndEvent(
                     task_name=self.name,
@@ -163,6 +197,6 @@ class ExampleWorkflow:
                 actions=[],
                 artifacts=[],
                 batch_result=None,
-                error=f"{type(exc).__name__}: {exc}",
+                error=_format_error(exc),
                 events=events,
             )

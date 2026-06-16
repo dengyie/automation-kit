@@ -4,7 +4,7 @@ import pytest
 
 from automation_core.actions import ActionBatchResult, ActionRequest
 from automation_core.drivers import ActionResult, ArtifactHandle, SessionInfo
-from automation_core.events import RetryAttemptEvent
+from automation_core.events import ErrorEvent, RetryAttemptEvent
 from examples.damai_web import create_workflow, run_smoke_workflow
 from examples.workflows import (
     ExampleWorkflow,
@@ -131,6 +131,75 @@ def test_example_workflow_preserves_events_returned_by_run_function():
     ]
 
 
+def test_example_workflow_emits_error_event_for_returned_failure_result():
+    session = FakeSession()
+    workflow = ExampleWorkflow(
+        name="custom-workflow",
+        session_factory=lambda: session,
+        run_fn=lambda current_session: ExampleWorkflowResult(
+            session=current_session.info,
+            success=False,
+            actions=[ActionResult(success=True, message="open")],
+            artifacts=[
+                ArtifactHandle(
+                    artifact_type="screenshot",
+                    path=Path("home.png"),
+                )
+            ],
+            error="RuntimeError: screenshot failed",
+        ),
+    )
+
+    result = workflow.run()
+
+    assert result.success is False
+    assert result.error == "RuntimeError: screenshot failed"
+    assert [event.event_type for event in result.events] == [
+        "task.start",
+        "artifact",
+        "error",
+        "task.end",
+    ]
+    assert result.events[2].payload == {
+        "task_name": "custom-workflow",
+        "task_id": "web-run",
+        "message": "screenshot failed",
+        "error_type": "RuntimeError",
+    }
+    assert result.events[-1].payload["outcome"] == "failed"
+
+
+def test_example_workflow_does_not_duplicate_returned_error_events():
+    session = FakeSession()
+    workflow = ExampleWorkflow(
+        name="custom-workflow",
+        session_factory=lambda: session,
+        run_fn=lambda current_session: ExampleWorkflowResult(
+            session=current_session.info,
+            success=False,
+            actions=[],
+            artifacts=[],
+            error="RuntimeError: screenshot failed",
+            events=[
+                ErrorEvent(
+                    task_name="custom-workflow",
+                    task_id=current_session.info.identifier,
+                    message="screenshot failed",
+                    error_type="RuntimeError",
+                ).to_envelope()
+            ],
+        ),
+    )
+
+    result = workflow.run()
+
+    assert [event.event_type for event in result.events] == [
+        "task.start",
+        "error",
+        "task.end",
+    ]
+
+
 def test_example_workflow_preserves_batch_summary_returned_by_run_function():
     session = FakeSession()
     workflow = ExampleWorkflow(
@@ -182,6 +251,38 @@ def test_run_workflow_steps_runs_actions_and_artifacts_in_order():
         ("screenshot", "home.png"),
         ("page_source", "after-click.html"),
     ]
+
+
+def test_run_workflow_steps_preserves_prior_results_when_artifact_capture_fails():
+    class ArtifactFailureSession(FakeSession):
+        def capture_artifact(self, artifact_type, name):
+            if name == "broken.png":
+                raise RuntimeError("screenshot failed")
+            return super().capture_artifact(artifact_type, name)
+
+    session = ArtifactFailureSession()
+
+    result = run_workflow_steps(
+        session,
+        [
+            WorkflowStep.action("open", url="https://example.test/damai"),
+            WorkflowStep.artifact("screenshot", "home.png"),
+            WorkflowStep.action("click", selector="#buy"),
+            WorkflowStep.artifact("screenshot", "broken.png"),
+        ],
+    )
+
+    assert result.success is False
+    assert result.error == "RuntimeError: screenshot failed"
+    assert [action.message for action in result.actions] == ["open", "click"]
+    assert result.batch_result is not None
+    assert [action.message for action in result.batch_result.results] == [
+        "open",
+        "click",
+    ]
+    assert [artifact.path for artifact in result.artifacts] == [Path("home.png")]
+    assert session.artifacts == [("screenshot", "home.png")]
+    assert session.stopped is True
 
 
 def test_run_workflow_steps_stops_after_failed_action_batch():
