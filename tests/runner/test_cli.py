@@ -72,6 +72,13 @@ def test_cli_runs_dry_workflow_without_live_flag(capsys):
     assert report["actions"] == [
         {"success": True, "message": "open"},
     ]
+    assert report["action_batch"] == {
+        "results": [
+            {"success": True, "message": "open", "data": None},
+        ],
+        "skipped": [],
+        "success": True,
+    }
     assert fixtures.CREATED_SESSIONS == []
 
 

@@ -1,22 +1,28 @@
 from typing import Callable
 
+from automation_core.actions import ActionBatch, ActionExecutor, ActionRequest
 from automation_core.drivers import DriverSession
 from examples.workflows import ExampleWorkflow, ExampleWorkflowResult
 
 
 def run_smoke_workflow(session: DriverSession, url: str) -> ExampleWorkflowResult:
-    actions = []
     artifacts = []
     try:
         session.start()
-        actions.append(session.execute_action("open", url=url))
+        batch_result = ActionExecutor(session).run_batch(
+            ActionBatch(
+                actions=[
+                    ActionRequest(name="open", parameters={"url": url}),
+                ]
+            )
+        )
         artifacts.append(session.capture_artifact("screenshot", "home.png"))
-        success = all(action.success for action in actions)
         return ExampleWorkflowResult(
             session=session.info,
-            success=success,
-            actions=actions,
+            success=batch_result.success,
+            actions=batch_result.results,
             artifacts=artifacts,
+            batch_result=batch_result,
         )
     finally:
         session.stop()

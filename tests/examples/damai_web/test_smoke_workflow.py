@@ -46,6 +46,9 @@ def test_damai_web_smoke_workflow_opens_url_and_captures_screenshot():
     assert result.success is True
     assert result.session == session.info
     assert result.actions[0].message == "open"
+    assert result.batch_result is not None
+    assert result.batch_result.results == result.actions
+    assert result.batch_result.skipped == []
     assert session.actions == [("open", {"url": "https://example.test/damai"})]
     assert session.artifacts == [("screenshot", "home.png")]
 
@@ -59,6 +62,8 @@ def test_damai_web_smoke_workflow_factory_returns_runnable_workflow():
     assert workflow.name == "damai-web-smoke"
     assert result.success is True
     assert session.actions == [("open", {"url": "https://example.test/damai"})]
+    assert result.batch_result is not None
+    assert result.batch_result.success is True
     assert [event.event_type for event in result.events] == [
         "task.start",
         "artifact",

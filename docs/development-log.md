@@ -2471,3 +2471,61 @@ Follow-up inspection confirmed:
 
 Commit and push the action batch reporting slice, then continue with the next roadmap
 phase.
+
+## 2026-06-16: Example Action Batches
+
+### Completed
+
+- Updated the Damai web smoke workflow to execute its `open` action through
+  `ActionExecutor.run_batch(...)`.
+- Updated the Damai Android smoke workflow to execute its `launch_app` action
+  through `ActionExecutor.run_batch(...)`.
+- Preserved the existing flat `actions` list while also returning
+  `batch_result` from both example workflows.
+- Documented the built-in smoke workflow batch path in
+  `docs/adding-a-workflow.md`.
+
+### Verification
+
+Focused example and CLI tests:
+
+```bash
+.venv/bin/python -m pytest tests/examples tests/runner/test_cli.py --no-cov -q
+```
+
+Result:
+
+```text
+40 passed
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+172 passed
+Total coverage: 95.15%
+Required coverage: 80%
+```
+
+### Review
+
+Ran the required production code quality review scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed the example workflows stay in the example layer
+and the report contract remains backward compatible.
+
+### Next Phase
+
+Stage, commit, and push the finished slice.

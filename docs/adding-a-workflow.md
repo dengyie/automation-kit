@@ -129,6 +129,11 @@ an `ActionBatch` and returns an `ActionBatchResult`. The batch result separates
 executed `results` from `skipped` actions when a `stop_on_failure` action fails.
 This keeps workflow reports honest about which actions actually ran.
 
+Built-in Damai smoke workflows use that batch path for their first action and
+still return the flat `actions` list for compatibility. Their reports now carry
+`action_batch` as the serialized batch summary, which makes dry-run and live-run
+output line up with the same execution model.
+
 ## Report Contract
 
 JSON reports currently include:
@@ -145,6 +150,7 @@ JSON reports currently include:
 - `events`
 - `session`
 - `actions`
+- `action_batch`
 - `artifacts`
 - `error`
 
