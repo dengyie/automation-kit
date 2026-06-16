@@ -46,7 +46,10 @@ class ActionExecutor:
         self.session = session
 
     def run(self, action: ActionRequest) -> ActionResult:
-        return self.session.execute_action(action.name, **action.parameters)
+        try:
+            return self.session.execute_action(action.name, **action.parameters)
+        except Exception as exc:
+            return ActionResult(False, f"{action.name} failed: {exc}")
 
     def run_batch(self, batch: ActionBatch) -> ActionBatchResult:
         results = []

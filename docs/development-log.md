@@ -2637,6 +2637,97 @@ Follow-up inspection confirmed:
 
 Stage, commit, and push the finished slice.
 
+## 2026-06-17: Action Executor Exception Results
+
+### Completed
+
+- Added a design note and implementation plan for action executor exception
+  result handling.
+- Added core action executor tests for ordinary session action exceptions.
+- Added core batch tests proving prior action results are preserved and later
+  actions are skipped when an action raises.
+- Added interruption coverage proving `KeyboardInterrupt` still propagates.
+- Updated web, Android, and CLI workflow tests to expect structured failed
+  action results instead of top-level workflow exceptions for action execution
+  failures.
+- Updated `ActionExecutor.run(...)` so ordinary `execute_action(...)`
+  exceptions return failed `ActionResult` values.
+- Documented the action batch exception contract in `docs/adding-a-workflow.md`.
+- Kept the behavior generic in `automation_core.actions` with no business,
+  website, or Android-specific logic.
+
+### Verification
+
+Focused red run before implementation:
+
+```bash
+.venv/bin/python -m pytest tests/actions/test_action_models.py tests/examples/damai_web/test_smoke_workflow.py tests/examples/damai_android/test_smoke_workflow.py --no-cov -q
+```
+
+Initial result:
+
+```text
+4 failed, 24 passed
+```
+
+Focused green run after implementation and expectation updates:
+
+```bash
+.venv/bin/python -m pytest tests/actions/test_action_models.py tests/examples/damai_web/test_smoke_workflow.py tests/examples/damai_android/test_smoke_workflow.py tests/runner/test_cli.py::test_cli_emits_json_report_when_workflow_fails --no-cov -q
+```
+
+Result:
+
+```text
+29 passed
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+253 passed
+Total coverage: 96.05%
+Required coverage: 80%
+```
+
+Whitespace check:
+
+```bash
+git diff --check
+```
+
+Result: no output.
+
+### Review
+
+Ran the required production code quality review scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- exception normalization lives in `automation_core.actions.ActionExecutor`.
+- ordinary action exceptions become failed `ActionResult` values.
+- `KeyboardInterrupt` and other non-`Exception` interruption paths are not
+  swallowed.
+- batch skipped-action reporting remains unchanged.
+- workflow and CLI reports now retain structured failed action evidence.
+- `automation_core` remains business-agnostic.
+
+### Next Phase
+
+Stage, commit, and push the finished slice.
+
 ## 2026-06-17: Adapter Action Execution Failure Handling
 
 ### Completed

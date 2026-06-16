@@ -1,7 +1,5 @@
 from pathlib import Path
 
-import pytest
-
 from automation_core.drivers import ActionResult, ArtifactHandle, SessionInfo
 from examples.damai_android import create_workflow, run_smoke_workflow
 
@@ -85,27 +83,33 @@ def test_damai_android_workflow_factory_returns_failure_result():
     result = workflow.run()
 
     assert result.success is False
-    assert result.error == "RuntimeError: activation failed"
-    assert result.actions == []
+    assert result.error is None
+    assert [action.message for action in result.actions] == [
+        "launch_app failed: activation failed",
+    ]
     assert result.artifacts == []
     assert [event.event_type for event in result.events] == [
         "task.start",
-        "error",
         "task.end",
     ]
-    assert result.events[1].payload["error_type"] == "RuntimeError"
+    assert result.events[-1].payload["outcome"] == "failed"
     assert session.stopped is True
 
 
-def test_damai_android_smoke_workflow_stops_session_when_action_fails():
+def test_damai_android_smoke_workflow_returns_failure_when_action_raises():
     class FailingSession(FakeSession):
         def execute_action(self, action_name, **kwargs):
             raise RuntimeError("activation failed")
 
     session = FailingSession()
 
-    with pytest.raises(RuntimeError, match="activation failed"):
-        run_smoke_workflow(session, app_id="cn.damai")
+    result = run_smoke_workflow(session, app_id="cn.damai")
 
+    assert result.success is False
+    assert result.error is None
+    assert [action.message for action in result.actions] == [
+        "launch_app failed: activation failed",
+    ]
+    assert result.artifacts == []
     assert session.started is True
     assert session.stopped is True

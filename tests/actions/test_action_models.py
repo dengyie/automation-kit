@@ -1,3 +1,5 @@
+import pytest
+
 from automation_core.actions import ActionBatch, ActionBatchResult, ActionExecutor, ActionRequest
 from automation_core.drivers import ActionResult
 
@@ -8,6 +10,10 @@ class FakeSession:
 
     def execute_action(self, action_name, **kwargs):
         self.calls.append((action_name, kwargs))
+        if action_name == "explode":
+            raise RuntimeError("driver disconnected")
+        if action_name == "interrupt":
+            raise KeyboardInterrupt()
         if action_name == "fail":
             return ActionResult(success=False, message="failed")
         return ActionResult(success=True, message=action_name, data=kwargs)
@@ -72,6 +78,25 @@ def test_action_executor_runs_action_against_driver_session():
     assert session.calls == [("get", {"url": "https://example.test"})]
 
 
+def test_action_executor_returns_failed_result_when_session_action_raises():
+    session = FakeSession()
+    executor = ActionExecutor(session)
+
+    result = executor.run(ActionRequest(name="explode"))
+
+    assert result.success is False
+    assert result.message == "explode failed: driver disconnected"
+    assert session.calls == [("explode", {})]
+
+
+def test_action_executor_does_not_catch_keyboard_interrupt():
+    session = FakeSession()
+    executor = ActionExecutor(session)
+
+    with pytest.raises(KeyboardInterrupt):
+        executor.run(ActionRequest(name="interrupt"))
+
+
 def test_action_executor_returns_batch_summary_for_successful_batch():
     session = FakeSession()
     executor = ActionExecutor(session)
@@ -108,6 +133,28 @@ def test_action_executor_stops_batch_on_failure_by_default():
     assert result.success is False
     assert [item.name for item in result.skipped] == ["after"]
     assert session.calls == [("get", {}), ("fail", {})]
+
+
+def test_action_executor_batch_stops_after_session_action_exception():
+    session = FakeSession()
+    executor = ActionExecutor(session)
+    batch = ActionBatch(
+        actions=[
+            ActionRequest(name="get"),
+            ActionRequest(name="explode"),
+            ActionRequest(name="after"),
+        ]
+    )
+
+    result = executor.run_batch(batch)
+
+    assert [item.success for item in result.results] == [True, False]
+    assert [item.message for item in result.results] == [
+        "get",
+        "explode failed: driver disconnected",
+    ]
+    assert [item.name for item in result.skipped] == ["after"]
+    assert session.calls == [("get", {}), ("explode", {})]
 
 
 def test_action_executor_can_continue_batch_after_failure():

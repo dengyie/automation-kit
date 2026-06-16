@@ -200,6 +200,9 @@ For multi-step workflows, `automation_core.actions.ActionExecutor` can execute
 an `ActionBatch` and returns an `ActionBatchResult`. The batch result separates
 executed `results` from `skipped` actions when a `stop_on_failure` action fails.
 This keeps workflow reports honest about which actions actually ran.
+`ActionExecutor` converts ordinary `execute_action(...)` exceptions into failed
+`ActionResult` values so batches can still report executed and skipped actions.
+Interruption exceptions such as `KeyboardInterrupt` are not swallowed.
 
 Built-in Damai smoke workflows use that batch path for their first action and
 still return the flat `actions` list for compatibility. Their reports now carry

@@ -955,20 +955,22 @@ def test_cli_emits_json_report_when_workflow_fails(tmp_path, capsys):
     assert report["run_state"]["finished_at"] is not None
     assert report["run_state"]["outcome"] == "failed"
     assert report["live"] is True
-    assert report["error"] == "RuntimeError: open failed"
+    assert report["error"] is None
     assert [event["event_type"] for event in report["events"]] == [
         "task.start",
-        "error",
         "task.end",
     ]
-    assert report["events"][1]["payload"] == {
-        "task_name": "damai-web-smoke",
-        "task_id": "cli-run",
-        "message": "open failed",
-        "error_type": "RuntimeError",
+    assert report["events"][1]["payload"]["outcome"] == "failed"
+    assert report["actions"] == [
+        {"success": False, "message": "open failed: open failed"}
+    ]
+    assert report["action_batch"] == {
+        "results": [
+            {"success": False, "message": "open failed: open failed"},
+        ],
+        "skipped": [],
+        "success": False,
     }
-    assert report["events"][2]["payload"]["outcome"] == "failed"
-    assert report["actions"] == []
     assert report["artifacts"] == []
     assert fixtures.CREATED_SESSIONS[0].stopped is True
 
