@@ -1,5 +1,5 @@
 from dataclasses import asdict, dataclass
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from automation_core.actions import ActionBatchResult
 from automation_core.drivers import ActionResult, ArtifactHandle, SessionInfo
@@ -8,7 +8,7 @@ from automation_runner.context import WorkflowContext
 from examples.workflows import ExampleWorkflowResult
 
 
-SENSITIVE_METADATA_TERMS = (
+SENSITIVE_REPORT_KEY_TERMS = (
     "authorization",
     "cookie",
     "password",
@@ -81,15 +81,32 @@ def _serialize_action_batch(batch_result: Optional[ActionBatchResult]) -> Option
     }
 
 
+def _redact_sensitive_values(value: Any) -> Any:
+    if isinstance(value, dict):
+        safe_value = {}
+        for key, nested_value in value.items():
+            lowered = str(key).lower()
+            if any(term in lowered for term in SENSITIVE_REPORT_KEY_TERMS):
+                safe_value[key] = "[redacted]"
+            else:
+                safe_value[key] = _redact_sensitive_values(nested_value)
+        return safe_value
+    if isinstance(value, list):
+        return [_redact_sensitive_values(item) for item in value]
+    return value
+
+
 def _serialize_metadata(metadata: Dict[str, str]) -> Dict[str, str]:
-    safe_metadata = {}
-    for key, value in metadata.items():
-        lowered = key.lower()
-        if any(term in lowered for term in SENSITIVE_METADATA_TERMS):
-            safe_metadata[key] = "[redacted]"
-        else:
-            safe_metadata[key] = value
-    return safe_metadata
+    return _redact_sensitive_values(metadata)
+
+
+def _serialize_events(events) -> List[Dict[str, object]]:
+    serialized_events = []
+    for envelope in events:
+        event = envelope.to_dict()
+        event["payload"] = _redact_sensitive_values(event["payload"])
+        serialized_events.append(event)
+    return serialized_events
 
 
 def _serialize_artifacts(artifacts: List[ArtifactHandle]) -> List[Dict[str, object]]:
@@ -150,7 +167,7 @@ def build_report(
         },
         live=live,
         elapsed_seconds=elapsed_seconds,
-        events=[envelope.to_dict() for envelope in result.events],
+        events=_serialize_events(result.events),
         session=_serialize_session(result.session),
         actions=_serialize_actions(result.actions),
         action_batch=_serialize_action_batch(result.batch_result),

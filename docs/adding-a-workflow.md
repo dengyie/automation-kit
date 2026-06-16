@@ -288,6 +288,8 @@ rules, report attachment rules, and dry-run behavior.
   capture mode, or content kind.
 - Report serialization redacts common sensitive metadata keys containing terms
   such as `token`, `secret`, `password`, `cookie`, or `authorization`.
+- Report serialization also redacts common sensitive keys in event payloads
+  before writing JSON to stdout or report files.
 - Dry workflows may return deterministic artifact paths without writing files.
 
 ## Adapter Rules

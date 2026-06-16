@@ -2,7 +2,7 @@ from pathlib import Path
 
 from automation_core.actions import ActionBatchResult, ActionRequest
 from automation_core.drivers import ActionResult, ArtifactHandle, SessionInfo
-from automation_core.events import TaskStartEvent
+from automation_core.events import EventEnvelope, TaskStartEvent
 from automation_core.state import RunState, RunStatus
 from automation_runner.context import WorkflowContext
 from automation_runner.reports import build_report
@@ -194,6 +194,56 @@ def test_build_report_serializes_workflow_events():
     assert report["events"][0]["payload"] == {
         "task_name": "damai-web-smoke",
         "task_id": "run-1",
+    }
+
+
+def test_build_report_redacts_sensitive_event_payload_fields():
+    result = ExampleWorkflowResult(
+        session=SessionInfo(
+            driver_name="fake",
+            platform="web",
+            identifier="run-1",
+        ),
+        success=False,
+        actions=[],
+        artifacts=[],
+        events=[
+            EventEnvelope(
+                event_type="error",
+                task_id="run-1",
+                payload={
+                    "task_name": "checkout",
+                    "auth_token": "secret-token",
+                    "details": {
+                        "cookie": "session=abc",
+                        "attempt": 1,
+                    },
+                    "attempts": [
+                        {
+                            "password": "secret",
+                            "status": "failed",
+                        }
+                    ],
+                },
+            )
+        ],
+    )
+
+    report = build_report("damai-web-smoke", result).to_dict()
+
+    assert report["events"][0]["payload"] == {
+        "task_name": "checkout",
+        "auth_token": "[redacted]",
+        "details": {
+            "cookie": "[redacted]",
+            "attempt": 1,
+        },
+        "attempts": [
+            {
+                "password": "[redacted]",
+                "status": "failed",
+            }
+        ],
     }
 
 

@@ -2530,6 +2530,94 @@ and the report contract remains backward compatible.
 
 Stage, commit, and push the finished slice.
 
+## 2026-06-17: Report Event Payload Redaction
+
+### Completed
+
+- Added a design note and implementation plan for runner report event payload
+  redaction.
+- Added report serialization coverage for sensitive event payload keys,
+  including nested dictionaries and dictionaries inside lists.
+- Added recursive report-level redaction for sensitive keys containing
+  `authorization`, `cookie`, `password`, `secret`, or `token`.
+- Reused the same redaction helper for artifact metadata so report-safe key
+  handling stays consistent.
+- Updated `build_report(...)` to serialize events through a report-safe helper.
+- Documented event payload redaction in `docs/adding-a-workflow.md`.
+- Left `automation_core.events` unchanged and business-agnostic.
+
+### Verification
+
+Focused red run before implementation:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_reports.py --no-cov -q
+```
+
+Initial result:
+
+```text
+1 failed, 8 passed
+```
+
+Focused green run after implementation:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_reports.py --no-cov -q
+```
+
+Result:
+
+```text
+9 passed
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+254 passed
+Total coverage: 96.13%
+Required coverage: 80%
+```
+
+Whitespace check:
+
+```bash
+git diff --check
+```
+
+Result: no output.
+
+### Review
+
+Ran the required production code quality review scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- redaction happens in `automation_runner.reports`.
+- `EventEnvelope` payloads remain unchanged before report serialization.
+- event payload dictionaries are redacted recursively by sensitive key name.
+- artifact metadata redaction still uses the same report-safe key policy.
+- the runner report schema remains unchanged because event payloads are still
+  extensible objects.
+- `automation_core.events` remains unchanged.
+
+### Next Phase
+
+Stage, commit, and push the finished slice.
+
 ## 2026-06-17: Workflow Artifact Failure Reporting
 
 ### Completed
