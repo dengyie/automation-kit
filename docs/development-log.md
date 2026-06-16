@@ -3032,3 +3032,83 @@ Follow-up inspection confirmed:
 ### Next Phase
 
 Stage, commit, and push the finished slice.
+
+## 2026-06-16: Runner Report Schema Version
+
+### Completed
+
+- Added top-level `schema_version` metadata to runner JSON reports.
+- Kept schema versioning in `automation_runner.reports`.
+- Left `automation_core`, workflow result models, and event envelopes unchanged.
+- Added report unit coverage and CLI JSON coverage for the new field.
+- Documented the report contract version in `docs/adding-a-workflow.md`.
+
+### Verification
+
+Focused red test run before implementation:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_reports.py::test_build_report_serializes_safe_workflow_summary tests/runner/test_cli.py::test_cli_runs_dry_workflow_without_live_flag --no-cov -q
+```
+
+Result:
+
+```text
+2 failed
+KeyError: 'schema_version'
+```
+
+Focused green test run after implementation:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_reports.py::test_build_report_serializes_safe_workflow_summary tests/runner/test_cli.py::test_cli_runs_dry_workflow_without_live_flag --no-cov -q
+```
+
+Result:
+
+```text
+2 passed
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+185 passed
+Total coverage: 94.86%
+Required coverage: 80%
+```
+
+Whitespace check:
+
+```bash
+git diff --check
+```
+
+Result: no output.
+
+### Review
+
+Ran the required production code quality review scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- `schema_version` is additive runner report metadata.
+- the field is emitted by both unit-level report serialization and CLI JSON.
+- no business-specific data was moved into `automation_core`.
+- workflow result models and event envelopes remain unversioned in this slice.
+
+### Next Phase
+
+Stage, commit, and push the finished slice.

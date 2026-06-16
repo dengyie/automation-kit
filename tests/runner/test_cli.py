@@ -83,6 +83,7 @@ def test_cli_runs_dry_workflow_without_live_flag(capsys):
     report = json.loads(captured.out)
 
     assert exit_code == 0
+    assert report["schema_version"] == "1"
     assert report["workflow"] == "damai-web-smoke"
     assert report["success"] is True
     assert report["live"] is False

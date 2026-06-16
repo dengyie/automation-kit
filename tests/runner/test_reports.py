@@ -44,6 +44,7 @@ def test_build_report_serializes_safe_workflow_summary():
         live=True,
     ).to_dict()
 
+    assert report["schema_version"] == "1"
     assert report["workflow"] == "damai-web-smoke"
     assert report["workflow_factory"] is None
     assert report["success"] is True

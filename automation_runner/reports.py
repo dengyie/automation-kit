@@ -19,6 +19,7 @@ SENSITIVE_METADATA_TERMS = (
 
 @dataclass(frozen=True)
 class RunnerReport:
+    schema_version: str
     workflow: str
     workflow_factory: Optional[str]
     session_factory: Optional[str]
@@ -124,6 +125,7 @@ def build_report(
         else:
             state.fail()
     return RunnerReport(
+        schema_version="1",
         workflow=workflow,
         workflow_factory=workflow_factory,
         session_factory=session_factory,

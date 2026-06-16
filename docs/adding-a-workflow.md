@@ -195,6 +195,7 @@ still get a structured failure payload. Startup failure reports also include
 
 JSON reports currently include:
 
+- `schema_version`
 - `workflow`
 - `workflow_factory`
 - `session_factory`
@@ -216,6 +217,10 @@ Each artifact entry contains:
 - `artifact_type`
 - `path`
 - `metadata`
+
+`schema_version` records the top-level runner JSON report contract version.
+It is report metadata and does not version workflow result models or event
+envelopes.
 
 `events` contains serialized `EventEnvelope` records. Example workflows emit:
 
