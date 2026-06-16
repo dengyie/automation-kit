@@ -3197,3 +3197,117 @@ Follow-up inspection confirmed:
 ### Next Phase
 
 Stage, commit, and push the finished slice.
+
+## 2026-06-16: Runner Report Schema CLI
+
+### Completed
+
+- Added `automation_runner.schemas.load_report_schema()` for packaged runner
+  report schema discovery.
+- Added `automation_runner/schemas/report-schema-v1.json` as a package
+  resource that matches `docs/report-schema-v1.json`.
+- Added `automation-runner report-schema --version 1` for CLI schema output.
+- Added unsupported-version handling for `report-schema --version 2`.
+- Added package configuration for including the schema resource in both sdist
+  and wheel formats.
+- Documented CLI schema discovery in `README.md` and
+  `docs/adding-a-workflow.md`.
+
+### Verification
+
+Focused red test run before implementation:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_report_schema.py tests/runner/test_cli.py::test_cli_prints_report_schema_v1 tests/runner/test_cli.py::test_cli_rejects_unknown_report_schema_version --no-cov -q
+```
+
+Result:
+
+```text
+1 error
+ModuleNotFoundError: No module named 'automation_runner.schemas'
+```
+
+Focused green test run after implementation:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_report_schema.py tests/runner/test_cli.py::test_cli_prints_report_schema_v1 tests/runner/test_cli.py::test_cli_rejects_unknown_report_schema_version --no-cov -q
+```
+
+Result:
+
+```text
+8 passed
+```
+
+Production review follow-up compatibility test:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_report_schema.py::test_packaged_report_schema_loader_supports_python_38_resources --no-cov -q
+```
+
+Initial result:
+
+```text
+1 failed
+AttributeError: module 'importlib.resources' has no attribute 'files'
+```
+
+After switching the loader to `importlib.resources.read_text(...)`, the focused
+schema and CLI tests passed.
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+193 passed
+Total coverage: 94.93%
+Required coverage: 80%
+```
+
+Whitespace check:
+
+```bash
+git diff --check
+```
+
+Result: no output.
+
+Package build check:
+
+```bash
+poetry build -f wheel
+```
+
+Result: not run locally because the `poetry` command and Python `build` module
+are unavailable in this shell. The package resource include is covered by a
+focused `pyproject.toml` contract test.
+
+### Review
+
+Ran the required production code quality review scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection and optimization confirmed:
+
+- schema discovery stays in `automation_runner`, not `automation_core`.
+- the packaged schema matches the documented schema.
+- unsupported schema versions return a clear CLI error without printing JSON.
+- `pyproject.toml` declares the schema resource for both source and wheel
+  distributions.
+- `load_report_schema()` uses a Python 3.8-compatible `importlib.resources`
+  API to match the declared package Python range.
+
+### Next Phase
+
+Stage, commit, and push the finished slice.

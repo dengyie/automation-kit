@@ -10,6 +10,9 @@ packages = [
     { include = "examples" },
     { include = "automation_runner" },
 ]
+include = [
+    { path = "automation_runner/schemas/report-schema-v1.json", format = ["sdist", "wheel"] },
+]
 
 [tool.poetry.dependencies]
 python = "^3.8"

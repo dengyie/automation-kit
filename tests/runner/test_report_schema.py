@@ -1,12 +1,15 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from automation_core.actions import ActionBatchResult, ActionRequest
 from automation_core.drivers import ActionResult, ArtifactHandle, SessionInfo
 from automation_core.events import TaskStartEvent
 from automation_core.state import RunState
 from automation_runner.context import WorkflowContext
 from automation_runner.reports import build_report
+from automation_runner.schemas import load_report_schema
 from examples.workflows import ExampleWorkflowResult
 
 
@@ -118,3 +121,27 @@ def test_report_schema_v1_documents_safe_nested_report_sections():
         "properties"
     ]
     assert "parameters" not in skipped_properties
+
+
+def test_packaged_report_schema_matches_docs_schema():
+    assert load_report_schema("1") == _load_schema()
+
+
+def test_unknown_report_schema_version_raises_clear_error():
+    with pytest.raises(ValueError, match="unsupported report schema version: 2"):
+        load_report_schema("2")
+
+
+def test_packaged_report_schema_loader_supports_python_38_resources(monkeypatch):
+    import automation_runner.schemas as schemas
+
+    monkeypatch.delattr(schemas.resources, "files")
+
+    assert schemas.load_report_schema("1") == _load_schema()
+
+
+def test_pyproject_includes_packaged_report_schema_resource():
+    content = Path("pyproject.toml").read_text(encoding="utf-8")
+
+    assert 'path = "automation_runner/schemas/report-schema-v1.json"' in content
+    assert 'format = ["sdist", "wheel"]' in content

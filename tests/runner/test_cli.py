@@ -60,6 +60,28 @@ def test_cli_examples_does_not_validate_run_config(capsys):
     assert "damai-web-smoke" in captured.out
 
 
+def test_cli_prints_report_schema_v1(capsys):
+    exit_code = main(["report-schema", "--version", "1"])
+
+    captured = capsys.readouterr()
+    schema = json.loads(captured.out)
+
+    assert exit_code == 0
+    assert schema["title"] == "Automation Kit Runner Report v1"
+    assert schema["properties"]["schema_version"]["const"] == "1"
+    assert captured.err == ""
+
+
+def test_cli_rejects_unknown_report_schema_version(capsys):
+    exit_code = main(["report-schema", "--version", "2"])
+
+    captured = capsys.readouterr()
+
+    assert exit_code == 2
+    assert captured.out == ""
+    assert "unsupported report schema version: 2" in captured.err
+
+
 def test_pyproject_exposes_runner_script():
     content = Path("pyproject.toml").read_text(encoding="utf-8")
 

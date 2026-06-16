@@ -58,6 +58,7 @@ automation-runner run --workflow-factory my_package.workflow:create_workflow \
   --json \
   --param account=test-user \
   --param city=shanghai
+automation-runner report-schema --version 1
 ```
 
 Runner options can also come from environment variables. Explicit CLI
@@ -97,6 +98,7 @@ passes those strings through as `options.parameters` and leaves workflow-specifi
 validation to the workflow package.
 
 See `docs/adding-a-workflow.md` for package boundaries, report fields, and
-adapter rules. See `docs/report-schema-v1.json` for the machine-readable
-runner report contract. See `docs/artifacts.md` for screenshot, page-source,
-UI-tree, trace, and log artifact conventions.
+adapter rules. `automation-runner report-schema --version 1` prints the
+packaged machine-readable runner report contract, which is also documented in
+`docs/report-schema-v1.json`. See `docs/artifacts.md` for screenshot,
+page-source, UI-tree, trace, and log artifact conventions.

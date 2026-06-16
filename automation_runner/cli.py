@@ -17,6 +17,7 @@ from automation_runner import WorkflowRunner
 from automation_runner.config import RunnerConfig, load_runner_config
 from automation_runner.dry_run import DryRunSession
 from automation_runner.reports import build_report
+from automation_runner.schemas import load_report_schema
 from examples.workflows import ExampleWorkflowResult
 from examples.damai_android import create_workflow as create_damai_android_workflow
 from examples.damai_web import create_workflow as create_damai_web_workflow
@@ -35,6 +36,16 @@ def build_parser() -> argparse.ArgumentParser:
     examples = subparsers.add_parser("examples", help="list example workflows")
     examples.add_argument("--dry-run", action="store_true", help="list only")
     examples.add_argument("--json", action="store_true", help="emit JSON workflow list")
+
+    report_schema = subparsers.add_parser(
+        "report-schema",
+        help="print runner report JSON schema",
+    )
+    report_schema.add_argument(
+        "--version",
+        default="1",
+        help="runner report schema version",
+    )
 
     run = subparsers.add_parser("run", help="run a workflow")
     run.add_argument("workflow", nargs="?", choices=sorted(WORKFLOWS))
@@ -224,6 +235,14 @@ def main(
             print(workflow_name)
         if args.dry_run:
             print("dry-run: no live browser, Appium, ADB, or device session started")
+        return 0
+
+    if args.command == "report-schema":
+        try:
+            schema = load_report_schema(args.version)
+        except ValueError as exc:
+            return _print_error(str(exc))
+        print(json.dumps(schema, sort_keys=True))
         return 0
 
     if args.command == "run":
