@@ -4285,3 +4285,105 @@ Follow-up inspection confirmed:
 ### Next Phase
 
 Stage, commit, and push the finished slice.
+
+## 2026-06-17: Adapter Element Lookup Failure Handling
+
+### Completed
+
+- Added a design note and implementation plan for direct element lookup failure
+  handling in adapters.
+- Added Selenium coverage for `click` and `type_text` when driver element lookup
+  raises.
+- Added Appium coverage for `tap` and `type_text` when driver element lookup
+  raises.
+- Updated Selenium and Appium `_resolve_element(...)` helpers so direct element
+  actions return failed `ActionResult` values instead of surfacing lookup
+  exceptions.
+- Preserved `wait_for_element` retry behavior by letting that path continue to
+  route lookup exceptions through `retry_until(...)`.
+- Documented the adapter contract in `docs/adding-a-workflow.md`.
+- Left `automation_core` unchanged and business-agnostic.
+
+### Verification
+
+Focused red run before implementation:
+
+```bash
+.venv/bin/python -m pytest tests/adapters/selenium/test_session.py tests/adapters/appium/test_session.py --no-cov -q
+```
+
+Initial result:
+
+```text
+4 failed, 51 passed
+```
+
+Message-semantics red run before final adjustment:
+
+```bash
+.venv/bin/python -m pytest tests/adapters/selenium/test_session.py::test_selenium_session_click_reports_missing_lookup_failure tests/adapters/selenium/test_session.py::test_selenium_session_type_text_reports_missing_lookup_failure tests/adapters/appium/test_session.py::test_appium_session_tap_reports_missing_lookup_failure tests/adapters/appium/test_session.py::test_appium_session_type_text_reports_missing_lookup_failure --no-cov -q
+```
+
+Result:
+
+```text
+4 failed
+```
+
+Focused green run after implementation:
+
+```bash
+.venv/bin/python -m pytest tests/adapters/selenium/test_session.py tests/adapters/appium/test_session.py --no-cov -q
+```
+
+Result:
+
+```text
+55 passed
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+235 passed
+Total coverage: 96.03%
+Required coverage: 80%
+```
+
+Whitespace check:
+
+```bash
+git diff --check
+```
+
+Result: no output.
+
+### Review
+
+Ran the required production code quality review scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- lookup failure handling remains in concrete adapters.
+- direct element actions now return failed `ActionResult` values on lookup
+  failure.
+- `wait_for_element` still uses retry semantics and timeout messaging.
+- no security-sensitive access-control logic was changed; the review risk flag
+  was triggered by adapter terminology rather than an auth path.
+- `automation_core` remains unchanged.
+
+### Next Phase
+
+Stage, commit, and push the finished slice.

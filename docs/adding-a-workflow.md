@@ -286,4 +286,6 @@ rules, report attachment rules, and dry-run behavior.
 - Do not move selectors, URLs, or business flow into `automation_core`.
 - Capture screenshots, page source, UI trees, traces, and logs as artifacts
   rather than embedding raw data in JSON reports.
+- Direct element actions return failed `ActionResult` values when lookup fails;
+  use `wait_for_element` when a workflow needs retry-style waiting.
 - Keep default tests offline and deterministic.

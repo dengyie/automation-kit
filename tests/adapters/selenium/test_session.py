@@ -264,6 +264,28 @@ def test_selenium_session_element_alias_reports_missing_lookup_support():
     assert result.message == "driver does not support element lookup"
 
 
+def test_selenium_session_click_reports_missing_lookup_failure():
+    driver = FakeDriver(lookup_failures=1)
+    session = SeleniumSession(driver=driver)
+
+    result = session.execute_action("click", selector="#buy")
+
+    assert result.success is False
+    assert result.message == "element lookup failed: #buy"
+    assert driver.lookups == [("css selector", "#buy")]
+
+
+def test_selenium_session_type_text_reports_missing_lookup_failure():
+    driver = FakeDriver(lookup_failures=1)
+    session = SeleniumSession(driver=driver)
+
+    result = session.execute_action("type_text", selector="#kw", text="concert")
+
+    assert result.success is False
+    assert result.message == "element lookup failed: #kw"
+    assert driver.lookups == [("css selector", "#kw")]
+
+
 def test_selenium_session_reports_unsupported_action():
     session = SeleniumSession(driver=FakeDriver())
 

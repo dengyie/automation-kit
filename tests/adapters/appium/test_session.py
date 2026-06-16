@@ -302,6 +302,28 @@ def test_appium_session_element_alias_reports_missing_lookup_support():
     assert result.message == "driver does not support element lookup"
 
 
+def test_appium_session_tap_reports_missing_lookup_failure():
+    driver = FakeMobileDriver(lookup_failures=1)
+    session = AppiumSession(driver=driver)
+
+    result = session.execute_action("tap", selector="buy")
+
+    assert result.success is False
+    assert result.message == "element lookup failed: buy"
+    assert driver.lookups == [("accessibility id", "buy")]
+
+
+def test_appium_session_type_text_reports_missing_lookup_failure():
+    driver = FakeMobileDriver(lookup_failures=1)
+    session = AppiumSession(driver=driver)
+
+    result = session.execute_action("type_text", selector="buy", text="concert")
+
+    assert result.success is False
+    assert result.message == "element lookup failed: buy"
+    assert driver.lookups == [("accessibility id", "buy")]
+
+
 def test_appium_session_reports_unsupported_action():
     session = AppiumSession(driver=FakeMobileDriver())
 

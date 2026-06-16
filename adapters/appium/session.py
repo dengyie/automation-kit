@@ -128,7 +128,11 @@ class AppiumSession:
         by = kwargs.get("by")
 
         def lookup():
-            element, error = self._resolve_element(selector=selector, by=by)
+            element, error = self._resolve_element(
+                selector=selector,
+                by=by,
+                retry_lookup=True,
+            )
             if error is not None:
                 return error
             return element
@@ -155,12 +159,23 @@ class AppiumSession:
         )
 
     def _resolve_element(
-        self, selector: str, by: Optional[str]
+        self,
+        selector: str,
+        by: Optional[str],
+        retry_lookup: bool = False,
     ) -> Tuple[Optional[Any], Optional[ActionResult]]:
         find_element = getattr(self.driver, "find_element", None)
         if not callable(find_element):
             return None, ActionResult(False, "driver does not support element lookup")
-        return find_element(by or "accessibility id", selector), None
+        try:
+            return find_element(by or "accessibility id", selector), None
+        except Exception:
+            if retry_lookup:
+                raise
+            return None, ActionResult(
+                False,
+                f"element lookup failed: {selector}",
+            )
 
     def capture_artifact(self, artifact_type: str, name: str) -> ArtifactHandle:
         record = self.artifact_store.record(
