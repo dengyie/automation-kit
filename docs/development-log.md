@@ -3608,3 +3608,87 @@ Follow-up inspection and optimization confirmed:
 ### Next Phase
 
 Stage, commit, and push the finished slice.
+
+## 2026-06-17: Module Entrypoint Coverage
+
+### Completed
+
+- Added a design note and implementation plan for direct runner module
+  entrypoint coverage.
+- Added direct tests for `automation_runner.__main__` delegation.
+- Added a tiny `run()` wrapper so module-entrypoint behavior can be tested
+  in-process.
+- Kept existing subprocess coverage for `python -m automation_runner`.
+- Kept all behavior inside `automation_runner`; `automation_core` remains
+  untouched.
+
+### Verification
+
+Focused red run before implementation:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_module_entrypoint.py --no-cov -q
+```
+
+Initial result:
+
+```text
+1 failed, 2 passed
+AttributeError: module 'automation_runner.__main__' has no attribute 'run'
+```
+
+Focused green run after implementation:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_module_entrypoint.py --no-cov -q
+```
+
+Result:
+
+```text
+3 passed
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+217 passed
+Total coverage: 95.65%
+Required coverage: 80%
+```
+
+Whitespace check:
+
+```bash
+git diff --check
+```
+
+Result: no output.
+
+### Review
+
+Ran the required production code quality review scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- module entrypoint behavior remains in `automation_runner`.
+- `automation_core` remains untouched.
+- the new direct tests cover the wrapper delegation and script exit code.
+- the existing subprocess smoke test still proves `python -m automation_runner`
+  executes through the package entrypoint.
+
+### Next Phase
+
+Stage, commit, and push the finished slice.

@@ -1,5 +1,9 @@
 from automation_runner.cli import main
 
 
+def run() -> int:
+    return main()
+
+
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(run())
