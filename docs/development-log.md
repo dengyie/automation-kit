@@ -2591,3 +2591,64 @@ Follow-up inspection confirmed:
 ### Next Phase
 
 Stage, commit, and push the finished slice.
+
+## 2026-06-16: Runner Failure Reporting
+
+### Completed
+
+- Added structured JSON reports for runner execution failures before a workflow
+  returns a normal result.
+- Added startup-failure coverage for live session factories.
+- Added workflow-construction failure coverage for custom workflow factories.
+- Reused the existing runner report contract instead of adding a second error
+  model.
+- Documented startup failure reports in `docs/adding-a-workflow.md`.
+
+### Verification
+
+Focused runner CLI tests:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_cli.py --no-cov -q
+```
+
+Result:
+
+```text
+32 passed
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+177 passed
+Total coverage: 94.71%
+Required coverage: 80%
+```
+
+### Review
+
+Ran the required production code quality review scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- runner startup failures now emit a structured JSON report when `--json` is
+  enabled.
+- report file output stays aligned with stdout output on startup failure.
+- the fallback session identity is only used when a real session never existed.
+
+### Next Phase
+
+Stage, commit, and push the finished slice.

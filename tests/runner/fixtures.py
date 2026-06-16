@@ -57,6 +57,10 @@ def record_import():
     return make_session
 
 
+def raise_session_startup():
+    raise RuntimeError("session startup failed")
+
+
 def create_custom_workflow(session_factory):
     return ExampleWorkflow(
         name="custom-smoke",
@@ -126,6 +130,10 @@ def create_kwargs_context_workflow(session_factory, **kwargs):
             ),
         ),
     )
+
+
+def create_raising_workflow(session_factory):
+    raise RuntimeError("workflow construction failed")
 
 
 def reset():

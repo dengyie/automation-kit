@@ -9,12 +9,14 @@ import time
 from typing import List, Optional
 
 from automation_core.config import ConfigSource, EnvConfigSource
+from automation_core.drivers import SessionInfo
 from automation_core.state import RunState
 from automation_runner.context import WorkflowContext, WorkflowOptions
 from automation_runner import WorkflowRunner
 from automation_runner.config import RunnerConfig, load_runner_config
 from automation_runner.dry_run import DryRunSession
 from automation_runner.reports import build_report
+from examples.workflows import ExampleWorkflowResult
 from examples.damai_android import create_workflow as create_damai_android_workflow
 from examples.damai_web import create_workflow as create_damai_web_workflow
 
@@ -61,6 +63,34 @@ def load_object(import_path: str):
 def _print_error(message: str) -> int:
     print(message, file=sys.stderr)
     return 2
+
+
+def _print_run_error(message: str) -> int:
+    print(message, file=sys.stderr)
+    return 1
+
+
+def _failure_result(workflow_name: str, exc: Exception) -> ExampleWorkflowResult:
+    return ExampleWorkflowResult(
+        session=SessionInfo(
+            driver_name="unavailable",
+            platform="unknown",
+            identifier=f"{workflow_name}-failed-run",
+        ),
+        success=False,
+        actions=[],
+        artifacts=[],
+        error=f"{type(exc).__name__}: {exc}",
+    )
+
+
+def _emit_json_report(report, report_file: Optional[str]) -> None:
+    payload = json.dumps(report.to_dict(), sort_keys=True)
+    print(payload)
+    if report_file:
+        report_path = Path(report_file)
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(payload + "\n", encoding="utf-8")
 
 
 def _merge_config(args: argparse.Namespace, config: RunnerConfig) -> RunnerConfig:
@@ -161,6 +191,8 @@ def main(
             workflow_name = _workflow_name(args, config)
         except ValueError as exc:
             return _print_error(str(exc))
+        if args.report_file and not config.emit_json:
+            return _print_error("--report-file requires --json")
         if config.live and not config.factory:
             return _print_error("--factory is required for live workflows")
         if workflow_name == "damai-web-smoke":
@@ -217,7 +249,12 @@ def main(
 
         started_at = time.monotonic()
         wall_started_at = time.time()
-        result = runner.run()
+        try:
+            result = runner.run()
+        except Exception as exc:
+            if not config.emit_json:
+                return _print_run_error(f"{type(exc).__name__}: {exc}")
+            result = _failure_result(workflow_name, exc)
         wall_finished_at = time.time()
         elapsed_seconds = time.monotonic() - started_at
         run_state = RunState(run_id=result.session.identifier)
@@ -237,16 +274,9 @@ def main(
                 workflow_context=context if config.workflow_factory else None,
                 elapsed_seconds=elapsed_seconds,
             )
-            payload = json.dumps(report.to_dict(), sort_keys=True)
-            print(payload)
-            if args.report_file:
-                report_path = Path(args.report_file)
-                report_path.parent.mkdir(parents=True, exist_ok=True)
-                report_path.write_text(payload + "\n", encoding="utf-8")
+            _emit_json_report(report, args.report_file)
             return 0 if result.success else 1
         else:
-            if args.report_file:
-                return _print_error("--report-file requires --json")
             print(f"{workflow_name} success={result.success}")
         return 0 if result.success else 1
 

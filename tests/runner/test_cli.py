@@ -712,6 +712,69 @@ def test_cli_emits_json_report_when_workflow_fails(tmp_path, capsys):
     assert fixtures.CREATED_SESSIONS[0].stopped is True
 
 
+def test_cli_emits_json_report_when_session_factory_fails(tmp_path, capsys):
+    fixtures.reset()
+    report_path = tmp_path / "startup-failed.json"
+
+    exit_code = main(
+        [
+            "run",
+            "damai-web-smoke",
+            "--live",
+            "--json",
+            "--report-file",
+            str(report_path),
+            "--factory",
+            "tests.runner.fixtures:raise_session_startup",
+            "--url",
+            "https://example.test/damai",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    report = json.loads(captured.out)
+
+    assert exit_code == 1
+    assert report_path.read_text(encoding="utf-8") == captured.out
+    assert report["workflow"] == "damai-web-smoke"
+    assert report["success"] is False
+    assert report["status"] == "failed"
+    assert report["run_id"] == "damai-web-smoke-failed-run"
+    assert report["run_state"]["status"] == "failed"
+    assert report["live"] is True
+    assert report["session"] == {
+        "driver_name": "unavailable",
+        "platform": "unknown",
+        "identifier": "damai-web-smoke-failed-run",
+    }
+    assert report["actions"] == []
+    assert report["artifacts"] == []
+    assert report["error"] == "RuntimeError: session startup failed"
+
+
+def test_cli_emits_json_report_when_custom_workflow_factory_fails(capsys):
+    fixtures.reset()
+
+    exit_code = main(
+        [
+            "run",
+            "--workflow-factory",
+            "tests.runner.fixtures:create_raising_workflow",
+            "--json",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    report = json.loads(captured.out)
+
+    assert exit_code == 1
+    assert report["workflow"] == "tests.runner.fixtures:create_raising_workflow"
+    assert report["workflow_factory"] == "tests.runner.fixtures:create_raising_workflow"
+    assert report["success"] is False
+    assert report["run_id"] == "tests.runner.fixtures:create_raising_workflow-failed-run"
+    assert report["error"] == "RuntimeError: workflow construction failed"
+
+
 def test_cli_creates_report_file_parent_directories(tmp_path, capsys):
     fixtures.reset()
     report_path = tmp_path / "nested" / "reports" / "report.json"
