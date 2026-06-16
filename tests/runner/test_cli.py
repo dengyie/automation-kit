@@ -750,6 +750,19 @@ def test_cli_emits_json_report_when_session_factory_fails(tmp_path, capsys):
     assert report["actions"] == []
     assert report["artifacts"] == []
     assert report["error"] == "RuntimeError: session startup failed"
+    assert [event["event_type"] for event in report["events"]] == [
+        "task.start",
+        "error",
+        "task.end",
+    ]
+    assert report["events"][0]["task_id"] == "damai-web-smoke-failed-run"
+    assert report["events"][1]["payload"] == {
+        "task_name": "damai-web-smoke",
+        "task_id": "damai-web-smoke-failed-run",
+        "message": "session startup failed",
+        "error_type": "RuntimeError",
+    }
+    assert report["events"][2]["payload"]["outcome"] == "failed"
 
 
 def test_cli_emits_json_report_when_custom_workflow_factory_fails(capsys):
@@ -773,6 +786,17 @@ def test_cli_emits_json_report_when_custom_workflow_factory_fails(capsys):
     assert report["success"] is False
     assert report["run_id"] == "tests.runner.fixtures:create_raising_workflow-failed-run"
     assert report["error"] == "RuntimeError: workflow construction failed"
+    assert [event["event_type"] for event in report["events"]] == [
+        "task.start",
+        "error",
+        "task.end",
+    ]
+    assert report["events"][1]["payload"] == {
+        "task_name": "tests.runner.fixtures:create_raising_workflow",
+        "task_id": "tests.runner.fixtures:create_raising_workflow-failed-run",
+        "message": "workflow construction failed",
+        "error_type": "RuntimeError",
+    }
 
 
 def test_cli_creates_report_file_parent_directories(tmp_path, capsys):

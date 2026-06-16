@@ -160,7 +160,8 @@ output line up with the same execution model.
 When `--json` is enabled, runner startup failures also emit a JSON report. In
 that case the runner uses a fallback session identity with
 `driver_name="unavailable"` and `platform="unknown"` so schedulers and scripts
-still get a structured failure payload.
+still get a structured failure payload. Startup failure reports also include
+`task.start`, `error`, and `task.end` events.
 
 ## Report Contract
 

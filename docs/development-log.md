@@ -2530,6 +2530,80 @@ and the report contract remains backward compatible.
 
 Stage, commit, and push the finished slice.
 
+## 2026-06-16: Runner Startup Failure Events
+
+### Completed
+
+- Added `task.start`, `error`, and `task.end` events to runner startup failure
+  JSON reports.
+- Reused existing `automation_core.events` event models instead of adding a
+  second event shape.
+- Covered live session factory startup failures and custom workflow factory
+  construction failures.
+- Documented startup failure event behavior in `docs/adding-a-workflow.md`.
+
+### Verification
+
+Focused startup failure regression tests:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_cli.py -k 'session_factory_fails or custom_workflow_factory_fails' --no-cov -q
+```
+
+Result:
+
+```text
+2 passed, 30 deselected
+```
+
+Focused runner CLI tests:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_cli.py --no-cov -q
+```
+
+Result:
+
+```text
+32 passed
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+177 passed
+Total coverage: 94.72%
+Required coverage: 80%
+```
+
+### Review
+
+Used `production-code-quality-review` required setup scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- startup failure reports now include `task.start`, `error`, and `task.end`
+  events.
+- fallback event payloads use the same fallback run id as the report session.
+- the change reuses existing `automation_core.events` models.
+- normal `ExampleWorkflow.run()` event behavior is unchanged.
+
+### Next Phase
+
+Commit and push the finished slice.
+
 ## 2026-06-16: Workflow Steps
 
 ### Completed

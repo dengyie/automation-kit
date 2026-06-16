@@ -10,6 +10,7 @@ from typing import List, Optional
 
 from automation_core.config import ConfigSource, EnvConfigSource
 from automation_core.drivers import SessionInfo
+from automation_core.events import ErrorEvent, TaskEndEvent, TaskStartEvent
 from automation_core.state import RunState
 from automation_runner.context import WorkflowContext, WorkflowOptions
 from automation_runner import WorkflowRunner
@@ -71,16 +72,31 @@ def _print_run_error(message: str) -> int:
 
 
 def _failure_result(workflow_name: str, exc: Exception) -> ExampleWorkflowResult:
+    task_id = f"{workflow_name}-failed-run"
     return ExampleWorkflowResult(
         session=SessionInfo(
             driver_name="unavailable",
             platform="unknown",
-            identifier=f"{workflow_name}-failed-run",
+            identifier=task_id,
         ),
         success=False,
         actions=[],
         artifacts=[],
         error=f"{type(exc).__name__}: {exc}",
+        events=[
+            TaskStartEvent(task_name=workflow_name, task_id=task_id).to_envelope(),
+            ErrorEvent(
+                task_name=workflow_name,
+                task_id=task_id,
+                message=str(exc),
+                error_type=type(exc).__name__,
+            ).to_envelope(),
+            TaskEndEvent(
+                task_name=workflow_name,
+                task_id=task_id,
+                outcome="failed",
+            ).to_envelope(),
+        ],
     )
 
 
