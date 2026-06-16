@@ -5,6 +5,7 @@ from unittest.mock import Mock
 
 import pytest
 
+from automation_core import __version__ as AUTOMATION_KIT_VERSION
 import automation_runner.__main__ as module_entrypoint
 import automation_runner.cli as cli
 
@@ -19,6 +20,18 @@ def test_runner_module_entrypoint_executes_dry_run():
 
     assert "damai-web-smoke" in result.stdout
     assert "dry-run" in result.stdout
+
+
+def test_runner_module_entrypoint_prints_version():
+    result = subprocess.run(
+        [sys.executable, "-m", "automation_runner", "--version"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.stdout == f"automation-runner {AUTOMATION_KIT_VERSION}\n"
+    assert result.stderr == ""
 
 
 def test_module_entrypoint_run_delegates_to_cli_main(monkeypatch):

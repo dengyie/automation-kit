@@ -8,6 +8,7 @@ import sys
 import time
 from typing import Dict, List, Optional
 
+from automation_core import __version__ as AUTOMATION_KIT_VERSION
 from automation_core.config import ConfigSource, EnvConfigSource
 from automation_core.drivers import SessionInfo
 from automation_core.events import ErrorEvent, TaskEndEvent, TaskStartEvent
@@ -31,6 +32,11 @@ WORKFLOWS = {
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="automation-runner")
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"automation-runner {AUTOMATION_KIT_VERSION}",
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     examples = subparsers.add_parser("examples", help="list example workflows")

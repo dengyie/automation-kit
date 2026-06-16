@@ -3692,3 +3692,84 @@ Follow-up inspection confirmed:
 ### Next Phase
 
 Stage, commit, and push the finished slice.
+
+## 2026-06-17: Runner Version CLI
+
+### Completed
+
+- Added a design note and implementation plan for the runner version command.
+- Added `automation-runner --version`.
+- Added `python -m automation_runner --version` coverage through the existing
+  module entrypoint path.
+- Reused `automation_core.__version__` as the existing package version source.
+- Kept report `schema_version` unchanged.
+- Documented the version command in `README.md`.
+
+### Verification
+
+Focused red run before implementation:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_cli.py::test_cli_prints_runner_version tests/runner/test_module_entrypoint.py::test_runner_module_entrypoint_prints_version --no-cov -q
+```
+
+Initial result:
+
+```text
+2 failed
+```
+
+Focused green run after implementation:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_cli.py::test_cli_prints_runner_version tests/runner/test_module_entrypoint.py::test_runner_module_entrypoint_prints_version --no-cov -q
+```
+
+Result:
+
+```text
+2 passed
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+219 passed
+Total coverage: 95.90%
+Required coverage: 80%
+```
+
+Whitespace check:
+
+```bash
+git diff --check
+```
+
+Result: no output.
+
+### Review
+
+Ran the required production code quality review scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- version display stays in `automation_runner.cli`.
+- `automation_core` is only used as the existing version source.
+- runner report `schema_version` remains unchanged.
+- direct CLI and module-entrypoint tests cover both supported invocation paths.
+
+### Next Phase
+
+Stage, commit, and push the finished slice.

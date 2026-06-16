@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 
+from automation_core import __version__ as AUTOMATION_KIT_VERSION
 from automation_core.config import DictConfigSource
 from automation_runner.cli import main
 from tests.runner import fixtures
@@ -58,6 +59,16 @@ def test_cli_examples_does_not_validate_run_config(capsys):
 
     assert exit_code == 0
     assert "damai-web-smoke" in captured.out
+
+
+def test_cli_prints_runner_version(capsys):
+    exit_code = main(["--version"])
+
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    assert captured.out == f"automation-runner {AUTOMATION_KIT_VERSION}\n"
+    assert captured.err == ""
 
 
 def test_cli_prints_report_schema_v1(capsys):

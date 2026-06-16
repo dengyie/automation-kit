@@ -49,6 +49,7 @@ The runner keeps live execution opt-in:
 ```bash
 automation-runner examples --dry-run
 automation-runner examples --json
+automation-runner --version
 automation-runner run damai-web-smoke --json \
   --url https://example.test/damai
 automation-runner run damai-web-smoke --live --json \
