@@ -96,6 +96,7 @@ def create_context_workflow(session_factory, context, options):
                     app_id=options.app_id,
                     emit_json=options.emit_json,
                     report_file=options.report_file,
+                    parameters=options.parameters,
                 )
             ],
             artifacts=[],

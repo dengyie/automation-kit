@@ -99,7 +99,9 @@ Custom workflow factory run:
 
 ```bash
 automation-runner run --workflow-factory my_package.workflow:create_workflow \
-  --json
+  --json \
+  --param account=test-user \
+  --param city=shanghai
 ```
 
 Runner defaults can also come from environment variables:
@@ -134,7 +136,9 @@ def create_workflow(session_factory, context, options):
 
 `context` carries runner metadata such as workflow name and live mode.
 `options` carries runner inputs such as `url`, `app_id`, `emit_json`, and
-`report_file`.
+`report_file`. Custom workflows can also read repeated `--param KEY=VALUE`
+inputs from `options.parameters`. Parameter values stay as strings; workflow
+packages own their own parsing, required-field checks, and secret handling.
 
 Built-in Damai examples still use `--url` or `--app-id`; custom workflows own
 their own parameters outside `automation_core`.

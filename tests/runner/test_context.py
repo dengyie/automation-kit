@@ -21,12 +21,14 @@ def test_workflow_options_records_runner_inputs():
         app_id="cn.damai",
         emit_json=True,
         report_file="reports/run.json",
+        parameters={"account": "test-user", "city": "shanghai"},
     )
 
     assert options.url == "https://example.test/damai"
     assert options.app_id == "cn.damai"
     assert options.emit_json is True
     assert options.report_file == "reports/run.json"
+    assert options.parameters == {"account": "test-user", "city": "shanghai"}
 
 
 def test_workflow_context_to_dict():
@@ -51,6 +53,7 @@ def test_workflow_options_to_dict():
         app_id="cn.damai",
         emit_json=True,
         report_file="reports/run.json",
+        parameters={"account": "test-user", "city": "shanghai"},
     )
 
     assert options.to_dict() == {
@@ -58,4 +61,8 @@ def test_workflow_options_to_dict():
         "app_id": "cn.damai",
         "emit_json": True,
         "report_file": "reports/run.json",
+        "parameters": {
+            "account": "test-user",
+            "city": "shanghai",
+        },
     }

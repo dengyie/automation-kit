@@ -1,5 +1,5 @@
-from dataclasses import dataclass
-from typing import Optional
+from dataclasses import dataclass, field
+from typing import Dict, Optional
 
 
 @dataclass(frozen=True)
@@ -24,6 +24,7 @@ class WorkflowOptions:
     app_id: Optional[str] = None
     emit_json: bool = False
     report_file: Optional[str] = None
+    parameters: Dict[str, str] = field(default_factory=dict)
 
     def to_dict(self):
         return {
@@ -31,4 +32,5 @@ class WorkflowOptions:
             "app_id": self.app_id,
             "emit_json": self.emit_json,
             "report_file": self.report_file,
+            "parameters": dict(self.parameters),
         }

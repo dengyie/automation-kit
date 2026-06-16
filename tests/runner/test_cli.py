@@ -170,6 +170,12 @@ def test_cli_passes_context_and_options_to_custom_workflow_factory(tmp_path, cap
             "https://example.test/damai",
             "--app-id",
             "cn.damai",
+            "--param",
+            "account=test-user",
+            "--param",
+            "city=shanghai",
+            "--param",
+            "token=a=b",
             "--report-file",
             str(report_path),
         ]
@@ -201,6 +207,11 @@ def test_cli_passes_context_and_options_to_custom_workflow_factory(tmp_path, cap
                 "app_id": "cn.damai",
                 "emit_json": True,
                 "report_file": str(report_path),
+                "parameters": {
+                    "account": "test-user",
+                    "city": "shanghai",
+                    "token": "a=b",
+                },
             },
         )
     ]
@@ -512,6 +523,30 @@ def test_cli_rejects_missing_factory_object(capsys):
 
     assert exit_code == 2
     assert "could not load factory" in captured.err
+    assert fixtures.CREATED_SESSIONS == []
+
+
+def test_cli_rejects_invalid_workflow_param_before_loading_factory(capsys):
+    fixtures.reset()
+
+    exit_code = main(
+        [
+            "run",
+            "--workflow-factory",
+            "tests.runner.fixtures:create_context_workflow",
+            "--live",
+            "--json",
+            "--factory",
+            "tests.runner.fixtures:make_session",
+            "--param",
+            "missing-equals",
+        ]
+    )
+
+    captured = capsys.readouterr()
+
+    assert exit_code == 2
+    assert "--param must use KEY=VALUE" in captured.err
     assert fixtures.CREATED_SESSIONS == []
 
 

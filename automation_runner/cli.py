@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 import sys
 import time
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from automation_core.config import ConfigSource, EnvConfigSource
 from automation_core.drivers import SessionInfo
@@ -42,6 +42,11 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--factory", help="session factory import path")
     run.add_argument("--url", help="URL for web workflows")
     run.add_argument("--app-id", help="app ID for Android workflows")
+    run.add_argument(
+        "--param",
+        action="append",
+        help="workflow parameter as KEY=VALUE; may be repeated",
+    )
     run.add_argument("--json", action="store_true", help="emit JSON report")
     run.add_argument("--report-file", help="write JSON report to file")
     return parser
@@ -147,7 +152,18 @@ def _workflow_options(config: RunnerConfig, args: argparse.Namespace) -> Workflo
         app_id=config.app_id,
         emit_json=config.emit_json,
         report_file=args.report_file,
+        parameters=_parse_parameters(args.param),
     )
+
+
+def _parse_parameters(values: Optional[List[str]]) -> Dict[str, str]:
+    parameters = {}
+    for value in values or []:
+        key, separator, raw_value = value.partition("=")
+        if not separator or not key:
+            raise ValueError("--param must use KEY=VALUE")
+        parameters[key] = raw_value
+    return parameters
 
 
 def _call_custom_workflow_factory(
@@ -217,6 +233,11 @@ def main(
         elif workflow_name == "damai-android-smoke":
             if not config.app_id:
                 return _print_error("--app-id is required for damai-android-smoke")
+        if config.workflow_factory:
+            try:
+                options = _workflow_options(config, args)
+            except ValueError as exc:
+                return _print_error(str(exc))
         if config.live:
             try:
                 session_factory = load_object(config.factory)
@@ -234,7 +255,6 @@ def main(
                 config=config,
                 session_factory_name=config.factory if config.live else None,
             )
-            options = _workflow_options(config, args)
             runner = WorkflowRunner(
                 session_factory=lambda: _call_custom_workflow_factory(
                     create_workflow,

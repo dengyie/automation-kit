@@ -2530,6 +2530,79 @@ and the report contract remains backward compatible.
 
 Stage, commit, and push the finished slice.
 
+## 2026-06-16: Runner Workflow Parameters
+
+### Completed
+
+- Added a repeated `--param KEY=VALUE` CLI input channel for custom workflow
+  factories.
+- Added `WorkflowOptions.parameters` as a business-agnostic string dictionary.
+- Preserved values containing additional `=` characters.
+- Rejected malformed parameters before live session factories are loaded.
+- Documented custom workflow parameter usage in `README.md` and
+  `docs/adding-a-workflow.md`.
+
+### Verification
+
+Focused context tests:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_context.py --no-cov -q
+```
+
+Result:
+
+```text
+4 passed
+```
+
+Focused CLI parameter tests:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_cli.py -k 'context_and_options or rejects_invalid_workflow_param' --no-cov -q
+```
+
+Result:
+
+```text
+2 passed, 31 deselected
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+178 passed
+Total coverage: 94.86%
+Required coverage: 80%
+```
+
+### Review
+
+Used `production-code-quality-review` required setup scripts against
+`/Users/mango/project/codex/automation-kit` before commit.
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- `--param` parsing and validation happens before live session factory loading.
+- malformed workflow parameters fail with a user-facing CLI error.
+- `automation_core` remains untouched by runner parameter handling.
+- raw `WorkflowOptions` are still not serialized as a top-level report object.
+
+### Next Phase
+
+Commit and push the finished slice.
+
 ## 2026-06-16: Runner Startup Failure Events
 
 ### Completed

@@ -53,7 +53,10 @@ automation-runner run damai-web-smoke --json \
 automation-runner run damai-web-smoke --live --json \
   --factory tests.runner.fixtures:make_session \
   --url https://example.test/damai
-automation-runner run --workflow-factory my_package.workflow:create_workflow --json
+automation-runner run --workflow-factory my_package.workflow:create_workflow \
+  --json \
+  --param account=test-user \
+  --param city=shanghai
 ```
 
 Runner options can also come from environment variables. Explicit CLI
@@ -78,6 +81,9 @@ def create_workflow(session_factory, context, options):
 ```
 
 JSON reports include a safe `workflow_context` summary for runner metadata.
+Custom workflow inputs can use repeated `--param KEY=VALUE` flags. The runner
+passes those strings through as `options.parameters` and leaves workflow-specific
+validation to the workflow package.
 
 See `docs/adding-a-workflow.md` for package boundaries, report fields, and
 adapter rules. See `docs/artifacts.md` for screenshot, page-source, UI-tree,
