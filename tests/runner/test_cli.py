@@ -263,6 +263,68 @@ def test_cli_reads_custom_workflow_factory_from_config(capsys):
     assert report["workflow"] == "tests.runner.fixtures:create_custom_workflow"
 
 
+def test_cli_passes_config_parameters_to_custom_workflow_factory(capsys):
+    fixtures.reset()
+
+    exit_code = main(
+        ["run"],
+        config_source=DictConfigSource(
+            {
+                "json": "true",
+                "live": "true",
+                "factory": "tests.runner.fixtures:make_session",
+                "workflow_factory": "tests.runner.fixtures:create_context_workflow",
+                "parameters": {
+                    "account": "config-user",
+                    "city": "beijing",
+                },
+            }
+        ),
+    )
+
+    captured = capsys.readouterr()
+    json.loads(captured.out)
+
+    assert exit_code == 0
+    assert fixtures.CREATED_SESSIONS[0].actions[0][1]["parameters"] == {
+        "account": "config-user",
+        "city": "beijing",
+    }
+
+
+def test_cli_param_overrides_config_parameters_for_custom_workflow(capsys):
+    fixtures.reset()
+
+    exit_code = main(
+        [
+            "run",
+            "--param",
+            "city=shanghai",
+        ],
+        config_source=DictConfigSource(
+            {
+                "json": "true",
+                "live": "true",
+                "factory": "tests.runner.fixtures:make_session",
+                "workflow_factory": "tests.runner.fixtures:create_context_workflow",
+                "parameters": {
+                    "account": "config-user",
+                    "city": "beijing",
+                },
+            }
+        ),
+    )
+
+    captured = capsys.readouterr()
+    json.loads(captured.out)
+
+    assert exit_code == 0
+    assert fixtures.CREATED_SESSIONS[0].actions[0][1]["parameters"] == {
+        "account": "config-user",
+        "city": "shanghai",
+    }
+
+
 def test_cli_requires_workflow_name_or_factory(capsys):
     exit_code = main(["run"])
 

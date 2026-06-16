@@ -112,6 +112,18 @@ AUTOMATION_RUNNER_URL=https://example.test/damai \
 automation-runner run damai-web-smoke
 ```
 
+Custom workflow parameters can also come from config. Environment values use a
+JSON object string:
+
+```bash
+AUTOMATION_RUNNER_JSON=true \
+AUTOMATION_RUNNER_WORKFLOW_FACTORY=my_package.workflow:create_workflow \
+AUTOMATION_RUNNER_PARAMETERS='{"account":"config-user","city":"beijing"}' \
+automation-runner run
+```
+
+Repeated CLI `--param KEY=VALUE` flags override matching config parameter keys.
+
 Supported runner environment keys are:
 
 - `AUTOMATION_RUNNER_LIVE`
@@ -120,6 +132,7 @@ Supported runner environment keys are:
 - `AUTOMATION_RUNNER_FACTORY`
 - `AUTOMATION_RUNNER_URL`
 - `AUTOMATION_RUNNER_APP_ID`
+- `AUTOMATION_RUNNER_PARAMETERS`
 
 CLI arguments take precedence over environment values.
 

@@ -20,6 +20,10 @@ def test_load_runner_config_reads_runtime_values():
                 "workflow_factory": "tests.runner.fixtures:create_custom_workflow",
                 "url": "https://example.test/damai",
                 "app_id": "cn.damai",
+                "parameters": {
+                    "account": "config-user",
+                    "city": "shanghai",
+                },
             }
         )
     )
@@ -31,7 +35,39 @@ def test_load_runner_config_reads_runtime_values():
         workflow_factory="tests.runner.fixtures:create_custom_workflow",
         url="https://example.test/damai",
         app_id="cn.damai",
+        parameters={
+            "account": "config-user",
+            "city": "shanghai",
+        },
     )
+
+
+def test_load_runner_config_reads_json_parameters():
+    config = load_runner_config(
+        DictConfigSource(
+            {
+                "parameters": '{"account":"config-user","city":"shanghai"}',
+            }
+        )
+    )
+
+    assert config.parameters == {
+        "account": "config-user",
+        "city": "shanghai",
+    }
+
+
+def test_load_runner_config_rejects_invalid_parameter_json():
+    with pytest.raises(ValueError, match="config parameters expected object"):
+        load_runner_config(DictConfigSource({"parameters": "not-json"}))
+
+
+def test_load_runner_config_rejects_non_string_parameter_values():
+    with pytest.raises(
+        ValueError,
+        match="config parameters expected string keys and values",
+    ):
+        load_runner_config(DictConfigSource({"parameters": {"count": 3}}))
 
 
 def test_load_runner_config_rejects_invalid_bool():

@@ -2530,6 +2530,80 @@ and the report contract remains backward compatible.
 
 Stage, commit, and push the finished slice.
 
+## 2026-06-16: Runner Config Workflow Parameters
+
+### Completed
+
+- Added `RunnerConfig.parameters` for config-sourced custom workflow inputs.
+- Supported dictionary parameter values from config sources.
+- Supported JSON object strings such as `AUTOMATION_RUNNER_PARAMETERS`.
+- Validated that config parameter keys and values are strings.
+- Merged CLI `--param` values over config parameters by key.
+- Documented config-sourced workflow parameters in `README.md` and
+  `docs/adding-a-workflow.md`.
+
+### Verification
+
+Focused runner config tests:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_config.py --no-cov -q
+```
+
+Result:
+
+```text
+6 passed
+```
+
+Focused CLI config parameter tests:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_cli.py -k 'config_parameters' --no-cov -q
+```
+
+Result:
+
+```text
+2 passed, 33 deselected
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+183 passed
+Total coverage: 94.81%
+Required coverage: 80%
+```
+
+### Review
+
+Used `production-code-quality-review` required setup scripts against
+`/Users/mango/project/codex/automation-kit` before commit.
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- config-sourced workflow parameters stay in `automation_runner`.
+- `automation_core` remains free of runner parameter handling.
+- invalid parameter config fails before live session factory loading.
+- CLI `--param` values override matching config parameter keys while preserving
+  other config keys.
+
+### Next Phase
+
+Commit and push the finished slice.
+
 ## 2026-06-16: Safe Action Batch Reporting
 
 ### Completed

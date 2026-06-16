@@ -1,5 +1,6 @@
-from dataclasses import dataclass
-from typing import Optional
+import json
+from dataclasses import dataclass, field
+from typing import Dict, Mapping, Optional
 
 from automation_core.config import ConfigSource
 
@@ -16,6 +17,7 @@ class RunnerConfig:
     workflow_factory: Optional[str] = None
     url: Optional[str] = None
     app_id: Optional[str] = None
+    parameters: Dict[str, str] = field(default_factory=dict)
 
 
 def _optional_string(source: ConfigSource, key: str) -> Optional[str]:
@@ -38,6 +40,25 @@ def _optional_bool(source: ConfigSource, key: str, default: bool = False) -> boo
     raise ValueError(f"config {key} expected bool")
 
 
+def _optional_parameters(source: ConfigSource, key: str) -> Dict[str, str]:
+    value = source.get(key, default=None).value
+    if value is None:
+        return {}
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"config {key} expected object") from exc
+    if not isinstance(value, Mapping):
+        raise ValueError(f"config {key} expected object")
+    parameters = {}
+    for parameter_key, parameter_value in value.items():
+        if not isinstance(parameter_key, str) or not isinstance(parameter_value, str):
+            raise ValueError(f"config {key} expected string keys and values")
+        parameters[parameter_key] = parameter_value
+    return parameters
+
+
 def load_runner_config(source: ConfigSource) -> RunnerConfig:
     return RunnerConfig(
         live=_optional_bool(source, "live"),
@@ -46,4 +67,5 @@ def load_runner_config(source: ConfigSource) -> RunnerConfig:
         workflow_factory=_optional_string(source, "workflow_factory"),
         url=_optional_string(source, "url"),
         app_id=_optional_string(source, "app_id"),
+        parameters=_optional_parameters(source, "parameters"),
     )

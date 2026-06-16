@@ -122,6 +122,7 @@ def _merge_config(args: argparse.Namespace, config: RunnerConfig) -> RunnerConfi
         workflow_factory=args.workflow_factory or config.workflow_factory,
         url=args.url or config.url,
         app_id=args.app_id or config.app_id,
+        parameters=dict(config.parameters),
     )
 
 
@@ -147,12 +148,14 @@ def _workflow_context(
 
 
 def _workflow_options(config: RunnerConfig, args: argparse.Namespace) -> WorkflowOptions:
+    parameters = dict(config.parameters)
+    parameters.update(_parse_parameters(args.param))
     return WorkflowOptions(
         url=config.url,
         app_id=config.app_id,
         emit_json=config.emit_json,
         report_file=args.report_file,
-        parameters=_parse_parameters(args.param),
+        parameters=parameters,
     )
 
 

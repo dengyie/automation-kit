@@ -68,6 +68,16 @@ AUTOMATION_RUNNER_URL=https://example.test/damai \
 automation-runner run damai-web-smoke
 ```
 
+Custom workflow parameters can also come from config. Environment values use a
+JSON object string, and CLI `--param` values override matching config keys:
+
+```bash
+AUTOMATION_RUNNER_JSON=true \
+AUTOMATION_RUNNER_WORKFLOW_FACTORY=my_package.workflow:create_workflow \
+AUTOMATION_RUNNER_PARAMETERS='{"account":"config-user","city":"beijing"}' \
+automation-runner run --param city=shanghai
+```
+
 Custom workflow factories can accept either the legacy `session_factory`
 signature or the typed runner context:
 
