@@ -2530,6 +2530,91 @@ and the report contract remains backward compatible.
 
 Stage, commit, and push the finished slice.
 
+## 2026-06-17: Examples JSON Metadata
+
+### Completed
+
+- Added a design note and implementation plan for richer built-in example
+  workflow discovery metadata.
+- Updated `automation-runner examples --json` so each built-in workflow entry
+  includes `name`, `description`, `platform`, `required_options`, and
+  `supports_dry_run`.
+- Preserved the top-level `dry_run` and `workflows` JSON shape.
+- Kept plain text `automation-runner examples` behavior unchanged.
+- Documented the metadata fields in `README.md` and
+  `docs/adding-a-workflow.md`.
+- Left `automation_core` unchanged and business-agnostic.
+
+### Verification
+
+Focused red run before implementation:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_cli.py -k 'example_workflows_as_json' --no-cov -q
+```
+
+Initial result:
+
+```text
+2 failed, 43 deselected
+```
+
+Focused green run after implementation:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_cli.py -k 'example_workflows_as_json' --no-cov -q
+```
+
+Result:
+
+```text
+2 passed, 43 deselected
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+254 passed
+Total coverage: 96.15%
+Required coverage: 80%
+```
+
+Whitespace check:
+
+```bash
+git diff --check
+```
+
+Result: no output.
+
+### Review
+
+Ran the required production code quality review scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- metadata lives beside the built-in `WORKFLOWS` registry in
+  `automation_runner.cli`.
+- discovery output remains deterministic and offline.
+- no live session factories or adapters are loaded by examples discovery.
+- no workflow registry or business metadata moved into `automation_core`.
+
+### Next Phase
+
+Stage, commit, and push the finished slice.
+
 ## 2026-06-17: Report Event Payload Redaction
 
 ### Completed

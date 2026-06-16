@@ -28,8 +28,20 @@ def test_cli_lists_example_workflows_as_json(capsys):
     assert payload == {
         "dry_run": False,
         "workflows": [
-            {"name": "damai-android-smoke"},
-            {"name": "damai-web-smoke"},
+            {
+                "description": "Launch an Android app and capture startup artifacts.",
+                "name": "damai-android-smoke",
+                "platform": "android",
+                "required_options": ["app_id"],
+                "supports_dry_run": True,
+            },
+            {
+                "description": "Open a web URL and capture a screenshot artifact.",
+                "name": "damai-web-smoke",
+                "platform": "web",
+                "required_options": ["url"],
+                "supports_dry_run": True,
+            },
         ],
     }
     assert captured.err == ""
@@ -44,8 +56,20 @@ def test_cli_lists_example_workflows_as_json_with_dry_run(capsys):
     assert exit_code == 0
     assert payload["dry_run"] is True
     assert payload["workflows"] == [
-        {"name": "damai-android-smoke"},
-        {"name": "damai-web-smoke"},
+        {
+            "description": "Launch an Android app and capture startup artifacts.",
+            "name": "damai-android-smoke",
+            "platform": "android",
+            "required_options": ["app_id"],
+            "supports_dry_run": True,
+        },
+        {
+            "description": "Open a web URL and capture a screenshot artifact.",
+            "name": "damai-web-smoke",
+            "platform": "web",
+            "required_options": ["url"],
+            "supports_dry_run": True,
+        },
     ]
 
 

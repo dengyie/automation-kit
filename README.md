@@ -62,6 +62,9 @@ automation-runner run --workflow-factory my_package.workflow:create_workflow \
 automation-runner report-schema --version 1
 ```
 
+`automation-runner examples --json` lists built-in workflow metadata including
+`name`, `description`, `platform`, `required_options`, and `supports_dry_run`.
+
 Runner options can also come from environment variables. Explicit CLI
 arguments take precedence:
 

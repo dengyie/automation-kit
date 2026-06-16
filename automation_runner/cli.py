@@ -30,6 +30,21 @@ WORKFLOWS = {
     "damai-android-smoke": create_damai_android_workflow,
 }
 
+WORKFLOW_METADATA = {
+    "damai-android-smoke": {
+        "description": "Launch an Android app and capture startup artifacts.",
+        "platform": "android",
+        "required_options": ["app_id"],
+        "supports_dry_run": True,
+    },
+    "damai-web-smoke": {
+        "description": "Open a web URL and capture a screenshot artifact.",
+        "platform": "web",
+        "required_options": ["url"],
+        "supports_dry_run": True,
+    },
+}
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="automation-runner")
@@ -142,6 +157,17 @@ def _emit_json_report(report) -> None:
     _emit_json_report_payload(_json_report_payload(report))
 
 
+def _workflow_listing_entry(workflow_name: str) -> Dict[str, object]:
+    metadata = WORKFLOW_METADATA[workflow_name]
+    return {
+        "name": workflow_name,
+        "description": metadata["description"],
+        "platform": metadata["platform"],
+        "required_options": list(metadata["required_options"]),
+        "supports_dry_run": metadata["supports_dry_run"],
+    }
+
+
 def _merge_config(args: argparse.Namespace, config: RunnerConfig) -> RunnerConfig:
     return RunnerConfig(
         live=args.live or config.live,
@@ -252,7 +278,7 @@ def main(
             payload = {
                 "dry_run": args.dry_run,
                 "workflows": [
-                    {"name": workflow_name}
+                    _workflow_listing_entry(workflow_name)
                     for workflow_name in sorted(WORKFLOWS)
                 ],
             }
