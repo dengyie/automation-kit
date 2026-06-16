@@ -2340,4 +2340,73 @@ Follow-up inspection confirmed:
 
 ### Next Phase
 
-Push the adapter alias slice, then continue with the next roadmap phase.
+Commit and push the adapter alias slice, then continue with the next roadmap
+phase.
+
+## 2026-06-16: Example Workflow Aliases
+
+### Completed
+
+- Switched the built-in web smoke workflow to use the `open` adapter alias.
+- Added `launch_app` as an Appium adapter alias for starting an app by
+  `app_id`.
+- Switched the built-in Android smoke workflow to use `launch_app`.
+- Kept raw driver-method fallback behavior available for framework-specific
+  behavior.
+- Updated example tests to expect the adapter alias vocabulary.
+- Updated workflow docs to include `launch_app` in the adapter action
+  vocabulary.
+
+### Verification
+
+Focused adapter and example tests:
+
+```bash
+.venv/bin/python -m pytest tests/adapters/appium/test_session.py --no-cov -q
+.venv/bin/python -m pytest tests/examples --no-cov -q
+```
+
+Result:
+
+```text
+19 passed
+9 passed
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+167 passed
+Total coverage: 95.02%
+Required coverage: 80%
+```
+
+### Review
+
+Used `production-code-quality-review` required setup scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- example workflows use adapter aliases for the first-run web and Android
+  paths.
+- the new `launch_app` alias stays in `adapters.appium`, not
+  `automation_core`.
+- raw driver-method fallback behavior remains available.
+- default tests remain offline and deterministic.
+
+### Next Phase
+
+Commit and push the example alias slice, then continue with the next roadmap
+phase.

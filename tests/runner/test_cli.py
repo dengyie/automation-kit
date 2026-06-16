@@ -70,7 +70,7 @@ def test_cli_runs_dry_workflow_without_live_flag(capsys):
     assert report["events"][0]["task_id"] == "damai-web-smoke-dry-run"
     assert report["events"][0]["payload"]["task_name"] == "damai-web-smoke"
     assert report["actions"] == [
-        {"success": True, "message": "get"},
+        {"success": True, "message": "open"},
     ]
     assert fixtures.CREATED_SESSIONS == []
 
@@ -95,7 +95,7 @@ def test_cli_uses_config_source_for_dry_workflow_defaults(capsys):
     assert report["workflow"] == "damai-web-smoke"
     assert report["live"] is False
     assert report["actions"] == [
-        {"success": True, "message": "get"},
+        {"success": True, "message": "open"},
     ]
     assert fixtures.CREATED_SESSIONS == []
 
@@ -322,7 +322,7 @@ def test_cli_arguments_override_config_source(capsys):
 
     assert exit_code == 0
     assert fixtures.CREATED_SESSIONS[0].actions == [
-        ("get", {"url": "https://example.test/cli"})
+        ("open", {"url": "https://example.test/cli"})
     ]
 
 
@@ -401,7 +401,7 @@ def test_cli_runs_live_damai_web_smoke_with_imported_factory(capsys):
     session = fixtures.CREATED_SESSIONS[0]
     assert session.started is True
     assert session.stopped is True
-    assert session.actions == [("get", {"url": "https://example.test/damai"})]
+    assert session.actions == [("open", {"url": "https://example.test/damai"})]
     assert session.artifacts == [("screenshot", "home.png")]
 
 
@@ -531,7 +531,7 @@ def test_cli_runs_live_damai_android_smoke_with_imported_factory(capsys):
     session = fixtures.CREATED_SESSIONS[0]
     assert session.started is True
     assert session.stopped is True
-    assert session.actions == [("activate_app", {"app_id": "cn.damai"})]
+    assert session.actions == [("launch_app", {"app_id": "cn.damai"})]
     assert session.artifacts == [
         ("screenshot", "startup.png"),
         ("page_source", "startup.xml"),
@@ -592,7 +592,7 @@ def test_cli_can_emit_json_report_for_live_workflow(capsys):
         "identifier": "cli-run",
     }
     assert report["actions"] == [
-        {"success": True, "message": "get"},
+        {"success": True, "message": "open"},
     ]
     assert report["artifacts"] == [
         {"artifact_type": "screenshot", "path": "home.png", "metadata": {}},
@@ -687,7 +687,7 @@ def test_cli_emits_json_report_when_workflow_fails(tmp_path, capsys):
     assert report["run_state"]["finished_at"] is not None
     assert report["run_state"]["outcome"] == "failed"
     assert report["live"] is True
-    assert report["error"] == "RuntimeError: get failed"
+    assert report["error"] == "RuntimeError: open failed"
     assert [event["event_type"] for event in report["events"]] == [
         "task.start",
         "error",
@@ -696,7 +696,7 @@ def test_cli_emits_json_report_when_workflow_fails(tmp_path, capsys):
     assert report["events"][1]["payload"] == {
         "task_name": "damai-web-smoke",
         "task_id": "cli-run",
-        "message": "get failed",
+        "message": "open failed",
         "error_type": "RuntimeError",
     }
     assert report["events"][2]["payload"]["outcome"] == "failed"

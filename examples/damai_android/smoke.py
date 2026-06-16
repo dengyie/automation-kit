@@ -9,7 +9,7 @@ def run_smoke_workflow(session: DriverSession, app_id: str) -> ExampleWorkflowRe
     artifacts = []
     try:
         session.start()
-        actions.append(session.execute_action("activate_app", app_id=app_id))
+        actions.append(session.execute_action("launch_app", app_id=app_id))
         artifacts.append(session.capture_artifact("screenshot", "startup.png"))
         artifacts.append(session.capture_artifact("page_source", "startup.xml"))
         success = all(action.success for action in actions)

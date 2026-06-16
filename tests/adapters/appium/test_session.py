@@ -81,6 +81,27 @@ def test_appium_session_executes_supported_driver_action():
     assert driver.activated == ["example.app"]
 
 
+def test_appium_session_launch_app_alias_activates_app():
+    driver = FakeMobileDriver()
+    session = AppiumSession(driver=driver)
+
+    result = session.execute_action("launch_app", app_id="example.app")
+
+    assert result.success is True
+    assert result.message == "launch_app"
+    assert result.data == "activated"
+    assert driver.activated == ["example.app"]
+
+
+def test_appium_session_launch_app_alias_requires_app_id():
+    session = AppiumSession(driver=FakeMobileDriver())
+
+    result = session.execute_action("launch_app")
+
+    assert result.success is False
+    assert result.message == "missing required parameter: app_id"
+
+
 def test_appium_session_executes_mobile_script_action():
     driver = FakeMobileDriver()
     session = AppiumSession(driver=driver)

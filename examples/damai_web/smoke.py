@@ -9,7 +9,7 @@ def run_smoke_workflow(session: DriverSession, url: str) -> ExampleWorkflowResul
     artifacts = []
     try:
         session.start()
-        actions.append(session.execute_action("get", url=url))
+        actions.append(session.execute_action("open", url=url))
         artifacts.append(session.capture_artifact("screenshot", "home.png"))
         success = all(action.success for action in actions)
         return ExampleWorkflowResult(

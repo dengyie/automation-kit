@@ -42,8 +42,8 @@ def test_damai_android_smoke_workflow_starts_app_and_captures_artifacts():
     assert session.stopped is True
     assert result.success is True
     assert result.session == session.info
-    assert result.actions[0].message == "activate_app"
-    assert session.actions == [("activate_app", {"app_id": "cn.damai"})]
+    assert result.actions[0].message == "launch_app"
+    assert session.actions == [("launch_app", {"app_id": "cn.damai"})]
     assert session.artifacts == [
         ("screenshot", "startup.png"),
         ("page_source", "startup.xml"),
@@ -58,7 +58,7 @@ def test_damai_android_smoke_workflow_factory_returns_runnable_workflow():
 
     assert workflow.name == "damai-android-smoke"
     assert result.success is True
-    assert session.actions == [("activate_app", {"app_id": "cn.damai"})]
+    assert session.actions == [("launch_app", {"app_id": "cn.damai"})]
     assert [event.event_type for event in result.events] == [
         "task.start",
         "artifact",

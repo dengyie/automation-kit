@@ -37,6 +37,8 @@ class AppiumSession:
         self._started = False
 
     def execute_action(self, action_name: str, **kwargs: Any) -> ActionResult:
+        if action_name == "launch_app":
+            return self._launch_app(**kwargs)
         if action_name == "tap":
             return self._tap(**kwargs)
         if action_name == "type_text":
@@ -60,6 +62,16 @@ class AppiumSession:
             )
         result = action(**kwargs)
         return ActionResult(success=True, message=action_name, data=result)
+
+    def _launch_app(self, **kwargs: Any) -> ActionResult:
+        app_id = kwargs.get("app_id")
+        if app_id is None:
+            return ActionResult(False, "missing required parameter: app_id")
+        activate_app = getattr(self.driver, "activate_app", None)
+        if not callable(activate_app):
+            return ActionResult(False, "driver does not support app launch")
+        result = activate_app(app_id)
+        return ActionResult(success=True, message="launch_app", data=result)
 
     def _tap(self, **kwargs: Any) -> ActionResult:
         selector = kwargs.get("selector")

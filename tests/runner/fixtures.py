@@ -47,7 +47,7 @@ def make_session():
 def make_failing_session():
     session = CliFakeSession()
     CREATED_SESSIONS.append(session)
-    session.fail_actions.add("get")
+    session.fail_actions.add("open")
     return session
 
 
