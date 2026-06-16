@@ -2530,6 +2530,101 @@ and the report contract remains backward compatible.
 
 Stage, commit, and push the finished slice.
 
+## 2026-06-17: Report Contract Run State Documentation
+
+### Completed
+
+- Added a design note and implementation plan for keeping the workflow guide's
+  report contract field list aligned with the actual runner report.
+- Added a documentation regression test that parses
+  `docs/adding-a-workflow.md` and compares the documented top-level JSON report
+  fields with a sample `build_report(...)` output.
+- Documented the missing `run_state` field in the workflow authoring guide.
+- Left report serialization, JSON schema files, and `automation_core`
+  unchanged.
+
+### Verification
+
+Focused red run before documentation update:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_report_schema.py::test_workflow_guide_documents_current_top_level_report_fields --no-cov -q
+```
+
+Initial result:
+
+```text
+1 failed
+Extra items in the right set: 'run_state'
+```
+
+Focused green run after documentation update:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_report_schema.py::test_workflow_guide_documents_current_top_level_report_fields --no-cov -q
+```
+
+Result:
+
+```text
+1 passed
+```
+
+Report schema regression tests:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_report_schema.py --no-cov -q
+```
+
+Result:
+
+```text
+7 passed
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+256 passed
+Total coverage: 96.20%
+Required coverage: 80%
+```
+
+Whitespace check:
+
+```bash
+git diff --check
+```
+
+Result: no output.
+
+### Review
+
+Ran the required production code quality review scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- the human workflow guide now lists all current top-level report fields.
+- the added regression test guards future guide/report drift.
+- report serialization and packaged schema files remain unchanged.
+- `automation_core` remains unchanged.
+
+### Next Phase
+
+Stage, commit, and push the finished slice.
+
 ## 2026-06-17: Examples Metadata Consistency
 
 ### Completed

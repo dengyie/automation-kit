@@ -232,6 +232,7 @@ JSON reports currently include:
 - `success`
 - `status`
 - `run_id`
+- `run_state`
 - `live`
 - `elapsed_seconds`
 - `events`
