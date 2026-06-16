@@ -168,8 +168,8 @@ their own parameters outside `automation_core`.
 
 Adapter sessions also expose a small common action vocabulary:
 
-- Selenium: `open`, `click`, `type_text`
-- Appium: `launch_app`, `tap`, `type_text`
+- Selenium: `open`, `click`, `type_text`, `wait_for_element`
+- Appium: `launch_app`, `tap`, `type_text`, `wait_for_element`
 
 These aliases stay in the adapter layer. Raw driver methods remain available
 for framework-specific behavior.

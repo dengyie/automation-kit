@@ -4,6 +4,7 @@ from typing import Any, Callable, Optional, Tuple
 from adapters.errors import AdapterStartupError
 from automation_core.artifacts import ArtifactStore
 from automation_core.drivers import ActionResult, ArtifactHandle, SessionInfo
+from automation_core.retries import RetryPolicy, retry_until
 
 
 DriverFactory = Callable[[], Any]
@@ -43,6 +44,8 @@ class SeleniumSession:
             return self._click(**kwargs)
         if action_name == "type_text":
             return self._type_text(**kwargs)
+        if action_name == "wait_for_element":
+            return self._wait_for_element(**kwargs)
 
         action = getattr(self.driver, action_name, None)
         if not callable(action):
@@ -86,6 +89,45 @@ class SeleniumSession:
             clear_method()
         result = element.send_keys(text)
         return ActionResult(success=True, message="type_text", data=result)
+
+    def _wait_for_element(self, **kwargs: Any) -> ActionResult:
+        selector = kwargs.get("selector")
+        if selector is None:
+            return ActionResult(False, "missing required parameter: selector")
+        timeout, error = _number_parameter(kwargs.get("timeout", 5.0), "timeout")
+        if error is not None:
+            return error
+        interval, error = _number_parameter(kwargs.get("interval", 0.25), "interval")
+        if error is not None:
+            return error
+        by = kwargs.get("by")
+
+        def lookup():
+            element, error = self._resolve_element(selector=selector, by=by)
+            if error is not None:
+                return error
+            return element
+
+        result = retry_until(
+            lookup,
+            predicate=lambda value: value is not None,
+            policy=RetryPolicy(
+                max_duration=timeout,
+                interval=interval,
+            ),
+        )
+        if result.success:
+            if isinstance(result.value, ActionResult):
+                return result.value
+            return ActionResult(
+                success=True,
+                message="wait_for_element",
+                data=result.value,
+            )
+        return ActionResult(
+            success=False,
+            message=f"timed out waiting for element: {selector}",
+        )
 
     def _resolve_element(
         self, selector: str, by: Optional[str]
@@ -141,3 +183,11 @@ class SeleniumSessionFactory:
             identifier=self.identifier,
             artifact_root=self.artifact_root,
         )
+
+
+def _number_parameter(value: Any, name: str) -> Tuple[float, Optional[ActionResult]]:
+    if not isinstance(value, (int, float)):
+        return 0.0, ActionResult(False, f"{name} must be a number")
+    if value < 0:
+        return 0.0, ActionResult(False, f"{name} must be >= 0")
+    return float(value), None

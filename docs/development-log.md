@@ -2530,6 +2530,126 @@ and the report contract remains backward compatible.
 
 Stage, commit, and push the finished slice.
 
+## 2026-06-16: Adapter Wait For Element Alias
+
+### Completed
+
+- Added a design note and implementation plan for adapter-level element waits.
+- Added Selenium `wait_for_element` action alias.
+- Added Appium `wait_for_element` action alias.
+- Reused `automation_core.retries.retry_until` for bounded polling.
+- Kept wait behavior in `adapters` without changing `automation_core`.
+- Added offline fake-driver tests for:
+  - retrying until an element appears.
+  - timeout reporting when the element never appears.
+  - missing selector validation.
+  - missing driver lookup support.
+- Documented the wait alias in `docs/adding-a-workflow.md`.
+
+### Verification
+
+Focused red runs before implementation:
+
+```bash
+.venv/bin/python -m pytest tests/adapters/selenium/test_session.py --no-cov -q
+.venv/bin/python -m pytest tests/adapters/appium/test_session.py --no-cov -q
+```
+
+Initial result:
+
+```text
+Selenium: 3 failed, 16 passed
+Appium: 3 failed, 19 passed
+```
+
+Follow-up red run for missing lookup support:
+
+```bash
+.venv/bin/python -m pytest tests/adapters/selenium/test_session.py::test_selenium_session_wait_for_element_reports_missing_lookup_support --no-cov -q
+```
+
+Initial result:
+
+```text
+1 failed
+```
+
+Production review follow-up red runs for invalid wait timing inputs:
+
+```bash
+.venv/bin/python -m pytest tests/adapters/selenium/test_session.py::test_selenium_session_wait_for_element_rejects_invalid_timeout tests/adapters/selenium/test_session.py::test_selenium_session_wait_for_element_rejects_invalid_interval --no-cov -q
+.venv/bin/python -m pytest tests/adapters/appium/test_session.py::test_appium_session_wait_for_element_rejects_invalid_timeout tests/adapters/appium/test_session.py::test_appium_session_wait_for_element_rejects_invalid_interval --no-cov -q
+```
+
+Initial result:
+
+```text
+Selenium: 2 failed
+Appium: 2 failed
+```
+
+Focused green runs after implementation:
+
+```bash
+.venv/bin/python -m pytest tests/adapters/selenium/test_session.py --no-cov -q
+.venv/bin/python -m pytest tests/adapters/appium/test_session.py --no-cov -q
+```
+
+Result:
+
+```text
+Selenium: 24 passed
+Appium: 27 passed
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+209 passed
+Total coverage: 94.93%
+Required coverage: 80%
+```
+
+Whitespace check:
+
+```bash
+git diff --check
+```
+
+Result: no output.
+
+### Review
+
+Ran the required production code quality review scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection and optimization confirmed:
+
+- wait behavior stays in `adapters`, not `automation_core`.
+- waiting reuses the existing bounded retry primitive.
+- missing driver lookup support returns a direct failed `ActionResult`.
+- negative timeout and interval inputs return failed `ActionResult` values
+  instead of leaking `RetryPolicy` exceptions.
+- non-numeric timeout and interval inputs return failed `ActionResult` values
+  instead of leaking `TypeError`.
+- default tests still use fake drivers and require no live browser, Appium,
+  ADB, Android device, or network.
+
+### Next Phase
+
+Stage, commit, and push the finished slice.
+
 ## 2026-06-16: Examples JSON Discovery
 
 ### Completed

@@ -8,10 +8,11 @@ from automation_core.drivers import DriverSession
 
 
 class FakeMobileDriver:
-    def __init__(self):
+    def __init__(self, lookup_failures=0):
         self.closed = False
         self.activated = []
         self.lookups = []
+        self.lookup_failures = lookup_failures
         self.scripts = []
         self.screenshots = []
         self.page_source = "<hierarchy />"
@@ -23,6 +24,8 @@ class FakeMobileDriver:
 
     def find_element(self, by, selector):
         self.lookups.append((by, selector))
+        if len(self.lookups) <= self.lookup_failures:
+            raise LookupError("not found")
         return self.element
 
     def execute_script(self, script, args):
@@ -167,6 +170,115 @@ def test_appium_session_type_text_alias_can_skip_clear():
     assert result.success is True
     assert driver.element.cleared is False
     assert driver.element.keys == ["concert"]
+
+
+def test_appium_session_wait_for_element_alias_retries_until_found():
+    driver = FakeMobileDriver(lookup_failures=1)
+    session = AppiumSession(driver=driver)
+
+    result = session.execute_action(
+        "wait_for_element",
+        selector="buy",
+        timeout=1.0,
+        interval=0,
+    )
+
+    assert result.success is True
+    assert result.message == "wait_for_element"
+    assert result.data is driver.element
+    assert driver.lookups == [
+        ("accessibility id", "buy"),
+        ("accessibility id", "buy"),
+    ]
+
+
+def test_appium_session_wait_for_element_alias_reports_timeout():
+    driver = FakeMobileDriver(lookup_failures=3)
+    session = AppiumSession(driver=driver)
+
+    result = session.execute_action(
+        "wait_for_element",
+        selector="missing",
+        timeout=0,
+        interval=0,
+    )
+
+    assert result.success is False
+    assert result.message == "timed out waiting for element: missing"
+    assert len(driver.lookups) == 1
+
+
+def test_appium_session_wait_for_element_alias_requires_selector():
+    session = AppiumSession(driver=FakeMobileDriver())
+
+    result = session.execute_action("wait_for_element")
+
+    assert result.success is False
+    assert result.message == "missing required parameter: selector"
+
+
+def test_appium_session_wait_for_element_reports_missing_lookup_support():
+    class NoLookupDriver:
+        pass
+
+    session = AppiumSession(driver=NoLookupDriver())
+
+    result = session.execute_action("wait_for_element", selector="buy")
+
+    assert result.success is False
+    assert result.message == "driver does not support element lookup"
+
+
+def test_appium_session_wait_for_element_rejects_negative_timeout():
+    session = AppiumSession(driver=FakeMobileDriver())
+
+    result = session.execute_action(
+        "wait_for_element",
+        selector="buy",
+        timeout=-1,
+    )
+
+    assert result.success is False
+    assert result.message == "timeout must be >= 0"
+
+
+def test_appium_session_wait_for_element_rejects_negative_interval():
+    session = AppiumSession(driver=FakeMobileDriver())
+
+    result = session.execute_action(
+        "wait_for_element",
+        selector="buy",
+        interval=-1,
+    )
+
+    assert result.success is False
+    assert result.message == "interval must be >= 0"
+
+
+def test_appium_session_wait_for_element_rejects_invalid_timeout():
+    session = AppiumSession(driver=FakeMobileDriver())
+
+    result = session.execute_action(
+        "wait_for_element",
+        selector="buy",
+        timeout="soon",
+    )
+
+    assert result.success is False
+    assert result.message == "timeout must be a number"
+
+
+def test_appium_session_wait_for_element_rejects_invalid_interval():
+    session = AppiumSession(driver=FakeMobileDriver())
+
+    result = session.execute_action(
+        "wait_for_element",
+        selector="buy",
+        interval="soon",
+    )
+
+    assert result.success is False
+    assert result.message == "interval must be a number"
 
 
 def test_appium_session_alias_reports_missing_required_parameter():
