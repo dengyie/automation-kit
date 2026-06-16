@@ -6,7 +6,9 @@ from automation_core.events import (
     RetryAttemptEvent,
     TaskEndEvent,
     TaskStartEvent,
+    retry_attempt_event_from_snapshot,
 )
+from automation_core.retries import RetryAttemptSnapshot
 
 
 def test_event_envelope_serializes():
@@ -66,6 +68,29 @@ def test_retry_attempt_event_fields():
     assert event.attempt == 2
     assert event.elapsed == 1.5
     assert event.to_envelope().event_type == EventType.RETRY_ATTEMPT.value
+
+
+def test_retry_attempt_event_can_be_created_from_snapshot():
+    snapshot = RetryAttemptSnapshot(
+        attempt=3,
+        elapsed=1.25,
+        value="not-ready",
+        exception=None,
+        will_retry=True,
+    )
+
+    event = retry_attempt_event_from_snapshot(
+        task_name="checkout",
+        task_id="task-1",
+        snapshot=snapshot,
+    )
+    envelope = event.to_envelope()
+
+    assert event.task_name == "checkout"
+    assert event.task_id == "task-1"
+    assert event.attempt == 3
+    assert event.elapsed == 1.25
+    assert envelope.event_type == EventType.RETRY_ATTEMPT.value
 
 
 def test_error_event_fields():

@@ -8,6 +8,7 @@ from automation_core.events.models import (
     RetryAttemptEvent,
     TaskEndEvent,
     TaskStartEvent,
+    retry_attempt_event_from_snapshot,
 )
 
 __all__ = [
@@ -18,4 +19,5 @@ __all__ = [
     "RetryAttemptEvent",
     "TaskEndEvent",
     "TaskStartEvent",
+    "retry_attempt_event_from_snapshot",
 ]

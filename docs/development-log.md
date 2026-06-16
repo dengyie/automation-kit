@@ -2530,6 +2530,98 @@ and the report contract remains backward compatible.
 
 Stage, commit, and push the finished slice.
 
+## 2026-06-16: Retry Snapshot Event Bridge
+
+### Completed
+
+- Added a design note and implementation plan for retry snapshot to event
+  bridging.
+- Added `retry_attempt_event_from_snapshot(...)` in `automation_core.events`.
+- Kept the bridge one-way: `automation_core.events` can adapt retry snapshots,
+  while `automation_core.retries` remains independent from events.
+- Added focused tests proving the bridge and the retry boundary.
+- Documented the one-way retry-to-event wiring rule in `docs/development-system.md`.
+
+### Verification
+
+Focused red run before implementation:
+
+```bash
+.venv/bin/python -m pytest tests/events/test_events.py tests/structure/test_boundaries.py --no-cov -q
+```
+
+Initial result:
+
+```text
+ImportError: cannot import name 'retry_attempt_event_from_snapshot'
+```
+
+Focused green run after implementation:
+
+```bash
+.venv/bin/python -m pytest tests/events/test_events.py tests/structure/test_boundaries.py --no-cov -q
+```
+
+Result:
+
+```text
+14 passed
+```
+
+### Review
+
+Full verification:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+215 passed in 0.26s
+Total coverage: 95.03%
+```
+
+Diff hygiene:
+
+```bash
+git diff --check
+```
+
+Result: no output.
+
+Production review scripts:
+
+```bash
+python3 /Users/mango/.agents/skills/production-code-quality-review/scripts/collect-review-context.py --repo /Users/mango/project/codex/automation-kit
+python3 /Users/mango/.agents/skills/production-code-quality-review/scripts/diff-line-map.py --repo /Users/mango/project/codex/automation-kit
+python3 /Users/mango/.agents/skills/production-code-quality-review/scripts/detect-stack.py --repo /Users/mango/project/codex/automation-kit
+python3 /Users/mango/.agents/skills/production-code-quality-review/scripts/run-safe-checks.py --repo /Users/mango/project/codex/automation-kit
+```
+
+Result: review context and changed-line maps were generated; stack detection
+reported Python; no additional review blockers were found.
+
+The safe-check helper suggested `python3 -m unittest discover`. In this pytest
+repository, running the equivalent command returned no discovered unittest
+tests:
+
+```bash
+.venv/bin/python -m unittest discover
+```
+
+Result:
+
+```text
+Ran 0 tests in 0.000s
+NO TESTS RAN
+```
+
+### Next Phase
+
+Stage, commit, and push the finished slice.
+
 ## 2026-06-16: Retry Attempt Observer
 
 ### Completed

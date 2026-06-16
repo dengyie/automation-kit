@@ -117,6 +117,8 @@ Keep these documents distinct:
 6. Prefer deterministic artifacts and logs over hidden automation state.
 7. Keep retry observability generic: retry primitives may expose attempt
    snapshots, but higher layers own task events, logs, and reports.
+8. Keep retry-to-event wiring one-way: event helpers may adapt retry snapshots,
+   but retry primitives must not import event models.
 
 ## Phase Roadmap
 

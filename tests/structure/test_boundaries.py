@@ -66,3 +66,9 @@ def test_adapter_and_example_shells_import():
 
     for module in modules:
         assert importlib.import_module(module)
+
+
+def test_retry_core_does_not_import_events():
+    retry_policy = ROOT / "automation_core" / "retries" / "policy.py"
+
+    assert "automation_core.events" not in retry_policy.read_text(encoding="utf-8")

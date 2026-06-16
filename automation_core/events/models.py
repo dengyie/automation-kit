@@ -3,6 +3,8 @@ from enum import Enum
 from typing import Any, Dict, Optional
 from uuid import uuid4
 
+from automation_core.retries import RetryAttemptSnapshot
+
 
 class EventType(str, Enum):
     TASK_START = "task.start"
@@ -70,6 +72,20 @@ class RetryAttemptEvent:
             task_id=self.task_id,
             payload=_payload(self),
         )
+
+
+def retry_attempt_event_from_snapshot(
+    *,
+    task_name: str,
+    task_id: str,
+    snapshot: RetryAttemptSnapshot,
+) -> RetryAttemptEvent:
+    return RetryAttemptEvent(
+        task_name=task_name,
+        task_id=task_id,
+        attempt=snapshot.attempt,
+        elapsed=snapshot.elapsed,
+    )
 
 
 @dataclass(frozen=True)
