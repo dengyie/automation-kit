@@ -2530,6 +2530,94 @@ and the report contract remains backward compatible.
 
 Stage, commit, and push the finished slice.
 
+## 2026-06-17: Examples Metadata Consistency
+
+### Completed
+
+- Added a design note and implementation plan for built-in examples metadata
+  consistency.
+- Added a regression test for `examples --json` when a workflow is present in
+  `WORKFLOWS` without matching `WORKFLOW_METADATA`.
+- Updated JSON examples discovery to validate metadata before printing the
+  payload.
+- Converted the previous raw `KeyError` path into a clear CLI error with exit
+  code `2` and no partial stdout.
+- Documented that built-in workflow entries must have matching discovery
+  metadata.
+- Left plain text `automation-runner examples` behavior unchanged.
+- Left `automation_core` unchanged and business-agnostic.
+
+### Verification
+
+Focused red run before implementation:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_cli.py::test_cli_examples_json_rejects_workflow_missing_metadata --no-cov -q
+```
+
+Initial result:
+
+```text
+1 failed
+KeyError: 'missing-metadata'
+```
+
+Focused green run after implementation:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_cli.py -k 'example_workflows_as_json or missing_metadata' --no-cov -q
+```
+
+Result:
+
+```text
+3 passed, 43 deselected
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+255 passed
+Total coverage: 96.20%
+Required coverage: 80%
+```
+
+Whitespace check:
+
+```bash
+git diff --check
+```
+
+Result: no output.
+
+### Review
+
+Ran the required production code quality review scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- metadata validation stays in `automation_runner.cli`.
+- successful JSON discovery shape remains unchanged.
+- missing metadata fails before any JSON is emitted.
+- plain text examples listing still only reads `WORKFLOWS`.
+- `automation_core` remains unchanged.
+
+### Next Phase
+
+Stage, commit, and push the finished slice.
+
 ## 2026-06-17: Examples JSON Metadata
 
 ### Completed

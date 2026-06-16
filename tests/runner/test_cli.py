@@ -3,6 +3,7 @@ from pathlib import Path
 
 from automation_core import __version__ as AUTOMATION_KIT_VERSION
 from automation_core.config import DictConfigSource
+import automation_runner.cli as cli
 from automation_runner.cli import main
 from tests.runner import fixtures
 
@@ -71,6 +72,20 @@ def test_cli_lists_example_workflows_as_json_with_dry_run(capsys):
             "supports_dry_run": True,
         },
     ]
+
+
+def test_cli_examples_json_rejects_workflow_missing_metadata(monkeypatch, capsys):
+    workflows = dict(cli.WORKFLOWS)
+    workflows["missing-metadata"] = object()
+    monkeypatch.setattr(cli, "WORKFLOWS", workflows)
+
+    exit_code = main(["examples", "--json"])
+
+    captured = capsys.readouterr()
+
+    assert exit_code == 2
+    assert captured.out == ""
+    assert "missing workflow metadata: missing-metadata" in captured.err
 
 
 def test_cli_examples_does_not_validate_run_config(capsys):

@@ -168,6 +168,16 @@ def _workflow_listing_entry(workflow_name: str) -> Dict[str, object]:
     }
 
 
+def _workflow_listing_entries() -> List[Dict[str, object]]:
+    missing_metadata = sorted(set(WORKFLOWS) - set(WORKFLOW_METADATA))
+    if missing_metadata:
+        raise ValueError(f"missing workflow metadata: {', '.join(missing_metadata)}")
+    return [
+        _workflow_listing_entry(workflow_name)
+        for workflow_name in sorted(WORKFLOWS)
+    ]
+
+
 def _merge_config(args: argparse.Namespace, config: RunnerConfig) -> RunnerConfig:
     return RunnerConfig(
         live=args.live or config.live,
@@ -275,12 +285,13 @@ def main(
 
     if args.command == "examples":
         if args.json:
+            try:
+                workflows = _workflow_listing_entries()
+            except ValueError as exc:
+                return _print_error(str(exc))
             payload = {
                 "dry_run": args.dry_run,
-                "workflows": [
-                    _workflow_listing_entry(workflow_name)
-                    for workflow_name in sorted(WORKFLOWS)
-                ],
+                "workflows": workflows,
             }
             print(json.dumps(payload, sort_keys=True))
             return 0

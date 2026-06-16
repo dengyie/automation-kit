@@ -87,6 +87,8 @@ The JSON discovery output lists built-in examples only and does not load live
 browser or device sessions. Each workflow entry includes `name`,
 `description`, `platform`, `required_options`, and `supports_dry_run` so
 automation tooling can choose the right runner inputs.
+Built-in workflow entries must have matching discovery metadata before they can
+be emitted by `examples --json`.
 
 Dry workflow run:
 
