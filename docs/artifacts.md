@@ -41,8 +41,8 @@ serialize only:
 - `artifact_type`
 - `path`
 
-Raw bytes, page source text, image data, tokens, cookies, and action `data`
-must not be embedded in JSON reports.
+Raw bytes, page source text, image data, tokens, cookies, action `data`, and
+skipped action parameters must not be embedded in JSON reports.
 
 ## Adapter Responsibilities
 

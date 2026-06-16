@@ -2530,6 +2530,93 @@ and the report contract remains backward compatible.
 
 Stage, commit, and push the finished slice.
 
+## 2026-06-16: Safe Action Batch Reporting
+
+### Completed
+
+- Changed runner `action_batch` report serialization to omit raw
+  `ActionResult.data`.
+- Changed runner `action_batch` skipped-action serialization to omit
+  `ActionRequest.parameters`.
+- Kept `automation_core.actions.ActionBatchResult.to_dict()` unchanged for core
+  consumers.
+- Documented that runner JSON reports exclude action `data` and skipped action
+  parameters.
+
+### Verification
+
+Focused regression test:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_reports.py::test_build_report_serializes_action_batch_summary --no-cov -q
+```
+
+Result:
+
+```text
+1 passed
+```
+
+Focused report and core action tests:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_reports.py tests/actions/test_action_models.py --no-cov -q
+```
+
+Result:
+
+```text
+17 passed
+```
+
+Focused runner/report/action tests:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_reports.py tests/runner/test_cli.py tests/actions/test_action_models.py --no-cov -q
+```
+
+Result:
+
+```text
+50 passed
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+178 passed
+Total coverage: 94.86%
+Required coverage: 80%
+```
+
+### Review
+
+Used `production-code-quality-review` required setup scripts against
+`/Users/mango/project/codex/automation-kit` before commit.
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- runner `action_batch` reports no longer include raw action result `data`.
+- runner `action_batch` reports no longer include skipped action parameters.
+- `automation_core.actions.ActionBatchResult.to_dict()` remains unchanged.
+- documentation now states that skipped action parameters are excluded from
+  JSON reports.
+
+### Next Phase
+
+Commit and push the finished slice.
+
 ## 2026-06-16: Runner Workflow Parameters
 
 ### Completed

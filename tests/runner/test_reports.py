@@ -267,8 +267,25 @@ def test_build_report_serializes_action_batch_summary():
         ],
         artifacts=[],
         batch_result=ActionBatchResult(
-            results=[ActionResult(success=True, message="get")],
-            skipped=[ActionRequest(name="after")],
+            results=[
+                ActionResult(
+                    success=True,
+                    message="get",
+                    data={
+                        "auth_token": "secret-token",
+                        "url": "https://example.test",
+                    },
+                )
+            ],
+            skipped=[
+                ActionRequest(
+                    name="after",
+                    parameters={
+                        "password": "secret",
+                        "selector": "#buy",
+                    },
+                )
+            ],
         ),
     )
 
@@ -279,13 +296,11 @@ def test_build_report_serializes_action_batch_summary():
             {
                 "success": True,
                 "message": "get",
-                "data": None,
             },
         ],
         "skipped": [
             {
                 "name": "after",
-                "parameters": {},
                 "stop_on_failure": True,
             },
         ],

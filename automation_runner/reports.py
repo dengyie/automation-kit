@@ -61,7 +61,23 @@ def _serialize_actions(actions: List[ActionResult]) -> List[Dict[str, object]]:
 def _serialize_action_batch(batch_result: Optional[ActionBatchResult]) -> Optional[Dict[str, object]]:
     if batch_result is None:
         return None
-    return batch_result.to_dict()
+    return {
+        "results": [
+            {
+                "success": result.success,
+                "message": result.message,
+            }
+            for result in batch_result.results
+        ],
+        "skipped": [
+            {
+                "name": action.name,
+                "stop_on_failure": action.stop_on_failure,
+            }
+            for action in batch_result.skipped
+        ],
+        "success": batch_result.success,
+    }
 
 
 def _serialize_metadata(metadata: Dict[str, str]) -> Dict[str, str]:

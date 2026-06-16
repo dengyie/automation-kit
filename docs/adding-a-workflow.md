@@ -159,7 +159,8 @@ This keeps workflow reports honest about which actions actually ran.
 Built-in Damai smoke workflows use that batch path for their first action and
 still return the flat `actions` list for compatibility. Their reports now carry
 `action_batch` as the serialized batch summary, which makes dry-run and live-run
-output line up with the same execution model.
+output line up with the same execution model. Runner reports omit raw action
+result `data` and skipped action `parameters` from `action_batch`.
 
 When `--json` is enabled, runner startup failures also emit a JSON report. In
 that case the runner uses a fallback session identity with
@@ -226,7 +227,8 @@ rules, report attachment rules, and dry-run behavior.
 - Traces and logs should use `trace` or `log`.
 - JSON run reports should be written with `--report-file`.
 - JSON reports should contain artifact paths only, not raw screenshot bytes,
-  page source text, tokens, cookies, or action `data`.
+  page source text, tokens, cookies, action `data`, or skipped action
+  parameters.
 - Artifact metadata should stay generic and small, such as source component,
   capture mode, or content kind.
 - Report serialization redacts common sensitive metadata keys containing terms
