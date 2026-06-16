@@ -155,6 +155,9 @@ import path when the runner is using a live adapter factory.
 context passed to custom factories and intentionally stays separate from raw
 workflow options.
 
+`WorkflowContext.to_dict()` is the report-safe serialization helper. The
+runner does not serialize raw `WorkflowOptions` as a top-level report object.
+
 - `task.start` when the workflow session starts executing.
 - `artifact` for each captured artifact.
 - `error` when workflow execution raises an exception.

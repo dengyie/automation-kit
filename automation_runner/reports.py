@@ -79,12 +79,7 @@ def _serialize_artifacts(artifacts: List[ArtifactHandle]) -> List[Dict[str, obje
 
 
 def _serialize_workflow_context(context: WorkflowContext) -> Dict[str, object]:
-    return {
-        "workflow_name": context.workflow_name,
-        "live": context.live,
-        "workflow_factory": context.workflow_factory,
-        "session_factory": context.session_factory,
-    }
+    return context.to_dict()
 
 
 def build_report(

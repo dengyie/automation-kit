@@ -27,3 +27,35 @@ def test_workflow_options_records_runner_inputs():
     assert options.app_id == "cn.damai"
     assert options.emit_json is True
     assert options.report_file == "reports/run.json"
+
+
+def test_workflow_context_to_dict():
+    context = WorkflowContext(
+        workflow_name="custom",
+        live=True,
+        workflow_factory="pkg:create",
+        session_factory="pkg:session",
+    )
+
+    assert context.to_dict() == {
+        "workflow_name": "custom",
+        "live": True,
+        "workflow_factory": "pkg:create",
+        "session_factory": "pkg:session",
+    }
+
+
+def test_workflow_options_to_dict():
+    options = WorkflowOptions(
+        url="https://example.test/damai",
+        app_id="cn.damai",
+        emit_json=True,
+        report_file="reports/run.json",
+    )
+
+    assert options.to_dict() == {
+        "url": "https://example.test/damai",
+        "app_id": "cn.damai",
+        "emit_json": True,
+        "report_file": "reports/run.json",
+    }

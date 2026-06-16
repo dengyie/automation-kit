@@ -2210,3 +2210,64 @@ Follow-up inspection confirmed:
 
 Commit and push the workflow-context report slice, then continue with the next
 roadmap slice.
+
+## 2026-06-16: Context Serialization Helpers
+
+### Completed
+
+- Added `WorkflowContext.to_dict()`.
+- Added `WorkflowOptions.to_dict()`.
+- Updated runner report serialization to reuse `WorkflowContext.to_dict()`.
+- Added design and implementation plan docs for context serialization.
+- Updated workflow docs to describe report-safe context serialization.
+- Added unit tests for both serialization helpers.
+
+### Verification
+
+Focused runner tests:
+
+```bash
+.venv/bin/python -m pytest tests/runner -q --no-cov
+```
+
+Result:
+
+```text
+47 passed
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+153 passed
+Total coverage: 95.02%
+Required coverage: 80%
+```
+
+### Review
+
+Used `production-code-quality-review` required setup scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- context serialization stays in `automation_runner`.
+- reports reuse the same `WorkflowContext` serialization contract.
+- raw `WorkflowOptions` still are not added to JSON reports.
+- default tests remain offline and deterministic.
+
+### Next Phase
+
+Commit and push the context serialization slice, then continue with the next
+roadmap slice.
