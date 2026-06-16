@@ -17,6 +17,37 @@ def test_cli_lists_example_workflows_without_live_execution(capsys):
     assert "dry-run" in captured.out
 
 
+def test_cli_lists_example_workflows_as_json(capsys):
+    exit_code = main(["examples", "--json"])
+
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
+
+    assert exit_code == 0
+    assert payload == {
+        "dry_run": False,
+        "workflows": [
+            {"name": "damai-android-smoke"},
+            {"name": "damai-web-smoke"},
+        ],
+    }
+    assert captured.err == ""
+
+
+def test_cli_lists_example_workflows_as_json_with_dry_run(capsys):
+    exit_code = main(["examples", "--dry-run", "--json"])
+
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
+
+    assert exit_code == 0
+    assert payload["dry_run"] is True
+    assert payload["workflows"] == [
+        {"name": "damai-android-smoke"},
+        {"name": "damai-web-smoke"},
+    ]
+
+
 def test_cli_examples_does_not_validate_run_config(capsys):
     exit_code = main(
         ["examples", "--dry-run"],

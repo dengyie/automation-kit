@@ -34,6 +34,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     examples = subparsers.add_parser("examples", help="list example workflows")
     examples.add_argument("--dry-run", action="store_true", help="list only")
+    examples.add_argument("--json", action="store_true", help="emit JSON workflow list")
 
     run = subparsers.add_parser("run", help="run a workflow")
     run.add_argument("workflow", nargs="?", choices=sorted(WORKFLOWS))
@@ -209,6 +210,16 @@ def main(
         return int(exc.code)
 
     if args.command == "examples":
+        if args.json:
+            payload = {
+                "dry_run": args.dry_run,
+                "workflows": [
+                    {"name": workflow_name}
+                    for workflow_name in sorted(WORKFLOWS)
+                ],
+            }
+            print(json.dumps(payload, sort_keys=True))
+            return 0
         for workflow_name in sorted(WORKFLOWS):
             print(workflow_name)
         if args.dry_run:

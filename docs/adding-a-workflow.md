@@ -72,6 +72,16 @@ Dry listing:
 automation-runner examples --dry-run
 ```
 
+Machine-readable built-in example discovery:
+
+```bash
+automation-runner examples --json
+automation-runner examples --dry-run --json
+```
+
+The JSON discovery output lists built-in examples only and does not load live
+browser or device sessions.
+
 Dry workflow run:
 
 ```bash

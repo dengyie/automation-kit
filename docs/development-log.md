@@ -2530,6 +2530,78 @@ and the report contract remains backward compatible.
 
 Stage, commit, and push the finished slice.
 
+## 2026-06-16: Examples JSON Discovery
+
+### Completed
+
+- Added `automation-runner examples --json`.
+- Added `automation-runner examples --dry-run --json`.
+- Kept existing plain text `examples --dry-run` behavior unchanged.
+- Kept discovery limited to the built-in `WORKFLOWS` registry.
+- Documented machine-readable built-in example discovery in `README.md` and
+  `docs/adding-a-workflow.md`.
+
+### Verification
+
+Focused JSON discovery tests:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_cli.py -k 'example_workflows_as_json' --no-cov -q
+```
+
+Result:
+
+```text
+2 passed, 35 deselected
+```
+
+Focused text compatibility tests:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_cli.py -k 'lists_example_workflows_without_live_execution or examples_does_not_validate_run_config' --no-cov -q
+```
+
+Result:
+
+```text
+2 passed, 35 deselected
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+185 passed
+Total coverage: 94.86%
+Required coverage: 80%
+```
+
+### Review
+
+Used `production-code-quality-review` required setup scripts against
+`/Users/mango/project/codex/automation-kit` before commit.
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- `examples --json` only lists the built-in `WORKFLOWS` registry.
+- JSON discovery does not load live session factories.
+- existing plain text examples output remains unchanged.
+- no discovery behavior moved into `automation_core`.
+
+### Next Phase
+
+Commit and push the finished slice.
+
 ## 2026-06-16: Runner Config Workflow Parameters
 
 ### Completed
