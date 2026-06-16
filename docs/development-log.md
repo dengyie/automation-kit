@@ -3773,3 +3773,100 @@ Follow-up inspection confirmed:
 ### Next Phase
 
 Stage, commit, and push the finished slice.
+
+## 2026-06-17: Runner Param Validation
+
+### Completed
+
+- Added a design note and implementation plan for runner `--param` validation.
+- Added a regression test proving invalid `--param` syntax is rejected for
+  built-in workflows before any session is created.
+- Moved runner parameter parsing to the shared `run` command path so custom and
+  built-in workflows use the same CLI validation boundary.
+- Kept parsed custom parameters available only through custom workflow
+  `WorkflowOptions.parameters`.
+- Left `automation_core` untouched and business-agnostic.
+- Documented that `--param KEY=VALUE` syntax is validated before execution even
+  when a selected workflow does not consume custom parameters.
+
+### Verification
+
+Focused red run before implementation:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_cli.py::test_cli_rejects_invalid_workflow_param_for_builtin_workflow --no-cov -q
+```
+
+Initial result:
+
+```text
+1 failed
+assert 0 == 2
+```
+
+Focused green run after implementation:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_cli.py::test_cli_rejects_invalid_workflow_param_for_builtin_workflow tests/runner/test_cli.py::test_cli_rejects_invalid_workflow_param_before_loading_factory --no-cov -q
+```
+
+Result:
+
+```text
+2 passed
+```
+
+Runner CLI test suite:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_cli.py --no-cov -q
+```
+
+Result:
+
+```text
+41 passed
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+220 passed
+Total coverage: 95.88%
+Required coverage: 80%
+```
+
+Whitespace check:
+
+```bash
+git diff --check
+```
+
+Result: no output.
+
+### Review
+
+Ran the required production code quality review scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- parameter validation remains in `automation_runner.cli`.
+- `automation_core` remains untouched.
+- built-in workflows still ignore custom parameters after syntax validation.
+- custom workflows still receive parsed parameters through `WorkflowOptions`.
+
+### Next Phase
+
+Stage, commit, and push the finished slice.

@@ -272,11 +272,10 @@ def main(
         elif workflow_name == "damai-android-smoke":
             if not config.app_id:
                 return _print_error("--app-id is required for damai-android-smoke")
-        if config.workflow_factory:
-            try:
-                options = _workflow_options(config, args)
-            except ValueError as exc:
-                return _print_error(str(exc))
+        try:
+            options = _workflow_options(config, args)
+        except ValueError as exc:
+            return _print_error(str(exc))
         if config.live:
             try:
                 session_factory = load_object(config.factory)

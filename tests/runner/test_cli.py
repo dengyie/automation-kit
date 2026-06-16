@@ -653,6 +653,29 @@ def test_cli_rejects_missing_factory_object(capsys):
     assert fixtures.CREATED_SESSIONS == []
 
 
+def test_cli_rejects_invalid_workflow_param_for_builtin_workflow(capsys):
+    fixtures.reset()
+
+    exit_code = main(
+        [
+            "run",
+            "damai-web-smoke",
+            "--json",
+            "--url",
+            "https://example.test/damai",
+            "--param",
+            "missing-equals",
+        ]
+    )
+
+    captured = capsys.readouterr()
+
+    assert exit_code == 2
+    assert captured.out == ""
+    assert "--param must use KEY=VALUE" in captured.err
+    assert fixtures.CREATED_SESSIONS == []
+
+
 def test_cli_rejects_invalid_workflow_param_before_loading_factory(capsys):
     fixtures.reset()
 
