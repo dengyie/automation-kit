@@ -1081,3 +1081,34 @@ def test_cli_rejects_report_file_without_json(capsys):
 
     assert exit_code == 2
     assert "--report-file requires --json" in captured.err
+
+
+def test_cli_handles_report_file_write_failure_without_partial_stdout(
+    tmp_path,
+    capsys,
+):
+    fixtures.reset()
+    blocked_parent = tmp_path / "blocked"
+    blocked_parent.write_text("not a directory", encoding="utf-8")
+
+    exit_code = main(
+        [
+            "run",
+            "damai-web-smoke",
+            "--live",
+            "--json",
+            "--report-file",
+            str(blocked_parent / "report.json"),
+            "--factory",
+            "tests.runner.fixtures:make_session",
+            "--url",
+            "https://example.test/damai",
+        ]
+    )
+
+    captured = capsys.readouterr()
+
+    assert exit_code == 2
+    assert captured.out == ""
+    assert "could not write report file" in captured.err
+    assert "Traceback" not in captured.err

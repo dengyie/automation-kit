@@ -118,6 +118,10 @@ Use either a built-in workflow name or `--workflow-factory`, not both. A
 positional workflow name overrides a config-provided workflow factory because
 CLI arguments take precedence over environment defaults.
 
+If `--report-file` is provided, the runner writes the file before emitting
+stdout. When the target path cannot be written, the CLI returns an error and
+does not print a partial JSON report.
+
 Runner defaults can also come from environment variables:
 
 ```bash

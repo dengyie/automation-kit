@@ -124,13 +124,22 @@ def _failure_result(workflow_name: str, exc: Exception) -> ExampleWorkflowResult
     )
 
 
-def _emit_json_report(report, report_file: Optional[str]) -> None:
-    payload = json.dumps(report.to_dict(), sort_keys=True)
-    print(payload)
-    if report_file:
-        report_path = Path(report_file)
-        report_path.parent.mkdir(parents=True, exist_ok=True)
-        report_path.write_text(payload + "\n", encoding="utf-8")
+def _json_report_payload(report) -> str:
+    return json.dumps(report.to_dict(), sort_keys=True) + "\n"
+
+
+def _write_json_report_file(report_file: str, payload: str) -> None:
+    report_path = Path(report_file)
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(payload, encoding="utf-8")
+
+
+def _emit_json_report_payload(payload: str) -> None:
+    print(payload, end="")
+
+
+def _emit_json_report(report) -> None:
+    _emit_json_report_payload(_json_report_payload(report))
 
 
 def _merge_config(args: argparse.Namespace, config: RunnerConfig) -> RunnerConfig:
@@ -364,7 +373,17 @@ def main(
                 workflow_context=context if config.workflow_factory else None,
                 elapsed_seconds=elapsed_seconds,
             )
-            _emit_json_report(report, args.report_file)
+            if args.report_file:
+                payload = _json_report_payload(report)
+                try:
+                    _write_json_report_file(args.report_file, payload)
+                except OSError as exc:
+                    return _print_error(
+                        f"could not write report file {args.report_file}: {exc}"
+                    )
+                _emit_json_report_payload(payload)
+            else:
+                _emit_json_report(report)
             return 0 if result.success else 1
         else:
             print(f"{workflow_name} success={result.success}")

@@ -3967,3 +3967,113 @@ Follow-up inspection confirmed:
 ### Next Phase
 
 Stage, commit, and push the finished slice.
+
+## 2026-06-17: Report File Write Failure Handling
+
+### Completed
+
+- Added a design note and implementation plan for clean report-file write
+  failure handling.
+- Added a regression test covering a blocked report-file parent path so the CLI
+  now fails cleanly instead of surfacing an unhandled filesystem traceback.
+- Split JSON report payload, report-file writing, and stdout emission so the
+  report file is written before stdout while filesystem errors stay scoped to
+  the report-file path.
+- Kept report-file/stdout parity intact for successful runs and for failure
+  reports generated from workflow or session errors.
+- Documented the report-file failure contract in `docs/adding-a-workflow.md`.
+- Left `automation_core` untouched and business-agnostic.
+
+### Verification
+
+Focused red run before implementation:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_cli.py::test_cli_handles_report_file_write_failure_without_partial_stdout --no-cov -q
+```
+
+Initial result:
+
+```text
+1 failed
+```
+
+Focused green run after implementation:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_cli.py::test_cli_handles_report_file_write_failure_without_partial_stdout --no-cov -q
+```
+
+Result:
+
+```text
+1 passed
+```
+
+Report-file regression tests:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_cli.py::test_cli_can_write_json_report_to_file tests/runner/test_cli.py::test_cli_can_write_report_file_when_json_comes_from_config tests/runner/test_cli.py::test_cli_emits_json_report_when_workflow_fails tests/runner/test_cli.py::test_cli_emits_json_report_when_session_factory_fails tests/runner/test_cli.py::test_cli_creates_report_file_parent_directories tests/runner/test_cli.py::test_cli_rejects_report_file_without_json --no-cov -q
+```
+
+Result:
+
+```text
+6 passed
+```
+
+Runner CLI test suite:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_cli.py --no-cov -q
+```
+
+Result:
+
+```text
+44 passed
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+223 passed
+Total coverage: 96.00%
+Required coverage: 80%
+```
+
+Whitespace check:
+
+```bash
+git diff --check
+```
+
+Result: no output.
+
+### Review
+
+Ran the required production code quality review scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- report-file write failures return a clean CLI error with no partial JSON
+  stdout.
+- successful report-file output remains byte-for-byte aligned with stdout.
+- filesystem error handling is scoped to report-file writing, not stdout.
+- `automation_core` remains untouched.
+
+### Next Phase
+
+Stage, commit, and push the finished slice.
