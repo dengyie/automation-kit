@@ -2410,3 +2410,51 @@ Follow-up inspection confirmed:
 
 Commit and push the example alias slice, then continue with the next roadmap
 phase.
+
+## 2026-06-16: Action Batch Summary
+
+### Completed
+
+- Added `ActionBatchResult` to `automation_core.actions`.
+- Updated `ActionExecutor.run_batch(...)` to return explicit batch summaries.
+- Added `skipped` actions for stop-on-failure short-circuit behavior.
+- Added `success` and `to_dict()` semantics for batch results.
+- Exported `ActionBatchResult` from `automation_core.actions`.
+- Updated workflow docs to describe batch summary behavior.
+
+### Verification
+
+Focused action tests:
+
+```bash
+.venv/bin/python -m pytest tests/actions/test_action_models.py --no-cov -q
+```
+
+Result:
+
+```text
+9 passed
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+170 passed
+Total coverage: 95.09%
+Required coverage: 80%
+```
+
+### Review
+
+Pending production review scripts.
+
+### Next Phase
+
+Run the production review gate, then commit and push the action batch summary
+slice.

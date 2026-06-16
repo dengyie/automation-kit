@@ -2,12 +2,14 @@
 
 from automation_core.actions.models import (
     ActionBatch,
+    ActionBatchResult,
     ActionExecutor,
     ActionRequest,
 )
 
 __all__ = [
     "ActionBatch",
+    "ActionBatchResult",
     "ActionExecutor",
     "ActionRequest",
 ]

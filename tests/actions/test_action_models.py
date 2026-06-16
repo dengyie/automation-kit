@@ -1,4 +1,4 @@
-from automation_core.actions import ActionBatch, ActionExecutor, ActionRequest
+from automation_core.actions import ActionBatch, ActionBatchResult, ActionExecutor, ActionRequest
 from automation_core.drivers import ActionResult
 
 
@@ -72,6 +72,24 @@ def test_action_executor_runs_action_against_driver_session():
     assert session.calls == [("get", {"url": "https://example.test"})]
 
 
+def test_action_executor_returns_batch_summary_for_successful_batch():
+    session = FakeSession()
+    executor = ActionExecutor(session)
+    batch = ActionBatch(
+        actions=[
+            ActionRequest(name="get"),
+            ActionRequest(name="screenshot", parameters={"name": "home.png"}),
+        ]
+    )
+
+    result = executor.run_batch(batch)
+
+    assert isinstance(result, ActionBatchResult)
+    assert result.success is True
+    assert [action.message for action in result.results] == ["get", "screenshot"]
+    assert result.skipped == []
+
+
 def test_action_executor_stops_batch_on_failure_by_default():
     session = FakeSession()
     executor = ActionExecutor(session)
@@ -83,9 +101,12 @@ def test_action_executor_stops_batch_on_failure_by_default():
         ]
     )
 
-    results = executor.run_batch(batch)
+    result = executor.run_batch(batch)
 
-    assert [result.success for result in results] == [True, False]
+    assert isinstance(result, ActionBatchResult)
+    assert [item.success for item in result.results] == [True, False]
+    assert result.success is False
+    assert [item.name for item in result.skipped] == ["after"]
     assert session.calls == [("get", {}), ("fail", {})]
 
 
@@ -99,7 +120,42 @@ def test_action_executor_can_continue_batch_after_failure():
         ]
     )
 
-    results = executor.run_batch(batch)
+    result = executor.run_batch(batch)
 
-    assert [result.success for result in results] == [False, True]
+    assert isinstance(result, ActionBatchResult)
+    assert [item.success for item in result.results] == [False, True]
+    assert result.skipped == []
     assert session.calls == [("fail", {}), ("after", {})]
+
+
+def test_action_executor_returns_empty_batch_summary_for_empty_batch():
+    session = FakeSession()
+    executor = ActionExecutor(session)
+
+    result = executor.run_batch(ActionBatch(actions=[]))
+
+    assert isinstance(result, ActionBatchResult)
+    assert result.success is False
+    assert result.results == []
+    assert result.skipped == []
+
+
+def test_action_batch_result_serializes():
+    result = ActionBatchResult(
+        results=[ActionResult(success=True, message="get")],
+        skipped=[ActionRequest(name="after")],
+    )
+
+    assert result.to_dict() == {
+        "results": [
+            {"success": True, "message": "get", "data": None},
+        ],
+        "skipped": [
+            {
+                "name": "after",
+                "parameters": {},
+                "stop_on_failure": True,
+            }
+        ],
+        "success": True,
+    }
