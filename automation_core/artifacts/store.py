@@ -27,15 +27,20 @@ class ArtifactStore:
     def __init__(self, root: Path):
         self.root = root
 
-    def _sanitize_name(self, name: str) -> str:
-        cleaned = name.replace("\\", "/").split("/")[-1].strip()
+    def _sanitize_component(self, value: str, field_name: str) -> str:
+        cleaned = value.replace("\\", "/").split("/")[-1].strip()
         if cleaned in {"", ".", ".."}:
-            raise ValueError("invalid artifact name")
+            raise ValueError(f"invalid {field_name}")
         return cleaned.replace(" ", "_")
 
     def build_path(self, run_id: str, artifact_type: str, name: str) -> Path:
-        safe_name = self._sanitize_name(name)
-        return self.root / run_id / artifact_type / safe_name
+        safe_run_id = self._sanitize_component(run_id, "run_id")
+        safe_artifact_type = self._sanitize_component(
+            artifact_type,
+            "artifact_type",
+        )
+        safe_name = self._sanitize_component(name, "artifact name")
+        return self.root / safe_run_id / safe_artifact_type / safe_name
 
     def record(
         self,

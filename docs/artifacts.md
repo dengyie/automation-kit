@@ -29,9 +29,9 @@ The default artifact root is `artifacts`. Tests may inject a temporary root.
   `trace`, or `log`.
 - Keep artifact names local to the artifact type, for example `home.png` or
   `startup.xml`.
-- Do not pass path-like names. `ArtifactStore` strips directories and rejects
-  empty, `.`, and `..` names.
-- Spaces in names are normalized to `_`.
+- `run_id`, `artifact_type`, and artifact names are all treated as single path
+  components. `ArtifactStore` strips directories, rejects empty, `.`, and `..`
+  components, and normalizes spaces to `_`.
 
 ## Report Attachment
 

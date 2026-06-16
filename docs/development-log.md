@@ -4077,3 +4077,102 @@ Follow-up inspection confirmed:
 ### Next Phase
 
 Stage, commit, and push the finished slice.
+
+## 2026-06-17: Artifact Path Component Sanitization
+
+### Completed
+
+- Added a design note and implementation plan for artifact path component
+  sanitization.
+- Added regression coverage proving `run_id` and `artifact_type` cannot escape
+  the artifact root through path-like input.
+- Added invalid component coverage for `run_id`, `artifact_type`, and artifact
+  names.
+- Replaced the name-only sanitizer in `ArtifactStore` with a shared path
+  component sanitizer used for `run_id`, `artifact_type`, and artifact names.
+- Documented that all artifact path components are reduced to one safe segment
+  and spaces are normalized to `_`.
+- Kept Selenium/Appium adapters delegating artifact paths to `ArtifactStore`.
+- Kept `automation_core` business-agnostic; the change only hardens a generic
+  storage contract.
+
+### Verification
+
+Focused red run before implementation:
+
+```bash
+.venv/bin/python -m pytest tests/artifacts/test_store.py --no-cov -q
+```
+
+Initial result:
+
+```text
+3 failed, 4 passed
+```
+
+Focused green run after implementation:
+
+```bash
+.venv/bin/python -m pytest tests/artifacts/test_store.py --no-cov -q
+```
+
+Result:
+
+```text
+7 passed
+```
+
+Adapter and driver artifact regression tests:
+
+```bash
+.venv/bin/python -m pytest tests/adapters/selenium/test_session.py tests/adapters/appium/test_session.py tests/drivers/test_contracts.py --no-cov -q
+```
+
+Result:
+
+```text
+61 passed
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+226 passed
+Total coverage: 96.01%
+Required coverage: 80%
+```
+
+Whitespace check:
+
+```bash
+git diff --check
+```
+
+Result: no output.
+
+### Review
+
+Ran the required production code quality review scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- artifact path sanitization lives in `automation_core.artifacts`.
+- adapters keep using the shared store contract.
+- path-like run IDs and artifact types no longer escape the artifact root.
+- existing artifact record serialization and report paths remain unchanged.
+
+### Next Phase
+
+Stage, commit, and push the finished slice.
