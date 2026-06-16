@@ -276,6 +276,10 @@ runner does not serialize raw `WorkflowOptions` as a top-level report object.
 - `error` when workflow execution raises an exception.
 - `task.end` with `outcome` set to `succeeded` or `failed`.
 
+If a workflow result already includes an `artifact` event for a returned
+artifact handle, `ExampleWorkflow` preserves that event and does not add a
+duplicate automatic artifact event.
+
 Artifacts stay generic. See `docs/artifacts.md` for storage layout, naming
 rules, report attachment rules, and dry-run behavior.
 

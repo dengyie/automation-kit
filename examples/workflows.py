@@ -48,6 +48,23 @@ def _split_error(error: str) -> Tuple[str, str]:
     return "Error", error
 
 
+def _has_artifact_event(
+    events: List[EventEnvelope],
+    *,
+    task_id: str,
+    artifact: ArtifactHandle,
+) -> bool:
+    artifact_path = str(artifact.path)
+    for event in events:
+        if event.event_type != "artifact" or event.task_id != task_id:
+            continue
+        if event.payload.get("artifact_type") != artifact.artifact_type:
+            continue
+        if event.payload.get("path") == artifact_path:
+            return True
+    return False
+
+
 def run_workflow_steps(
     session: DriverSession,
     steps: List[WorkflowStep],
@@ -134,18 +151,21 @@ class ExampleWorkflow:
         try:
             result = self.run_fn(session)
             events.extend(result.events)
-            events.extend(
-                artifact_event.to_envelope()
-                for artifact_event in (
+            for artifact in result.artifacts:
+                if _has_artifact_event(
+                    result.events,
+                    task_id=session.info.identifier,
+                    artifact=artifact,
+                ):
+                    continue
+                events.append(
                     ArtifactEvent(
                         task_name=self.name,
                         task_id=session.info.identifier,
                         artifact_type=artifact.artifact_type,
                         path=str(artifact.path),
-                    )
-                    for artifact in result.artifacts
+                    ).to_envelope()
                 )
-            )
             has_error_event = any(
                 event.event_type == "error" for event in result.events
             )

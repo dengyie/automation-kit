@@ -2530,6 +2530,91 @@ and the report contract remains backward compatible.
 
 Stage, commit, and push the finished slice.
 
+## 2026-06-17: Workflow Artifact Event Deduplication
+
+### Completed
+
+- Added a design note and implementation plan for artifact event deduplication
+  in example workflow event assembly.
+- Added regression coverage proving `ExampleWorkflow` does not duplicate an
+  `artifact` event when the workflow result already includes a matching
+  caller-provided artifact event.
+- Updated `ExampleWorkflow.run(...)` to skip automatic artifact event creation
+  for artifacts already represented by returned events.
+- Documented the artifact event deduplication behavior in
+  `docs/adding-a-workflow.md`.
+- Left `automation_core` unchanged and business-agnostic.
+
+### Verification
+
+Focused red run before implementation:
+
+```bash
+.venv/bin/python -m pytest tests/examples/damai_web/test_smoke_workflow.py::test_example_workflow_does_not_duplicate_returned_artifact_events --no-cov -q
+```
+
+Initial result:
+
+```text
+1 failed
+```
+
+Focused green run after implementation:
+
+```bash
+.venv/bin/python -m pytest tests/examples/damai_web/test_smoke_workflow.py::test_example_workflow_does_not_duplicate_returned_artifact_events tests/examples/damai_web/test_smoke_workflow.py::test_damai_web_smoke_workflow_factory_returns_runnable_workflow tests/examples/damai_android/test_smoke_workflow.py::test_damai_android_smoke_workflow_factory_returns_runnable_workflow --no-cov -q
+```
+
+Result:
+
+```text
+3 passed
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+257 passed
+Total coverage: 96.20%
+Required coverage: 80%
+```
+
+Whitespace check:
+
+```bash
+git diff --check
+```
+
+Result: no output.
+
+### Review
+
+Ran the required production code quality review scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- artifact event deduplication lives in `examples.workflows`.
+- caller-provided workflow events are still preserved.
+- automatic artifact events are still created for built-in workflows that only
+  return artifact handles.
+- `automation_core` remains unchanged.
+
+### Next Phase
+
+Stage, commit, and push the finished slice.
+
 ## 2026-06-17: Report Contract Run State Documentation
 
 ### Completed
