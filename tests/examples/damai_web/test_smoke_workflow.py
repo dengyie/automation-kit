@@ -6,7 +6,12 @@ from automation_core.actions import ActionBatchResult, ActionRequest
 from automation_core.drivers import ActionResult, ArtifactHandle, SessionInfo
 from automation_core.events import RetryAttemptEvent
 from examples.damai_web import create_workflow, run_smoke_workflow
-from examples.workflows import ExampleWorkflow, ExampleWorkflowResult
+from examples.workflows import (
+    ExampleWorkflow,
+    ExampleWorkflowResult,
+    WorkflowStep,
+    run_workflow_steps,
+)
 
 
 class FakeSession:
@@ -148,6 +153,80 @@ def test_example_workflow_preserves_batch_summary_returned_by_run_function():
     assert result.batch_result is not None
     assert result.batch_result.success is True
     assert [item.message for item in result.batch_result.results] == ["open"]
+
+
+def test_run_workflow_steps_runs_actions_and_artifacts_in_order():
+    session = FakeSession()
+
+    result = run_workflow_steps(
+        session,
+        [
+            WorkflowStep.action("open", url="https://example.test/damai"),
+            WorkflowStep.artifact("screenshot", "home.png"),
+            WorkflowStep.action("click", selector="#buy"),
+            WorkflowStep.artifact("page_source", "after-click.html"),
+        ],
+    )
+
+    assert session.started is True
+    assert session.stopped is True
+    assert result.success is True
+    assert [action.message for action in result.actions] == ["open", "click"]
+    assert result.batch_result is not None
+    assert result.batch_result.skipped == []
+    assert session.actions == [
+        ("open", {"url": "https://example.test/damai"}),
+        ("click", {"selector": "#buy"}),
+    ]
+    assert session.artifacts == [
+        ("screenshot", "home.png"),
+        ("page_source", "after-click.html"),
+    ]
+
+
+def test_run_workflow_steps_stops_after_failed_action_batch():
+    class FailedActionSession(FakeSession):
+        def execute_action(self, action_name, **kwargs):
+            self.actions.append((action_name, kwargs))
+            return ActionResult(success=action_name != "open", message=action_name)
+
+    session = FailedActionSession()
+
+    result = run_workflow_steps(
+        session,
+        [
+            WorkflowStep.action("open", url="https://example.test/damai"),
+            WorkflowStep.action("click", selector="#buy"),
+            WorkflowStep.artifact("screenshot", "should-not-run.png"),
+        ],
+    )
+
+    assert result.success is False
+    assert [action.message for action in result.actions] == ["open"]
+    assert result.batch_result is not None
+    assert [action.name for action in result.batch_result.skipped] == ["click"]
+    assert result.artifacts == []
+    assert session.artifacts == []
+    assert session.stopped is True
+
+
+def test_run_workflow_steps_allows_artifact_only_sequences():
+    session = FakeSession()
+
+    result = run_workflow_steps(
+        session,
+        [
+            WorkflowStep.artifact("screenshot", "home.png"),
+        ],
+    )
+
+    assert session.started is True
+    assert session.stopped is True
+    assert result.success is True
+    assert result.actions == []
+    assert result.batch_result is None
+    assert session.actions == []
+    assert session.artifacts == [("screenshot", "home.png")]
 
 
 def test_damai_web_smoke_workflow_stops_session_when_action_fails():

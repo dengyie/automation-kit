@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
-from typing import Callable, List, Optional
+from typing import Callable, Dict, List, Optional
 
-from automation_core.actions import ActionBatchResult
+from automation_core.actions import ActionBatch, ActionBatchResult, ActionExecutor, ActionRequest
 from automation_core.drivers import (
     ActionResult,
     ArtifactHandle,
@@ -9,6 +9,21 @@ from automation_core.drivers import (
     SessionInfo,
 )
 from automation_core.events import ArtifactEvent, ErrorEvent, EventEnvelope, TaskEndEvent, TaskStartEvent
+
+
+@dataclass(frozen=True)
+class WorkflowStep:
+    kind: str
+    name: str
+    parameters: Dict[str, object] = field(default_factory=dict)
+
+    @classmethod
+    def action(cls, name: str, **parameters: object) -> "WorkflowStep":
+        return cls(kind="action", name=name, parameters=parameters)
+
+    @classmethod
+    def artifact(cls, artifact_type: str, name: str) -> "WorkflowStep":
+        return cls(kind="artifact", name=artifact_type, parameters={"name": name})
 
 
 @dataclass(frozen=True)
@@ -20,6 +35,65 @@ class ExampleWorkflowResult:
     batch_result: Optional[ActionBatchResult] = None
     error: Optional[str] = None
     events: List[EventEnvelope] = field(default_factory=list)
+
+
+def run_workflow_steps(
+    session: DriverSession,
+    steps: List[WorkflowStep],
+) -> ExampleWorkflowResult:
+    actions = []
+    artifacts = []
+    skipped = []
+    pending_actions = []
+    ran_action_batch = False
+    executor = ActionExecutor(session)
+
+    def flush_actions() -> bool:
+        nonlocal ran_action_batch
+        if not pending_actions:
+            return True
+        ran_action_batch = True
+        batch_result = executor.run_batch(ActionBatch(actions=list(pending_actions)))
+        pending_actions.clear()
+        actions.extend(batch_result.results)
+        skipped.extend(batch_result.skipped)
+        return batch_result.success
+
+    try:
+        session.start()
+        for step in steps:
+            if step.kind == "action":
+                pending_actions.append(
+                    ActionRequest(name=step.name, parameters=dict(step.parameters))
+                )
+                continue
+
+            if not flush_actions():
+                break
+            artifacts.append(
+                session.capture_artifact(
+                    step.name,
+                    str(step.parameters["name"]),
+                )
+            )
+
+        if not skipped:
+            flush_actions()
+
+        batch_result = (
+            ActionBatchResult(results=actions, skipped=skipped)
+            if ran_action_batch
+            else None
+        )
+        return ExampleWorkflowResult(
+            session=session.info,
+            success=(batch_result.success if batch_result is not None else True),
+            actions=actions,
+            artifacts=artifacts,
+            batch_result=batch_result,
+        )
+    finally:
+        session.stop()
 
 
 @dataclass(frozen=True)

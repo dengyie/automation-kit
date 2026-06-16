@@ -2529,3 +2529,65 @@ and the report contract remains backward compatible.
 ### Next Phase
 
 Stage, commit, and push the finished slice.
+
+## 2026-06-16: Workflow Steps
+
+### Completed
+
+- Added example-layer `WorkflowStep` helpers for ordered action and artifact
+  composition.
+- Added `run_workflow_steps(...)` to execute step sequences with shared
+  session lifecycle handling.
+- Moved the Damai web and Android smoke workflows onto the new step helper.
+- Kept existing `ExampleWorkflow` result and event behavior intact.
+- Documented workflow steps in `docs/adding-a-workflow.md`.
+
+### Verification
+
+Focused example and CLI tests:
+
+```bash
+.venv/bin/python -m pytest tests/examples tests/runner/test_cli.py --no-cov -q
+```
+
+Result:
+
+```text
+43 passed
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+175 passed
+Total coverage: 95.15%
+Required coverage: 80%
+```
+
+### Review
+
+Ran the required production code quality review scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- workflow step composition stays in the example layer.
+- `automation_core` remains business-agnostic.
+- action failure short-circuits later steps and reports skipped actions.
+- artifact-only sequences remain successful and do not emit empty
+  `action_batch` summaries.
+
+### Next Phase
+
+Stage, commit, and push the finished slice.

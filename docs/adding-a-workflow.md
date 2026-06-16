@@ -29,6 +29,29 @@ The lower-level helper remains available when you want direct function calls:
 from examples.damai_web import run_smoke_workflow
 ```
 
+## Workflow Steps
+
+Example workflows can use `WorkflowStep` helpers to keep simple action and
+artifact sequences compact:
+
+```python
+from examples.workflows import WorkflowStep, run_workflow_steps
+
+
+def run_smoke_workflow(session, url):
+    return run_workflow_steps(
+        session,
+        [
+            WorkflowStep.action("open", url=url),
+            WorkflowStep.artifact("screenshot", "home.png"),
+        ],
+    )
+```
+
+`WorkflowStep` is an example-layer authoring helper. It is not a persisted DSL,
+and it does not move URLs, selectors, package names, or business flow into
+`automation_core`.
+
 ## Creating A New Workflow
 
 1. Put business-specific code under `examples/<domain>_<platform>/` or another
