@@ -524,6 +524,29 @@ def test_cli_arguments_override_config_source(capsys):
     ]
 
 
+def test_cli_rejects_non_string_config_factory_before_loading_factory(capsys):
+    fixtures.reset()
+
+    exit_code = main(
+        [
+            "run",
+            "damai-web-smoke",
+            "--live",
+            "--json",
+            "--url",
+            "https://example.test/damai",
+        ],
+        config_source=DictConfigSource({"factory": 123}),
+    )
+
+    captured = capsys.readouterr()
+
+    assert exit_code == 2
+    assert captured.out == ""
+    assert "config factory expected string" in captured.err
+    assert fixtures.CREATED_SESSIONS == []
+
+
 def test_cli_rejects_invalid_config_bool(capsys):
     exit_code = main(
         ["run", "damai-web-smoke"],

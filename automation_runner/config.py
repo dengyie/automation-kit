@@ -24,7 +24,9 @@ def _optional_string(source: ConfigSource, key: str) -> Optional[str]:
     value = source.get(key, default=None).value
     if value is None:
         return None
-    return str(value)
+    if not isinstance(value, str):
+        raise ValueError(f"config {key} expected string")
+    return value
 
 
 def _optional_bool(source: ConfigSource, key: str, default: bool = False) -> bool:

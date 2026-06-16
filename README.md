@@ -71,6 +71,10 @@ AUTOMATION_RUNNER_URL=https://example.test/damai \
 automation-runner run damai-web-smoke
 ```
 
+Dictionary-backed runner config must provide string values for `factory`,
+`workflow_factory`, `url`, and `app_id`; invalid types fail before factories are
+loaded.
+
 Custom workflow parameters can also come from config. Environment values use a
 JSON object string, and CLI `--param` values override matching config keys:
 

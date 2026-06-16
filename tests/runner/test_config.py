@@ -62,6 +62,20 @@ def test_load_runner_config_rejects_invalid_parameter_json():
         load_runner_config(DictConfigSource({"parameters": "not-json"}))
 
 
+@pytest.mark.parametrize(
+    ("key", "value"),
+    [
+        ("factory", 123),
+        ("workflow_factory", {"module": "factory"}),
+        ("url", ["https://example.test"]),
+        ("app_id", 42),
+    ],
+)
+def test_load_runner_config_rejects_non_string_fields(key, value):
+    with pytest.raises(ValueError, match=f"config {key} expected string"):
+        load_runner_config(DictConfigSource({key: value}))
+
+
 def test_load_runner_config_rejects_non_string_parameter_values():
     with pytest.raises(
         ValueError,

@@ -4176,3 +4176,112 @@ Follow-up inspection confirmed:
 ### Next Phase
 
 Stage, commit, and push the finished slice.
+
+## 2026-06-17: Runner Config String Validation
+
+### Completed
+
+- Added a design note and implementation plan for runner config string field
+  validation.
+- Added runner config coverage for non-string `factory`, `workflow_factory`,
+  `url`, and `app_id` values.
+- Added CLI coverage proving invalid config factories fail before live factory
+  loading.
+- Tightened `_optional_string(...)` in `automation_runner.config` so dictionary
+  or file-backed config cannot silently coerce non-string values.
+- Documented dictionary-backed runner config type expectations in `README.md`
+  and `docs/adding-a-workflow.md`.
+- Kept `automation_core.config` generic and unchanged.
+
+### Verification
+
+Focused red config run before implementation:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_config.py --no-cov -q
+```
+
+Initial result:
+
+```text
+4 failed, 6 passed
+```
+
+Focused red CLI boundary run before implementation:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_cli.py::test_cli_rejects_non_string_config_factory_before_loading_factory --no-cov -q
+```
+
+Initial result:
+
+```text
+1 failed
+```
+
+Focused green run after implementation:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_config.py tests/runner/test_cli.py::test_cli_rejects_non_string_config_factory_before_loading_factory --no-cov -q
+```
+
+Result:
+
+```text
+11 passed
+```
+
+Runner regression tests:
+
+```bash
+.venv/bin/python -m pytest tests/runner --no-cov -q
+```
+
+Result:
+
+```text
+79 passed
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+231 passed
+Total coverage: 96.03%
+Required coverage: 80%
+```
+
+Whitespace check:
+
+```bash
+git diff --check
+```
+
+Result: no output.
+
+### Review
+
+Ran the required production code quality review scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- string-field validation lives in `automation_runner.config`.
+- environment-backed config remains string-based and compatible.
+- invalid dictionary-backed config fails before workflow or factory loading.
+- `automation_core` remains unchanged and business-agnostic.
+
+### Next Phase
+
+Stage, commit, and push the finished slice.
