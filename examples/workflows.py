@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Callable, List, Optional
 
+from automation_core.actions import ActionBatchResult
 from automation_core.drivers import (
     ActionResult,
     ArtifactHandle,
@@ -16,6 +17,7 @@ class ExampleWorkflowResult:
     success: bool
     actions: List[ActionResult]
     artifacts: List[ArtifactHandle]
+    batch_result: Optional[ActionBatchResult] = None
     error: Optional[str] = None
     events: List[EventEnvelope] = field(default_factory=list)
 
@@ -61,6 +63,7 @@ class ExampleWorkflow:
                 success=result.success,
                 actions=result.actions,
                 artifacts=result.artifacts,
+                batch_result=result.batch_result,
                 error=result.error,
                 events=events,
             )
@@ -85,6 +88,7 @@ class ExampleWorkflow:
                 success=False,
                 actions=[],
                 artifacts=[],
+                batch_result=None,
                 error=f"{type(exc).__name__}: {exc}",
                 events=events,
             )

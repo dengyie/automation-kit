@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from automation_core.actions import ActionBatchResult, ActionRequest
 from automation_core.drivers import ActionResult, ArtifactHandle, SessionInfo
 from examples.workflows import ExampleWorkflow, ExampleWorkflowResult
 
@@ -65,6 +66,10 @@ def create_custom_workflow(session_factory):
             success=True,
             actions=[session.execute_action("custom_action")],
             artifacts=[],
+            batch_result=ActionBatchResult(
+                results=[ActionResult(success=True, message="custom_action")],
+                skipped=[],
+            ),
         ),
     )
 
@@ -90,6 +95,10 @@ def create_context_workflow(session_factory, context, options):
                 )
             ],
             artifacts=[],
+            batch_result=ActionBatchResult(
+                results=[ActionResult(success=True, message="context_action")],
+                skipped=[ActionRequest(name="after_context")],
+            ),
         ),
     )
 
@@ -111,6 +120,10 @@ def create_kwargs_context_workflow(session_factory, **kwargs):
                 )
             ],
             artifacts=[],
+            batch_result=ActionBatchResult(
+                results=[ActionResult(success=True, message="kwargs_context_action")],
+                skipped=[],
+            ),
         ),
     )
 

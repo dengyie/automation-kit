@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from automation_core.actions import ActionBatchResult, ActionRequest
 from automation_core.drivers import ActionResult, ArtifactHandle, SessionInfo
 from automation_core.events import TaskStartEvent
 from automation_core.state import RunState, RunStatus
@@ -250,4 +251,43 @@ def test_build_report_serializes_workflow_context():
         "live": True,
         "workflow_factory": "pkg:create",
         "session_factory": "pkg:session",
+    }
+
+
+def test_build_report_serializes_action_batch_summary():
+    result = ExampleWorkflowResult(
+        session=SessionInfo(
+            driver_name="fake",
+            platform="web",
+            identifier="run-1",
+        ),
+        success=True,
+        actions=[
+            ActionResult(success=True, message="get"),
+        ],
+        artifacts=[],
+        batch_result=ActionBatchResult(
+            results=[ActionResult(success=True, message="get")],
+            skipped=[ActionRequest(name="after")],
+        ),
+    )
+
+    report = build_report("damai-web-smoke", result).to_dict()
+
+    assert report["action_batch"] == {
+        "results": [
+            {
+                "success": True,
+                "message": "get",
+                "data": None,
+            },
+        ],
+        "skipped": [
+            {
+                "name": "after",
+                "parameters": {},
+                "stop_on_failure": True,
+            },
+        ],
+        "success": True,
     }

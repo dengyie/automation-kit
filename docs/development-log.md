@@ -2452,9 +2452,22 @@ Required coverage: 80%
 
 ### Review
 
-Pending production review scripts.
+Used `production-code-quality-review` required setup scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- action batch summaries stay in `automation_core.actions` and are surfaced
+  through runner reports only when workflows provide them.
+- `action_batch` remains optional in reports and defaults to `None` when no batch summary is provided.
+- default tests remain offline and deterministic.
 
 ### Next Phase
 
-Run the production review gate, then commit and push the action batch summary
-slice.
+Commit and push the action batch reporting slice, then continue with the next roadmap
+phase.

@@ -1,6 +1,7 @@
 from dataclasses import asdict, dataclass
 from typing import Dict, List, Optional
 
+from automation_core.actions import ActionBatchResult
 from automation_core.drivers import ActionResult, ArtifactHandle, SessionInfo
 from automation_core.state import RunState
 from automation_runner.context import WorkflowContext
@@ -33,6 +34,7 @@ class RunnerReport:
     actions: List[Dict[str, object]]
     artifacts: List[Dict[str, object]]
     error: Optional[str] = None
+    action_batch: Optional[Dict[str, object]] = None
 
     def to_dict(self) -> Dict[str, object]:
         return asdict(self)
@@ -54,6 +56,12 @@ def _serialize_actions(actions: List[ActionResult]) -> List[Dict[str, object]]:
         }
         for action in actions
     ]
+
+
+def _serialize_action_batch(batch_result: Optional[ActionBatchResult]) -> Optional[Dict[str, object]]:
+    if batch_result is None:
+        return None
+    return batch_result.to_dict()
 
 
 def _serialize_metadata(metadata: Dict[str, str]) -> Dict[str, str]:
@@ -127,6 +135,7 @@ def build_report(
         events=[envelope.to_dict() for envelope in result.events],
         session=_serialize_session(result.session),
         actions=_serialize_actions(result.actions),
+        action_batch=_serialize_action_batch(result.batch_result),
         artifacts=_serialize_artifacts(result.artifacts),
         error=error if error is not None else result.error,
     )

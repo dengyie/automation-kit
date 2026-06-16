@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 
+from automation_core.actions import ActionBatchResult, ActionRequest
 from automation_core.drivers import ActionResult, ArtifactHandle, SessionInfo
 from automation_core.events import RetryAttemptEvent
 from examples.damai_web import create_workflow, run_smoke_workflow
@@ -118,6 +119,30 @@ def test_example_workflow_preserves_events_returned_by_run_function():
         "retry.attempt",
         "task.end",
     ]
+
+
+def test_example_workflow_preserves_batch_summary_returned_by_run_function():
+    session = FakeSession()
+    workflow = ExampleWorkflow(
+        name="custom-workflow",
+        session_factory=lambda: session,
+        run_fn=lambda current_session: ExampleWorkflowResult(
+            session=current_session.info,
+            success=True,
+            actions=[],
+            artifacts=[],
+            batch_result=ActionBatchResult(
+                results=[ActionResult(success=True, message="open")],
+                skipped=[ActionRequest(name="after")],
+            ),
+        ),
+    )
+
+    result = workflow.run()
+
+    assert result.batch_result is not None
+    assert result.batch_result.success is True
+    assert [item.message for item in result.batch_result.results] == ["open"]
 
 
 def test_damai_web_smoke_workflow_stops_session_when_action_fails():
