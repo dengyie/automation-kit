@@ -1,0 +1,304 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/dengyie/automation-kit/docs/report-schema-v1.json",
+  "title": "Automation Kit Runner Report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "workflow",
+    "workflow_factory",
+    "session_factory",
+    "workflow_context",
+    "success",
+    "status",
+    "run_id",
+    "run_state",
+    "live",
+    "elapsed_seconds",
+    "events",
+    "session",
+    "actions",
+    "artifacts",
+    "error",
+    "action_batch"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1"
+    },
+    "workflow": {
+      "type": "string"
+    },
+    "workflow_factory": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "session_factory": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "workflow_context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workflow_name",
+        "live",
+        "workflow_factory",
+        "session_factory"
+      ],
+      "properties": {
+        "workflow_name": {
+          "type": "string"
+        },
+        "live": {
+          "type": "boolean"
+        },
+        "workflow_factory": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "session_factory": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "success": {
+      "type": "boolean"
+    },
+    "status": {
+      "enum": [
+        "succeeded",
+        "failed"
+      ]
+    },
+    "run_id": {
+      "type": "string"
+    },
+    "run_state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "run_id",
+        "status",
+        "started_at",
+        "finished_at",
+        "outcome"
+      ],
+      "properties": {
+        "run_id": {
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "running",
+            "succeeded",
+            "failed",
+            "cancelled"
+          ]
+        },
+        "started_at": {
+          "type": "number"
+        },
+        "finished_at": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "outcome": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "live": {
+      "type": "boolean"
+    },
+    "elapsed_seconds": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "event_id",
+          "event_type",
+          "task_id",
+          "payload"
+        ],
+        "properties": {
+          "event_id": {
+            "type": "string"
+          },
+          "event_type": {
+            "enum": [
+              "task.start",
+              "task.end",
+              "retry.attempt",
+              "error",
+              "artifact"
+            ]
+          },
+          "task_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "payload": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      }
+    },
+    "session": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "driver_name",
+        "platform",
+        "identifier"
+      ],
+      "properties": {
+        "driver_name": {
+          "type": "string"
+        },
+        "platform": {
+          "type": "string"
+        },
+        "identifier": {
+          "type": "string"
+        }
+      }
+    },
+    "actions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "success",
+          "message"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "artifact_type",
+          "path",
+          "metadata"
+        ],
+        "properties": {
+          "artifact_type": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "error": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "action_batch": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "results",
+            "skipped",
+            "success"
+          ],
+          "properties": {
+            "results": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "success",
+                  "message"
+                ],
+                "properties": {
+                  "success": {
+                    "type": "boolean"
+                  },
+                  "message": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "skipped": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "name",
+                  "stop_on_failure"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "stop_on_failure": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            },
+            "success": {
+              "type": "boolean"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

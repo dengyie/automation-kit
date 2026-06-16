@@ -220,7 +220,8 @@ Each artifact entry contains:
 
 `schema_version` records the top-level runner JSON report contract version.
 It is report metadata and does not version workflow result models or event
-envelopes.
+envelopes. The machine-readable contract for `schema_version == "1"` lives in
+`docs/report-schema-v1.json`.
 
 `events` contains serialized `EventEnvelope` records. Example workflows emit:
 

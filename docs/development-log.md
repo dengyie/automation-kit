@@ -3112,3 +3112,88 @@ Follow-up inspection confirmed:
 ### Next Phase
 
 Stage, commit, and push the finished slice.
+
+## 2026-06-16: Runner Report JSON Schema
+
+### Completed
+
+- Added `docs/report-schema-v1.json` as the machine-readable runner report
+  contract for `schema_version == "1"`.
+- Added tests that compare the schema top-level fields with a real
+  `build_report(...).to_dict()` payload.
+- Added tests for safe nested report sections including `session`, `run_state`,
+  `actions`, `artifacts`, and `action_batch`.
+- Linked the schema from `README.md` and `docs/adding-a-workflow.md`.
+- Kept the schema in `docs` with no runtime validation dependency.
+
+### Verification
+
+Focused red test run before adding the schema:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_report_schema.py --no-cov -q
+```
+
+Result:
+
+```text
+2 failed
+FileNotFoundError: docs/report-schema-v1.json
+```
+
+Focused green test run after adding the schema:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_report_schema.py --no-cov -q
+```
+
+Result:
+
+```text
+2 passed
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+187 passed
+Total coverage: 94.86%
+Required coverage: 80%
+```
+
+Whitespace check:
+
+```bash
+git diff --check
+```
+
+Result: no output.
+
+### Review
+
+Ran the required production code quality review scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- the schema is documentation and compatibility metadata only.
+- report emission remains in `automation_runner.reports`.
+- no JSON Schema runtime dependency was added.
+- event payloads and artifact metadata remain extensible.
+- raw action `data` and skipped action `parameters` remain excluded from the
+  documented report contract.
+
+### Next Phase
+
+Stage, commit, and push the finished slice.

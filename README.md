@@ -97,5 +97,6 @@ passes those strings through as `options.parameters` and leaves workflow-specifi
 validation to the workflow package.
 
 See `docs/adding-a-workflow.md` for package boundaries, report fields, and
-adapter rules. See `docs/artifacts.md` for screenshot, page-source, UI-tree,
-trace, and log artifact conventions.
+adapter rules. See `docs/report-schema-v1.json` for the machine-readable
+runner report contract. See `docs/artifacts.md` for screenshot, page-source,
+UI-tree, trace, and log artifact conventions.
