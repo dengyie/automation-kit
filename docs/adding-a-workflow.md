@@ -123,6 +123,7 @@ JSON reports currently include:
 - `workflow`
 - `workflow_factory`
 - `session_factory`
+- `workflow_context`
 - `success`
 - `status`
 - `run_id`
@@ -149,6 +150,10 @@ factory import path.
 `workflow_factory` records the workflow factory import path when a custom
 workflow factory is used. `session_factory` records the live session factory
 import path when the runner is using a live adapter factory.
+
+`workflow_context` is a safe summary of runner metadata. It mirrors the typed
+context passed to custom factories and intentionally stays separate from raw
+workflow options.
 
 - `task.start` when the workflow session starts executing.
 - `artifact` for each captured artifact.

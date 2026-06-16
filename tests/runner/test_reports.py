@@ -3,6 +3,7 @@ from pathlib import Path
 from automation_core.drivers import ActionResult, ArtifactHandle, SessionInfo
 from automation_core.events import TaskStartEvent
 from automation_core.state import RunState, RunStatus
+from automation_runner.context import WorkflowContext
 from automation_runner.reports import build_report
 from examples.workflows import ExampleWorkflowResult
 
@@ -219,3 +220,34 @@ def test_build_report_records_factory_elapsed_and_error_summary():
     assert report["session_factory"] == "tests.runner.fixtures:make_session"
     assert report["elapsed_seconds"] == 0.25
     assert report["error"] == "workflow failed"
+
+
+def test_build_report_serializes_workflow_context():
+    result = ExampleWorkflowResult(
+        session=SessionInfo(
+            driver_name="fake",
+            platform="web",
+            identifier="run-1",
+        ),
+        success=True,
+        actions=[],
+        artifacts=[],
+    )
+
+    report = build_report(
+        "custom",
+        result,
+        workflow_context=WorkflowContext(
+            workflow_name="custom",
+            live=True,
+            workflow_factory="pkg:create",
+            session_factory="pkg:session",
+        ),
+    ).to_dict()
+
+    assert report["workflow_context"] == {
+        "workflow_name": "custom",
+        "live": True,
+        "workflow_factory": "pkg:create",
+        "session_factory": "pkg:session",
+    }

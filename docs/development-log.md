@@ -2147,3 +2147,66 @@ Follow-up inspection confirmed:
 
 Commit and push the workflow context slice, then continue with the next roadmap
 slice.
+
+## 2026-06-16: Workflow Context In Reports
+
+### Completed
+
+- Added `workflow_context` to runner JSON reports.
+- Reused `automation_runner.context.WorkflowContext` as the report source.
+- Kept top-level `workflow`, `workflow_factory`, `session_factory`, and
+  `live` fields for compatibility.
+- Avoided serializing raw `WorkflowOptions` values into reports.
+- Updated README, workflow docs, design docs, and implementation plan docs.
+- Added report tests for explicit workflow context serialization.
+
+### Verification
+
+Focused runner tests:
+
+```bash
+.venv/bin/python -m pytest tests/runner -q --no-cov
+```
+
+Result:
+
+```text
+45 passed
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+151 passed
+Total coverage: 94.99%
+Required coverage: 80%
+```
+
+### Review
+
+Used `production-code-quality-review` required setup scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- report context serialization stays in `automation_runner`, not
+  `automation_core`.
+- reports still omit raw action `data`.
+- raw workflow options are not serialized as a report object.
+- existing top-level report fields remain present.
+
+### Next Phase
+
+Commit and push the workflow-context report slice, then continue with the next
+roadmap slice.

@@ -234,6 +234,7 @@ def main(
                 live=config.live,
                 workflow_factory=config.workflow_factory,
                 session_factory=config.factory if config.live else None,
+                workflow_context=context if config.workflow_factory else None,
                 elapsed_seconds=elapsed_seconds,
             )
             payload = json.dumps(report.to_dict(), sort_keys=True)

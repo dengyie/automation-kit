@@ -3,6 +3,7 @@ from typing import Dict, List, Optional
 
 from automation_core.drivers import ActionResult, ArtifactHandle, SessionInfo
 from automation_core.state import RunState
+from automation_runner.context import WorkflowContext
 from examples.workflows import ExampleWorkflowResult
 
 
@@ -20,6 +21,7 @@ class RunnerReport:
     workflow: str
     workflow_factory: Optional[str]
     session_factory: Optional[str]
+    workflow_context: Dict[str, object]
     success: bool
     status: str
     run_id: str
@@ -76,6 +78,15 @@ def _serialize_artifacts(artifacts: List[ArtifactHandle]) -> List[Dict[str, obje
     ]
 
 
+def _serialize_workflow_context(context: WorkflowContext) -> Dict[str, object]:
+    return {
+        "workflow_name": context.workflow_name,
+        "live": context.live,
+        "workflow_factory": context.workflow_factory,
+        "session_factory": context.session_factory,
+    }
+
+
 def build_report(
     workflow: str,
     result: ExampleWorkflowResult,
@@ -83,6 +94,7 @@ def build_report(
     live: bool = False,
     workflow_factory: Optional[str] = None,
     session_factory: Optional[str] = None,
+    workflow_context: Optional[WorkflowContext] = None,
     elapsed_seconds: Optional[float] = None,
     error: Optional[str] = None,
 ) -> RunnerReport:
@@ -96,6 +108,15 @@ def build_report(
         workflow=workflow,
         workflow_factory=workflow_factory,
         session_factory=session_factory,
+        workflow_context=_serialize_workflow_context(
+            workflow_context
+            or WorkflowContext(
+                workflow_name=workflow,
+                live=live,
+                workflow_factory=workflow_factory,
+                session_factory=session_factory,
+            )
+        ),
         success=result.success,
         status="succeeded" if result.success else "failed",
         run_id=result.session.identifier,
