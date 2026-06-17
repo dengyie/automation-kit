@@ -245,7 +245,7 @@ def _parse_parameters(values: Optional[List[str]]) -> Dict[str, str]:
     parameters = {}
     for value in values or []:
         key, separator, raw_value = value.partition("=")
-        if not separator or not key:
+        if not separator or not key.strip():
             raise ValueError("--param must use KEY=VALUE")
         parameters[key] = raw_value
     return parameters

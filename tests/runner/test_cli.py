@@ -791,6 +791,50 @@ def test_cli_rejects_invalid_workflow_param_for_builtin_workflow(capsys):
     assert fixtures.CREATED_SESSIONS == []
 
 
+def test_cli_rejects_blank_workflow_param_key(capsys):
+    fixtures.reset()
+
+    exit_code = main(
+        [
+            "run",
+            "--workflow-factory",
+            "tests.runner.fixtures:create_context_workflow",
+            "--json",
+            "--param",
+            "   =value",
+        ]
+    )
+
+    captured = capsys.readouterr()
+
+    assert exit_code == 2
+    assert captured.out == ""
+    assert "--param must use KEY=VALUE" in captured.err
+    assert fixtures.CREATED_SESSIONS == []
+
+
+def test_cli_rejects_tab_only_workflow_param_key(capsys):
+    fixtures.reset()
+
+    exit_code = main(
+        [
+            "run",
+            "--workflow-factory",
+            "tests.runner.fixtures:create_context_workflow",
+            "--json",
+            "--param",
+            "\t=value",
+        ]
+    )
+
+    captured = capsys.readouterr()
+
+    assert exit_code == 2
+    assert captured.out == ""
+    assert "--param must use KEY=VALUE" in captured.err
+    assert fixtures.CREATED_SESSIONS == []
+
+
 def test_cli_rejects_invalid_workflow_param_before_loading_factory(capsys):
     fixtures.reset()
 

@@ -103,7 +103,8 @@ def create_workflow(session_factory, context, options):
 JSON reports include a safe `workflow_context` summary for runner metadata.
 Custom workflow inputs can use repeated `--param KEY=VALUE` flags. The runner
 passes those strings through as `options.parameters` and leaves workflow-specific
-validation to the workflow package.
+validation to the workflow package. The `KEY` portion must contain at least one
+non-whitespace character.
 Cancelled workflows keep `success=false`, but their top-level report `status`
 and `run_state.status` are both `cancelled` so orchestrators can distinguish an
 intentional stop from a failure. The CLI also returns exit code `130` for

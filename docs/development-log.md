@@ -5832,3 +5832,99 @@ Follow-up inspection confirmed:
 ### Next Phase
 
 Stage, commit, and push the finished slice.
+
+## 2026-06-17: Runner Param Key Validation
+
+### Completed
+
+- Added a design note and implementation plan for rejecting whitespace-only
+  CLI parameter keys.
+- Added focused CLI regression tests for blank-key and tab-only-key `--param`
+  values.
+- Tightened `_parse_parameters(...)` in `automation_runner.cli` so blank keys
+  are rejected before any workflow executes.
+- Documented the non-whitespace key requirement in `README.md` and
+  `docs/adding-a-workflow.md`.
+- Left `automation_core` unchanged and business-agnostic.
+
+### Verification
+
+Focused red run before implementation:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_cli.py -k 'blank_workflow_param_key or tab_only_workflow_param_key' --no-cov -q
+```
+
+Initial result:
+
+```text
+2 failed
+```
+
+Focused green run after implementation:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_cli.py -k 'blank_workflow_param_key or tab_only_workflow_param_key or passes_context_and_options_to_custom_workflow_factory or param_overrides_config_parameters' --no-cov -q
+```
+
+Result:
+
+```text
+4 passed, 46 deselected
+```
+
+Runner regression tests:
+
+```bash
+.venv/bin/python -m pytest tests/runner --no-cov -q
+```
+
+Result:
+
+```text
+87 passed
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+280 passed
+Total coverage: 96.29%
+Required coverage: 80%
+```
+
+Whitespace check:
+
+```bash
+git diff --check
+```
+
+Result: no output.
+
+### Review
+
+Ran the required production code quality review scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- `automation_runner.cli` now rejects blank keys before workflow execution.
+- valid keys, empty values, and values containing `=` remain unchanged.
+- built-in and custom workflows still receive the same parameter shape for
+  valid inputs.
+- `automation_core` remains unchanged and business-agnostic.
+
+### Next Phase
+
+Stage, commit, and push the finished slice.

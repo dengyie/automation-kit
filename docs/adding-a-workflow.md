@@ -188,7 +188,8 @@ def create_workflow(session_factory, context, options):
 inputs from `options.parameters`. Parameter values stay as strings; workflow
 packages own their own parsing, required-field checks, and secret handling.
 The runner validates `--param KEY=VALUE` syntax before execution even when the
-selected workflow does not consume custom parameters.
+selected workflow does not consume custom parameters. The `KEY` portion must
+contain at least one non-whitespace character.
 
 Built-in Damai examples still use `--url` or `--app-id`; custom workflows own
 their own parameters outside `automation_core`.
