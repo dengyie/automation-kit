@@ -417,6 +417,17 @@ Follow-up inspection confirmed:
 - Risk: future live integration coverage will need separate opt-in jobs instead
   of being folded into this baseline.
 
+#### Decision: keep `poetry.lock` after final audit verification
+
+- Problem: the final audit must prove the documented Poetry-based install and
+  test path, not only raw local venv execution.
+- Choice: run `poetry install && poetry run pytest -q` during the final audit
+  and keep the resulting lockfile.
+- Reason: the repository now declares Poetry-driven CI, so the lockfile is part
+  of the reproducible delivery baseline.
+- Risk: routine dependency drift becomes visible versioned change, which is
+  acceptable for a shared foundation repo.
+
 ### Verification
 
 Focused compatibility check:
@@ -459,6 +470,11 @@ Production code quality review outcome:
     opt-in live jobs
 - Quality score: 91
 - Pass status: pass
+
+### Final Audit Note
+
+- Confirmed the documented Poetry path:
+  `poetry install && poetry run pytest -q`.
 
 Commit and push the finished slice, then continue with the next roadmap slice.
 
