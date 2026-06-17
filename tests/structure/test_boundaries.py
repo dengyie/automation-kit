@@ -4,6 +4,7 @@ import importlib
 
 ROOT = Path(__file__).resolve().parents[2]
 CORE_ROOT = ROOT / "automation_core"
+EXAMPLES_ROOT = ROOT / "examples"
 
 
 def _read_core_text():
@@ -72,3 +73,32 @@ def test_retry_core_does_not_import_events():
     retry_policy = ROOT / "automation_core" / "retries" / "policy.py"
 
     assert "automation_core.events" not in retry_policy.read_text(encoding="utf-8")
+
+
+def _read_tree(root: Path) -> str:
+    return "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in root.rglob("*.py")
+    ).lower()
+
+
+def test_examples_do_not_import_future_application_or_plugin_packages():
+    example_text = _read_tree(EXAMPLES_ROOT)
+
+    forbidden = [
+        "automation_app_",
+        "automation_plugin_",
+        "ticket_purchase",
+        "damai_appium",
+        "console.",
+    ]
+
+    for term in forbidden:
+        assert term not in example_text
+
+
+def test_examples_readme_declares_thin_shell_boundary():
+    readme = (EXAMPLES_ROOT / "README.md").read_text(encoding="utf-8").lower()
+
+    assert "thin" in readme
+    assert "not production business apps" in readme

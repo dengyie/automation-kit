@@ -259,6 +259,138 @@ Follow-up inspection confirmed:
 
 ### Next Phase
 
+Proceed to the ecosystem consumer surface phase:
+
+- publish workflow authoring helpers from `automation_runner`
+- keep `examples/` as thin reference consumers
+- document core/app/plugin repository boundaries
+
+## 2026-06-17: Ecosystem Consumer Surface
+
+### Completed
+
+- Added `automation_runner.workflows` as the public workflow authoring module.
+- Moved the shared workflow helper implementation out of `examples/` and into
+  `automation_runner`.
+- Kept `examples.workflows` as a compatibility layer for built-in examples and
+  existing tests.
+- Updated built-in Damai examples to import workflow authoring helpers from
+  `automation_runner.workflows`.
+- Updated runner modules to use `WorkflowResult` from
+  `automation_runner.workflows`.
+- Added `tests/runner/test_workflows.py` to verify the public workflow surface.
+- Added `examples/README.md` and `docs/ecosystem.md`.
+- Added structure tests that protect the thin-example boundary.
+
+### Decision Record
+
+#### Decision: promote workflow helpers instead of chaining re-exports
+
+- Problem: the implementation plan sketched `automation_runner.workflows`
+  forwarding to `examples.workflows` while `examples.workflows` also pointed
+  back to the runner. That shape would create a circular import and make the
+  public surface fragile.
+- Choice: move the real implementation into `automation_runner.workflows` and
+  reduce `examples.workflows` to a compatibility shim.
+- Reason: external application repositories need a stable public dependency
+  surface that does not rely on the example package internals.
+- Risk: downstream code importing `examples.workflows` will continue to work
+  for now, but the compatibility layer must remain documented until external
+  consumers migrate.
+
+#### Decision: use the repository virtualenv for verification
+
+- Problem: the current shell environment does not expose a global `poetry`
+  command.
+- Choice: run verification through `/Users/mango/project/codex/automation-kit/.venv/bin/python -m pytest`.
+- Reason: this keeps phase verification moving without changing machine-wide
+  tooling assumptions.
+- Risk: command examples in docs still use `poetry`; CI and future execution
+  should continue to verify that Poetry remains the supported workflow.
+
+### Verification
+
+Focused verification:
+
+```bash
+/Users/mango/project/codex/automation-kit/.venv/bin/python -m pytest \
+  tests/runner/test_workflows.py \
+  tests/examples/damai_web/test_smoke_workflow.py \
+  tests/examples/damai_android/test_smoke_workflow.py \
+  tests/structure/test_boundaries.py \
+  --no-cov -q
+```
+
+Result:
+
+```text
+44 passed
+```
+
+Full suite:
+
+```bash
+/Users/mango/project/codex/automation-kit/.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+300 passed
+Total coverage: 94.65%
+Required coverage: 80%
+```
+
+Whitespace check:
+
+```bash
+git diff --check
+```
+
+Result: no output.
+
+### Review
+
+Ran the required production code quality review setup against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `run-safe-checks.py`
+
+Review outcome:
+
+- Severe issues: none
+- Improvement suggestions:
+  - keep migrating internal tests and helpers toward `automation_runner`
+    imports so the compatibility shim can eventually be retired
+  - add a dedicated compatibility matrix doc when application and plugin repos
+    are created in later phases
+- Quality score: 92
+- Pass status: pass
+
+Follow-up inspection confirmed:
+
+- `automation_runner.workflows` is now the real implementation layer.
+- `examples.workflows` no longer owns business-adjacent workflow primitives.
+- built-in examples remain runnable and offline-testable.
+- default verification remains browser/device/network free.
+
+### Todo Status
+
+- Phase 1 Task 1: done
+- Phase 1 Task 2: done
+- Phase 2 application repository work: pending
+- Phase 3 plugin repository work: pending
+- Phase 4 compatibility and CI federation: pending
+
+### Next Phase Risk
+
+- External application repos will need a stable minimum import surface from
+  `automation_runner`; future changes to workflow result shapes should remain
+  additive where possible.
+- The compatibility shim in `examples.workflows` should not become permanent
+  technical debt.
+
 Commit and push the finished slice, then continue with the next roadmap slice.
 
 ## 2026-06-16: Thin Adapter And Example Shells

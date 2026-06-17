@@ -21,7 +21,7 @@ from automation_runner.config import RunnerConfig, load_runner_config
 from automation_runner.dry_run import DryRunSession
 from automation_runner.reports import build_report
 from automation_runner.schemas import load_report_schema
-from examples.workflows import ExampleWorkflowResult
+from automation_runner.workflows import WorkflowResult
 from examples.damai_android import create_workflow as create_damai_android_workflow
 from examples.damai_web import create_workflow as create_damai_web_workflow
 
@@ -111,9 +111,9 @@ def _print_run_error(message: str) -> int:
     return 1
 
 
-def _failure_result(workflow_name: str, exc: Exception) -> ExampleWorkflowResult:
+def _failure_result(workflow_name: str, exc: Exception) -> WorkflowResult:
     task_id = f"{workflow_name}-failed-run"
-    return ExampleWorkflowResult(
+    return WorkflowResult(
         session=SessionInfo(
             driver_name="unavailable",
             platform="unknown",
@@ -158,7 +158,7 @@ def _emit_json_report(report) -> None:
     _emit_json_report_payload(_json_report_payload(report))
 
 
-def _workflow_exit_code(result: ExampleWorkflowResult) -> int:
+def _workflow_exit_code(result: WorkflowResult) -> int:
     if result.state == TaskState.CANCELLED:
         return 130
     return 0 if result.success else 1

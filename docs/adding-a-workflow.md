@@ -5,7 +5,8 @@
 ## Package Boundaries
 
 - `automation_core`: generic runtime primitives only.
-- `automation_runner`: command-line execution, JSON reports, and report files.
+- `automation_runner`: command-line execution, JSON reports, report files, and
+  public workflow authoring helpers.
 - `adapters`: Selenium/Appium session wrappers and startup errors.
 - `examples`: business-specific workflow composition.
 
@@ -31,11 +32,12 @@ from examples.damai_web import run_smoke_workflow
 
 ## Workflow Steps
 
-Example workflows can use `WorkflowStep` helpers to keep simple action and
-artifact sequences compact:
+Workflow packages should import authoring helpers from
+`automation_runner.workflows`. Example workflows can use `WorkflowStep` helpers
+to keep simple action and artifact sequences compact:
 
 ```python
-from examples.workflows import WorkflowStep, run_workflow_steps
+from automation_runner.workflows import WorkflowStep, run_workflow_steps
 
 
 def run_smoke_workflow(session, url):
@@ -48,9 +50,10 @@ def run_smoke_workflow(session, url):
     )
 ```
 
-`WorkflowStep` is an example-layer authoring helper. It is not a persisted DSL,
+`WorkflowStep` is a runner-layer authoring helper. It is not a persisted DSL,
 and it does not move URLs, selectors, package names, or business flow into
-`automation_core`.
+`automation_core`. `examples.workflows` remains a compatibility module for
+built-in examples only.
 
 If an artifact step fails after earlier actions or artifacts completed,
 `run_workflow_steps(...)` returns a failed result that preserves the evidence
@@ -68,7 +71,7 @@ traversal-like, or non-string names before a workflow run starts.
 2. Accept an injected `session_factory` instead of constructing Selenium,
    Appium, or other live clients during import.
 3. Start and stop the session inside the workflow helper with `try/finally`.
-4. Return `ExampleWorkflowResult` with generic actions, artifacts, and optional
+4. Return `WorkflowResult` with generic actions, artifacts, and optional
    structured events.
 5. Expose `create_workflow(...)` so the runner can construct the workflow.
 6. Add tests with fake sessions so default tests stay offline.

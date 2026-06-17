@@ -5,7 +5,7 @@ from automation_core.actions import ActionBatchResult
 from automation_core.drivers import ActionResult, ArtifactHandle, SessionInfo
 from automation_core.state import RunState, RunStatus
 from automation_runner.context import WorkflowContext
-from examples.workflows import ExampleWorkflowResult
+from automation_runner.workflows import WorkflowResult
 
 
 SENSITIVE_REPORT_KEY_TERMS = (
@@ -132,7 +132,7 @@ def _report_status(success: bool, state: RunState) -> str:
 
 def build_report(
     workflow: str,
-    result: ExampleWorkflowResult,
+    result: WorkflowResult,
     run_state: Optional[RunState] = None,
     live: bool = False,
     workflow_factory: Optional[str] = None,

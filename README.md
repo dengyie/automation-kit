@@ -19,6 +19,14 @@ Android app workflows.
 AI assistance, business workflows, selectors, and platform-specific
 capabilities belong in adapters or examples, not in `automation_core`.
 
+External repositories should depend on:
+
+- `automation_core` for runtime contracts
+- `automation_runner` for workflow authoring helpers
+
+Built-in examples remain thin references and are not the long-term home for
+business workflows.
+
 ## Development
 
 ```bash
@@ -123,4 +131,5 @@ See `docs/adding-a-workflow.md` for package boundaries, report fields, and
 adapter rules. `automation-runner report-schema --version 1` prints the
 packaged machine-readable runner report contract, which is also documented in
 `docs/report-schema-v1.json`. See `docs/artifacts.md` for screenshot,
-page-source, UI-tree, trace, and log artifact conventions.
+page-source, UI-tree, trace, and log artifact conventions. See
+`docs/ecosystem.md` for repository roles.
