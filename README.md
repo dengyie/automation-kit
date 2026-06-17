@@ -74,6 +74,9 @@ AUTOMATION_RUNNER_URL=https://example.test/damai \
 automation-runner run damai-web-smoke
 ```
 
+Explicit CLI values for `--factory`, `--workflow-factory`, `--url`, and
+`--app-id` must contain at least one non-whitespace character.
+
 Dictionary-backed runner config must provide string values for `factory`,
 `workflow_factory`, `url`, and `app_id`; invalid types fail before factories are
 loaded. Those config-backed string values must contain at least one

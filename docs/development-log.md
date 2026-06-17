@@ -2604,6 +2604,123 @@ and the report contract remains backward compatible.
 
 Stage, commit, and push the finished slice.
 
+## 2026-06-17: Runner CLI Blank String Validation
+
+### Completed
+
+- Added CLI regression coverage for explicit whitespace-only values passed to:
+  - `--url` for `damai-web-smoke`
+  - `--app-id` for `damai-android-smoke`
+  - `--workflow-factory`
+  - `--factory` in live mode
+- Added override regression coverage proving explicit blank `--url` and
+  `--app-id` do not silently fall back to config defaults.
+- Tightened `automation_runner.cli` merge behavior so:
+  - explicit blank `--url` and `--app-id` become missing values and trigger the
+    built-in required-option errors,
+  - explicit blank `--factory` and `--workflow-factory` keep surfacing the
+    import-path validation error instead of being treated as omitted.
+- Added a focused CLI helper to keep this logic inside `automation_runner`
+  without changing `automation_core`.
+- Documented the non-whitespace requirement for explicit CLI string inputs in
+  `README.md` and `docs/adding-a-workflow.md`.
+
+### Verification
+
+Focused red verification:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_cli.py::test_cli_rejects_blank_explicit_url_for_builtin_workflow tests/runner/test_cli.py::test_cli_rejects_blank_explicit_app_id_for_builtin_workflow tests/runner/test_cli.py::test_cli_rejects_blank_explicit_workflow_factory tests/runner/test_cli.py::test_cli_rejects_blank_explicit_factory_for_live_workflow --no-cov -q
+```
+
+Result:
+
+```text
+2 failed, 2 passed
+```
+
+Focused override red verification:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_cli.py::test_cli_rejects_blank_explicit_url_even_with_config_default tests/runner/test_cli.py::test_cli_rejects_blank_explicit_app_id_even_with_config_default --no-cov -q
+```
+
+Result:
+
+```text
+2 failed
+```
+
+Focused green verification:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_cli.py::test_cli_rejects_blank_explicit_url_for_builtin_workflow tests/runner/test_cli.py::test_cli_rejects_blank_explicit_app_id_for_builtin_workflow tests/runner/test_cli.py::test_cli_rejects_blank_explicit_url_even_with_config_default tests/runner/test_cli.py::test_cli_rejects_blank_explicit_app_id_even_with_config_default tests/runner/test_cli.py::test_cli_rejects_blank_explicit_workflow_factory tests/runner/test_cli.py::test_cli_rejects_blank_explicit_factory_for_live_workflow --no-cov -q
+```
+
+Result:
+
+```text
+6 passed
+```
+
+Runner regression tests:
+
+```bash
+.venv/bin/python -m pytest tests/runner --no-cov -q
+```
+
+Result:
+
+```text
+100 passed
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+293 passed
+Total coverage: 96.14%
+Required coverage: 80%
+```
+
+Whitespace check:
+
+```bash
+git diff --check
+```
+
+Result: no output.
+
+### Review
+
+Ran the required production code quality review scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- the change stays inside `automation_runner.cli`, which is the correct
+  ownership layer for CLI argument semantics;
+- built-in required-option validation now rejects explicit blank `--url` and
+  `--app-id` even when config defaults are present;
+- explicit blank factory import paths still produce the existing
+  `import path must use module:object` error instead of changing failure mode;
+- `automation_core` remains unchanged and business-agnostic.
+
+### Next Phase
+
+Stage, commit, and push the finished slice.
+
 ## 2026-06-17: Workflow Step Action Name Validation
 
 ### Completed

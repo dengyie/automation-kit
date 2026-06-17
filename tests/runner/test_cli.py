@@ -232,6 +232,74 @@ def test_cli_rejects_blank_config_url_for_builtin_workflow(capsys):
     assert fixtures.CREATED_SESSIONS == []
 
 
+def test_cli_rejects_blank_explicit_url_for_builtin_workflow(capsys):
+    fixtures.reset()
+
+    exit_code = main(["run", "damai-web-smoke", "--json", "--url", "   "])
+
+    captured = capsys.readouterr()
+
+    assert exit_code == 2
+    assert captured.out == ""
+    assert "--url is required for damai-web-smoke" in captured.err
+    assert fixtures.CREATED_SESSIONS == []
+
+
+def test_cli_rejects_blank_explicit_app_id_for_builtin_workflow(capsys):
+    fixtures.reset()
+
+    exit_code = main(["run", "damai-android-smoke", "--json", "--app-id", "   "])
+
+    captured = capsys.readouterr()
+
+    assert exit_code == 2
+    assert captured.out == ""
+    assert "--app-id is required for damai-android-smoke" in captured.err
+    assert fixtures.CREATED_SESSIONS == []
+
+
+def test_cli_rejects_blank_explicit_url_even_with_config_default(capsys):
+    fixtures.reset()
+
+    exit_code = main(
+        ["run", "damai-web-smoke", "--json", "--url", "   "],
+        config_source=DictConfigSource(
+            {
+                "json": "true",
+                "url": "https://example.test/from-config",
+            }
+        ),
+    )
+
+    captured = capsys.readouterr()
+
+    assert exit_code == 2
+    assert captured.out == ""
+    assert "--url is required for damai-web-smoke" in captured.err
+    assert fixtures.CREATED_SESSIONS == []
+
+
+def test_cli_rejects_blank_explicit_app_id_even_with_config_default(capsys):
+    fixtures.reset()
+
+    exit_code = main(
+        ["run", "damai-android-smoke", "--json", "--app-id", "   "],
+        config_source=DictConfigSource(
+            {
+                "json": "true",
+                "app_id": "cn.damai.from.config",
+            }
+        ),
+    )
+
+    captured = capsys.readouterr()
+
+    assert exit_code == 2
+    assert captured.out == ""
+    assert "--app-id is required for damai-android-smoke" in captured.err
+    assert fixtures.CREATED_SESSIONS == []
+
+
 def test_cli_reads_runner_environment_defaults(monkeypatch, capsys):
     fixtures.reset()
     monkeypatch.setenv("AUTOMATION_RUNNER_JSON", "true")
@@ -505,6 +573,16 @@ def test_cli_rejects_missing_workflow_factory(capsys):
     assert "could not load factory" in captured.err
 
 
+def test_cli_rejects_blank_explicit_workflow_factory(capsys):
+    exit_code = main(["run", "--workflow-factory", "   ", "--json"])
+
+    captured = capsys.readouterr()
+
+    assert exit_code == 2
+    assert captured.out == ""
+    assert "import path must use module:object" in captured.err
+
+
 def test_cli_rejects_workflow_name_with_explicit_workflow_factory(capsys):
     fixtures.reset()
 
@@ -525,6 +603,30 @@ def test_cli_rejects_workflow_name_with_explicit_workflow_factory(capsys):
     assert exit_code == 2
     assert captured.out == ""
     assert "workflow and --workflow-factory are mutually exclusive" in captured.err
+    assert fixtures.CREATED_SESSIONS == []
+
+
+def test_cli_rejects_blank_explicit_factory_for_live_workflow(capsys):
+    fixtures.reset()
+
+    exit_code = main(
+        [
+            "run",
+            "damai-web-smoke",
+            "--live",
+            "--json",
+            "--factory",
+            "   ",
+            "--url",
+            "https://example.test/damai",
+        ]
+    )
+
+    captured = capsys.readouterr()
+
+    assert exit_code == 2
+    assert captured.out == ""
+    assert "import path must use module:object" in captured.err
     assert fixtures.CREATED_SESSIONS == []
 
 

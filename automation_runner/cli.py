@@ -189,10 +189,14 @@ def _merge_config(args: argparse.Namespace, config: RunnerConfig) -> RunnerConfi
     return RunnerConfig(
         live=args.live or config.live,
         emit_json=args.json or config.emit_json,
-        factory=args.factory or config.factory,
-        workflow_factory=args.workflow_factory or config.workflow_factory,
-        url=args.url or config.url,
-        app_id=args.app_id or config.app_id,
+        factory=args.factory if args.factory is not None else config.factory,
+        workflow_factory=(
+            args.workflow_factory
+            if args.workflow_factory is not None
+            else config.workflow_factory
+        ),
+        url=_merged_optional_cli_string(args.url, config.url),
+        app_id=_merged_optional_cli_string(args.app_id, config.app_id),
         parameters=dict(config.parameters),
     )
 
@@ -239,6 +243,23 @@ def _workflow_options(config: RunnerConfig, args: argparse.Namespace) -> Workflo
         report_file=args.report_file,
         parameters=parameters,
     )
+
+
+def _optional_cli_string(value: Optional[str]) -> Optional[str]:
+    if value is None:
+        return None
+    if not value.strip():
+        return None
+    return value
+
+
+def _merged_optional_cli_string(
+    cli_value: Optional[str],
+    config_value: Optional[str],
+) -> Optional[str]:
+    if cli_value is None:
+        return config_value
+    return _optional_cli_string(cli_value)
 
 
 def _parse_parameters(values: Optional[List[str]]) -> Dict[str, str]:
