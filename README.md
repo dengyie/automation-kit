@@ -106,7 +106,8 @@ passes those strings through as `options.parameters` and leaves workflow-specifi
 validation to the workflow package.
 Cancelled workflows keep `success=false`, but their top-level report `status`
 and `run_state.status` are both `cancelled` so orchestrators can distinguish an
-intentional stop from a failure.
+intentional stop from a failure. The CLI also returns exit code `130` for
+cancelled runs, while ordinary workflow failures still return `1`.
 Use either a built-in workflow name or `--workflow-factory`, not both. A
 positional workflow name overrides a config-provided workflow factory because
 CLI arguments take precedence over environment defaults.

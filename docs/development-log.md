@@ -2604,6 +2604,107 @@ and the report contract remains backward compatible.
 
 Stage, commit, and push the finished slice.
 
+## 2026-06-17: Runner Cancelled Exit Code
+
+### Completed
+
+- Added a design note and implementation plan for a distinct cancelled runner
+  exit code.
+- Tightened the cancelled JSON CLI regression test to assert the new process
+  exit-code contract.
+- Added plain-text CLI coverage proving cancelled custom workflows return the
+  same distinct exit code without requiring JSON parsing.
+- Added `_workflow_exit_code(...)` in `automation_runner.cli` so cancelled
+  workflow results return exit code `130` while failed runs still return `1`
+  and successful runs still return `0`.
+- Documented the cancelled exit-code contract in `README.md` and
+  `docs/adding-a-workflow.md`.
+- Left `automation_core` unchanged and business-agnostic.
+
+### Verification
+
+Focused red run before implementation:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_cli.py::test_cli_emits_json_report_when_workflow_is_cancelled tests/runner/test_cli.py::test_cli_returns_cancelled_exit_code_without_json --no-cov -q
+```
+
+Initial result:
+
+```text
+2 failed
+```
+
+Focused green run after implementation:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_cli.py::test_cli_emits_json_report_when_workflow_is_cancelled tests/runner/test_cli.py::test_cli_returns_cancelled_exit_code_without_json --no-cov -q
+```
+
+Result:
+
+```text
+2 passed
+```
+
+Runner CLI regression tests:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_cli.py --no-cov -q
+```
+
+Result:
+
+```text
+48 passed
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+263 passed
+Total coverage: 96.29%
+Required coverage: 80%
+```
+
+Whitespace check:
+
+```bash
+git diff --check
+```
+
+Result: no output.
+
+### Review
+
+Ran the required production code quality review scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- cancelled exit-code policy stays in `automation_runner.cli`.
+- `automation_core` cancellation models and report schemas remain unchanged.
+- cancelled JSON and plain-text CLI paths now share one exit-code mapping.
+- validation/configuration errors still return `2`, failures still return `1`,
+  and cancelled runs now return `130`.
+- focused and full runner tests would fail if the cancelled path regressed back
+  to the failure exit code.
+
+### Next Phase
+
+Stage, commit, and push the finished slice.
+
 ## 2026-06-17: Runner Task Cancellation
 
 ### Completed

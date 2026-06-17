@@ -158,6 +158,12 @@ def _emit_json_report(report) -> None:
     _emit_json_report_payload(_json_report_payload(report))
 
 
+def _workflow_exit_code(result: ExampleWorkflowResult) -> int:
+    if result.state == TaskState.CANCELLED:
+        return 130
+    return 0 if result.success else 1
+
+
 def _workflow_listing_entry(workflow_name: str) -> Dict[str, object]:
     metadata = WORKFLOW_METADATA[workflow_name]
     return {
@@ -424,9 +430,9 @@ def main(
                 _emit_json_report_payload(payload)
             else:
                 _emit_json_report(report)
-            return 0 if result.success else 1
+            return _workflow_exit_code(result)
         else:
             print(f"{workflow_name} success={result.success}")
-        return 0 if result.success else 1
+        return _workflow_exit_code(result)
 
     return 1

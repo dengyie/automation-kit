@@ -1029,7 +1029,7 @@ def test_cli_emits_json_report_when_workflow_is_cancelled(capsys):
     captured = capsys.readouterr()
     report = json.loads(captured.out)
 
-    assert exit_code == 1
+    assert exit_code == 130
     assert report["workflow"] == "tests.runner.fixtures:create_cancelled_workflow"
     assert report["workflow_factory"] == "tests.runner.fixtures:create_cancelled_workflow"
     assert report["success"] is False
@@ -1041,6 +1041,24 @@ def test_cli_emits_json_report_when_workflow_is_cancelled(capsys):
         "task.end",
     ]
     assert report["events"][-1]["payload"]["outcome"] == "cancelled"
+
+
+def test_cli_returns_cancelled_exit_code_without_json(capsys):
+    fixtures.reset()
+
+    exit_code = main(
+        [
+            "run",
+            "--workflow-factory",
+            "tests.runner.fixtures:create_cancelled_workflow",
+        ]
+    )
+
+    captured = capsys.readouterr()
+
+    assert exit_code == 130
+    assert captured.out == "tests.runner.fixtures:create_cancelled_workflow success=False\n"
+    assert captured.err == ""
 
 
 def test_cli_emits_json_report_when_session_factory_fails(tmp_path, capsys):

@@ -283,7 +283,8 @@ Core task helpers may also treat intentional stops as first-class cancellation.
 converting it into an ordinary failure result.
 When a workflow is cancelled, runner reports keep `success=false` for backward
 compatibility but use top-level `status="cancelled"` and
-`run_state.status="cancelled"`.
+`run_state.status="cancelled"`. The CLI returns exit code `130` for cancelled
+runs so shell-based schedulers can distinguish them from ordinary failures.
 
 If a workflow result already includes an `artifact` event for a returned
 artifact handle, `ExampleWorkflow` preserves that event and does not add a
