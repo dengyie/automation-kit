@@ -25,7 +25,11 @@ class WorkflowStep:
 
     @classmethod
     def artifact(cls, artifact_type: str, name: str) -> "WorkflowStep":
-        return cls(kind="artifact", name=artifact_type, parameters={"name": name})
+        return cls(
+            kind="artifact",
+            name=artifact_type,
+            parameters={"name": _validate_workflow_artifact_name(name)},
+        )
 
 
 @dataclass(frozen=True)
@@ -49,6 +53,15 @@ def _split_error(error: str) -> Tuple[str, str]:
     if separator:
         return error_type, message
     return "Error", error
+
+
+def _validate_workflow_artifact_name(name: str) -> str:
+    if not isinstance(name, str):
+        raise ValueError("invalid workflow artifact name")
+    cleaned = name.replace("\\", "/").split("/")[-1].strip()
+    if cleaned in {"", ".", ".."}:
+        raise ValueError("invalid workflow artifact name")
+    return name
 
 
 def _has_artifact_event(

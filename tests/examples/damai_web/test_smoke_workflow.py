@@ -446,6 +446,26 @@ def test_run_workflow_steps_rejects_unknown_step_kind_and_preserves_prior_result
     assert session.stopped is True
 
 
+@pytest.mark.parametrize("name", ["", "   ", ".", ".."])
+def test_workflow_step_artifact_rejects_invalid_name(name):
+    with pytest.raises(ValueError, match="invalid workflow artifact name"):
+        WorkflowStep.artifact("screenshot", name)
+
+
+@pytest.mark.parametrize("name", [None, 123])
+def test_workflow_step_artifact_rejects_non_string_name(name):
+    with pytest.raises(ValueError, match="invalid workflow artifact name"):
+        WorkflowStep.artifact("screenshot", name)
+
+
+def test_workflow_step_artifact_allows_valid_name():
+    step = WorkflowStep.artifact("screenshot", "home.png")
+
+    assert step.kind == "artifact"
+    assert step.name == "screenshot"
+    assert step.parameters == {"name": "home.png"}
+
+
 def test_damai_web_smoke_workflow_returns_failure_when_action_raises():
     class FailingSession(FakeSession):
         def execute_action(self, action_name, **kwargs):

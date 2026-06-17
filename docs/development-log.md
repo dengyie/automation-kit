@@ -2604,6 +2604,112 @@ and the report contract remains backward compatible.
 
 Stage, commit, and push the finished slice.
 
+## 2026-06-17: Workflow Step Artifact Name Validation
+
+### Completed
+
+- Added a design note and implementation plan for explicit artifact-name
+  validation in `WorkflowStep.artifact(...)`.
+- Added example coverage for invalid string artifact names, non-string artifact
+  names, and a valid-name regression.
+- Updated `WorkflowStep.artifact(...)` so empty, whitespace-only, and
+  traversal-like names fail immediately at the authoring boundary.
+- Tightened the validator during production review so non-string names fail
+  instead of being coerced with `str(...)`.
+- Documented the workflow authoring boundary in `docs/adding-a-workflow.md`.
+- Left `automation_core` unchanged and business-agnostic.
+
+### Verification
+
+Focused red run before implementation:
+
+```bash
+.venv/bin/python -m pytest tests/examples/damai_web/test_smoke_workflow.py -k 'artifact_rejects_invalid_name or artifact_allows_valid_name' --no-cov -q
+```
+
+Initial result:
+
+```text
+4 failed, 1 passed
+```
+
+Focused green run after implementation:
+
+```bash
+.venv/bin/python -m pytest tests/examples/damai_web/test_smoke_workflow.py -k 'artifact_rejects_invalid_name or artifact_allows_valid_name' --no-cov -q
+```
+
+Result:
+
+```text
+7 passed, 16 deselected
+```
+
+Example regression tests:
+
+```bash
+.venv/bin/python -m pytest tests/examples/damai_web/test_smoke_workflow.py tests/examples/damai_android/test_smoke_workflow.py --no-cov -q
+```
+
+Result:
+
+```text
+27 passed
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+271 passed
+Total coverage: 96.29%
+Required coverage: 80%
+```
+
+Whitespace check:
+
+```bash
+git diff --check
+```
+
+Result: no output.
+
+### Review
+
+Ran the required production code quality review scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Review follow-up found and fixed one issue:
+
+- `WorkflowStep.artifact(...)` initially validated names through `str(name)`,
+  which would have accepted non-string values such as `None` or `123`.
+  Added non-string regression coverage and changed the validator to reject
+  non-string names directly.
+
+Follow-up inspection confirmed:
+
+- artifact-name validation stays in `examples.workflows`, where the
+  `WorkflowStep` authoring helper lives.
+- `automation_core` remains unchanged and business-agnostic.
+- invalid artifact names now fail before workflow execution starts.
+- storage-layer artifact validation remains unchanged as a separate safeguard.
+- valid artifact step construction and existing example workflows remain
+  covered by focused regression tests.
+
+### Next Phase
+
+Stage, commit, and push the finished slice.
+
 ## 2026-06-17: Workflow Step Kind Validation
 
 ### Completed
