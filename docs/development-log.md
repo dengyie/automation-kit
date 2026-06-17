@@ -2530,6 +2530,78 @@ and the report contract remains backward compatible.
 
 Stage, commit, and push the finished slice.
 
+## 2026-06-17: Element Lookup Session Contract Alignment
+
+### Completed
+
+- Added a design note and implementation plan for aligning the core element
+  lookup session contract with the real adapter lookup shape.
+- Updated `automation_core.drivers.ElementLookupSession` so
+  `find_element(...)` accepts both an optional lookup strategy and a selector.
+- Updated driver contract tests so the fake lookup session matches the real
+  two-argument lookup shape already used by Selenium and Appium adapters.
+- Documented the aligned contract shape in `docs/adding-a-workflow.md`.
+- Kept `automation_core` business-agnostic and left Selenium/Appium runtime
+  behavior unchanged.
+
+### Verification
+
+Focused driver/import verification:
+
+```bash
+.venv/bin/python -m pytest tests/drivers/test_contracts.py tests/test_imports.py --no-cov -q
+```
+
+Result:
+
+```text
+16 passed
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+258 passed
+Total coverage: 96.20%
+Required coverage: 80%
+```
+
+Whitespace check:
+
+```bash
+git diff --check
+```
+
+Result: no output.
+
+### Review
+
+Ran the required production code quality review scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- the contract change lives in `automation_core.drivers`.
+- Selenium/Appium adapter lookup behavior was already using the aligned shape.
+- the update removes a misleading core boundary without adding business
+  coupling.
+- `automation_core` remains business-agnostic.
+
+### Next Phase
+
+Stage, commit, and push the finished slice.
+
 ## 2026-06-17: Workflow Task Event Deduplication
 
 ### Completed

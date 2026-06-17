@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Optional
 from automation_core.artifacts import ArtifactRecord, ArtifactStore
 from automation_core.drivers import (
     ActionResult,
@@ -54,8 +55,8 @@ class FakeElement:
 
 
 class FakeLookupSession(FakeSession):
-    def find_element(self, selector: str):
-        self.selector = selector
+    def find_element(self, by: Optional[str], selector: str):
+        self.lookup = (by, selector)
         return FakeElement()
 
 
@@ -110,10 +111,10 @@ def test_lookup_session_extends_driver_contract():
 
     assert isinstance(session, DriverSession)
     assert isinstance(session, ElementLookupSession)
-    element = session.find_element("button.login")
+    element = session.find_element("css selector", "button.login")
 
     assert isinstance(element, ElementHandle)
-    assert session.selector == "button.login"
+    assert session.lookup == ("css selector", "button.login")
 
 
 def test_fake_session_implements_driver_contract():

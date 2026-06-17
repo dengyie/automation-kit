@@ -199,6 +199,8 @@ for framework-specific behavior.
 Adapter aliases return failed `ActionResult` values for lookup and execution
 failures. `wait_for_element` remains the retrying primitive for wait-style
 flows.
+`ElementLookupSession` models driver lookups with both an optional lookup
+strategy and a selector so the core contract matches the real adapter shape.
 
 For multi-step workflows, `automation_core.actions.ActionExecutor` can execute
 an `ActionBatch` and returns an `ActionBatchResult`. The batch result separates

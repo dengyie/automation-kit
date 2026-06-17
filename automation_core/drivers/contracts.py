@@ -57,7 +57,7 @@ class DriverSession(Protocol):
 
 @runtime_checkable
 class ElementLookupSession(DriverSession, Protocol):
-    def find_element(self, selector: str) -> ElementHandle:
+    def find_element(self, by: Optional[str], selector: str) -> ElementHandle:
         ...
 
 
