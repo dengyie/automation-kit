@@ -4,7 +4,7 @@ import pytest
 
 from automation_core.actions import ActionBatchResult, ActionRequest
 from automation_core.drivers import ActionResult, ArtifactHandle, SessionInfo
-from automation_core.events import ArtifactEvent, ErrorEvent, RetryAttemptEvent
+from automation_core.events import ArtifactEvent, ErrorEvent, RetryAttemptEvent, TaskEndEvent
 from examples.damai_web import create_workflow, run_smoke_workflow
 from examples.workflows import (
     ExampleWorkflow,
@@ -232,6 +232,41 @@ def test_example_workflow_does_not_duplicate_returned_artifact_events():
     assert [event.event_type for event in result.events] == [
         "task.start",
         "artifact",
+        "task.end",
+    ]
+
+
+def test_example_workflow_does_not_duplicate_returned_task_events():
+    session = FakeSession()
+    workflow = ExampleWorkflow(
+        name="custom-workflow",
+        session_factory=lambda: session,
+        run_fn=lambda current_session: ExampleWorkflowResult(
+            session=current_session.info,
+            success=True,
+            actions=[],
+            artifacts=[],
+            events=[
+                RetryAttemptEvent(
+                    task_name="custom-workflow",
+                    task_id=current_session.info.identifier,
+                    attempt=1,
+                    elapsed=0.1,
+                ).to_envelope(),
+                TaskEndEvent(
+                    task_name="custom-workflow",
+                    task_id=current_session.info.identifier,
+                    outcome="succeeded",
+                ).to_envelope(),
+            ],
+        ),
+    )
+
+    result = workflow.run()
+
+    assert [event.event_type for event in result.events] == [
+        "task.start",
+        "retry.attempt",
         "task.end",
     ]
 

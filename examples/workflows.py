@@ -65,6 +65,37 @@ def _has_artifact_event(
     return False
 
 
+def _has_task_start_event(
+    events: List[EventEnvelope],
+    *,
+    task_id: str,
+    task_name: str,
+) -> bool:
+    for event in events:
+        if event.event_type != "task.start" or event.task_id != task_id:
+            continue
+        if event.payload.get("task_name") == task_name:
+            return True
+    return False
+
+
+def _has_task_end_event(
+    events: List[EventEnvelope],
+    *,
+    task_id: str,
+    task_name: str,
+    outcome: str,
+) -> bool:
+    for event in events:
+        if event.event_type != "task.end" or event.task_id != task_id:
+            continue
+        if event.payload.get("task_name") != task_name:
+            continue
+        if event.payload.get("outcome") == outcome:
+            return True
+    return False
+
+
 def run_workflow_steps(
     session: DriverSession,
     steps: List[WorkflowStep],
@@ -142,15 +173,24 @@ class ExampleWorkflow:
 
     def run(self) -> ExampleWorkflowResult:
         session = self.session_factory()
+        outcome = "succeeded"
         events = [
-            TaskStartEvent(
-                task_name=self.name,
-                task_id=session.info.identifier,
-            ).to_envelope()
         ]
         try:
             result = self.run_fn(session)
             events.extend(result.events)
+            if not _has_task_start_event(
+                result.events,
+                task_id=session.info.identifier,
+                task_name=self.name,
+            ):
+                events.insert(
+                    0,
+                    TaskStartEvent(
+                        task_name=self.name,
+                        task_id=session.info.identifier,
+                    ).to_envelope(),
+                )
             for artifact in result.artifacts:
                 if _has_artifact_event(
                     result.events,
@@ -179,13 +219,20 @@ class ExampleWorkflow:
                         error_type=error_type,
                     ).to_envelope()
                 )
-            events.append(
-                TaskEndEvent(
-                    task_name=self.name,
-                    task_id=session.info.identifier,
-                    outcome="succeeded" if result.success else "failed",
-                ).to_envelope()
-            )
+            outcome = "succeeded" if result.success else "failed"
+            if not _has_task_end_event(
+                result.events,
+                task_id=session.info.identifier,
+                task_name=self.name,
+                outcome=outcome,
+            ):
+                events.append(
+                    TaskEndEvent(
+                        task_name=self.name,
+                        task_id=session.info.identifier,
+                        outcome=outcome,
+                    ).to_envelope()
+                )
             return ExampleWorkflowResult(
                 session=result.session,
                 success=result.success,
@@ -196,6 +243,12 @@ class ExampleWorkflow:
                 events=events,
             )
         except Exception as exc:
+            events = [
+                TaskStartEvent(
+                    task_name=self.name,
+                    task_id=session.info.identifier,
+                ).to_envelope()
+            ]
             events.append(
                 ErrorEvent(
                     task_name=self.name,

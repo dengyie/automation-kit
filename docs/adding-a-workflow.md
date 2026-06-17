@@ -280,6 +280,10 @@ If a workflow result already includes an `artifact` event for a returned
 artifact handle, `ExampleWorkflow` preserves that event and does not add a
 duplicate automatic artifact event.
 
+If a workflow result already includes matching `task.start` or `task.end`
+events, `ExampleWorkflow` preserves them and does not add duplicate automatic
+lifecycle events.
+
 Artifacts stay generic. See `docs/artifacts.md` for storage layout, naming
 rules, report attachment rules, and dry-run behavior.
 
