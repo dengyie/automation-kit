@@ -2604,6 +2604,118 @@ and the report contract remains backward compatible.
 
 Stage, commit, and push the finished slice.
 
+## 2026-06-17: Runner Report Contract Consistency
+
+### Completed
+
+- Added a design note and implementation plan for tightening runner report
+  contract consistency without changing schema version `"1"`.
+- Added report-schema regression coverage that compares the documented artifact
+  report-entry fields in `docs/artifacts.md` with a real
+  `build_report(...).to_dict()` artifact entry.
+- Added report-schema coverage for artifact metadata safety wording so report
+  docs keep mentioning metadata and redaction behavior.
+- Updated `docs/artifacts.md` to match the existing runner report contract:
+  artifact entries include `artifact_type`, `path`, and `metadata`.
+- Documented that artifact metadata should stay generic and small and that
+  runner JSON serialization redacts sensitive metadata keys.
+- Left `automation_runner.reports`, packaged schema files, and
+  `automation_core` unchanged.
+
+### Verification
+
+Focused red verification before doc alignment:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_report_schema.py::test_artifact_guide_documents_current_artifact_report_fields tests/runner/test_report_schema.py::test_artifact_guide_documents_metadata_safety_rules --no-cov -q
+```
+
+Initial result:
+
+```text
+2 failed
+```
+
+Focused green verification after doc/test alignment:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_report_schema.py::test_artifact_guide_documents_current_artifact_report_fields tests/runner/test_report_schema.py::test_artifact_guide_documents_metadata_safety_rules --no-cov -q
+```
+
+Result:
+
+```text
+2 passed
+```
+
+Report schema regression tests:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_report_schema.py --no-cov -q
+```
+
+Result:
+
+```text
+9 passed
+```
+
+Runner regression tests:
+
+```bash
+.venv/bin/python -m pytest tests/runner --no-cov -q
+```
+
+Result:
+
+```text
+102 passed
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+295 passed
+Total coverage: 96.14%
+Required coverage: 80%
+```
+
+Whitespace check:
+
+```bash
+git diff --check
+```
+
+Result: no output.
+
+### Review
+
+Ran the required production code quality review scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- the change stays in report-contract documentation and test coverage;
+- `docs/artifacts.md` now matches the current emitted runner report artifact
+  shape;
+- packaged schema parity and runtime report shape remain unchanged;
+- `automation_core` remains untouched and business-agnostic.
+
+### Next Phase
+
+Stage, commit, and push the finished slice.
+
 ## 2026-06-17: Runner CLI Blank String Validation
 
 ### Completed

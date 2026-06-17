@@ -40,9 +40,13 @@ serialize only:
 
 - `artifact_type`
 - `path`
+- `metadata`
 
 Raw bytes, page source text, image data, tokens, cookies, action `data`, and
 skipped action parameters must not be embedded in JSON reports.
+Artifact metadata should stay generic and small, for example source component,
+capture mode, or content kind. Runner JSON report serialization redacts sensitive
+metadata keys before writing stdout or report files.
 
 ## Adapter Responsibilities
 

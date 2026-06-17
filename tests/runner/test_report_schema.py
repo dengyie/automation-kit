@@ -84,6 +84,18 @@ def _documented_report_fields():
     return fields
 
 
+def _documented_artifact_report_fields():
+    content = Path("docs/artifacts.md").read_text(encoding="utf-8")
+    start = content.index("serialize only:")
+    end = content.index("Raw bytes", start)
+    fields = []
+    for line in content[start:end].splitlines():
+        stripped = line.strip()
+        if stripped.startswith("- `") and stripped.endswith("`"):
+            fields.append(stripped.removeprefix("- `").removesuffix("`"))
+    return fields
+
+
 def test_report_schema_v1_matches_current_top_level_report_contract():
     schema = _load_schema()
     report = _sample_report()
@@ -101,6 +113,19 @@ def test_workflow_guide_documents_current_top_level_report_fields():
     report = _sample_report()
 
     assert set(_documented_report_fields()) == set(report)
+
+
+def test_artifact_guide_documents_current_artifact_report_fields():
+    report = _sample_report()
+
+    assert set(_documented_artifact_report_fields()) == set(report["artifacts"][0])
+
+
+def test_artifact_guide_documents_metadata_safety_rules():
+    content = Path("docs/artifacts.md").read_text(encoding="utf-8")
+
+    assert "metadata" in content
+    assert "redact" in content.lower()
 
 
 def test_report_schema_v1_documents_safe_nested_report_sections():
