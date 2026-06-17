@@ -58,8 +58,8 @@ captured before the failure.
 If a workflow step uses an unsupported `kind`, `run_workflow_steps(...)`
 returns a failed result with a direct structured error instead of treating that
 step as an artifact step.
-`WorkflowStep.artifact(...)` rejects empty or traversal-like artifact names
-before a workflow run starts.
+`WorkflowStep.action(...)` and `WorkflowStep.artifact(...)` reject empty,
+traversal-like, or non-string names before a workflow run starts.
 
 ## Creating A New Workflow
 

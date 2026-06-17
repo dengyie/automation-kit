@@ -2604,6 +2604,103 @@ and the report contract remains backward compatible.
 
 Stage, commit, and push the finished slice.
 
+## 2026-06-17: Workflow Step Action Name Validation
+
+### Completed
+
+- Added a design note and implementation plan for constructor-level action name
+  validation in example workflows.
+- Added focused tests for `WorkflowStep.action(...)` rejecting empty,
+  traversal-like, and non-string names.
+- Added a valid-action regression test proving parameters are preserved.
+- Added `_validate_workflow_action_name(...)` in `examples.workflows` and wired
+  it into `WorkflowStep.action(...)`.
+- Documented that `WorkflowStep` authoring helpers reject invalid names before
+  workflow execution starts.
+- Left `automation_core` unchanged and business-agnostic.
+
+### Verification
+
+Focused red run before implementation:
+
+```bash
+.venv/bin/python -m pytest tests/examples/damai_web/test_smoke_workflow.py -k 'action_rejects_invalid_name or action_rejects_non_string_name or action_allows_valid_name' --no-cov -q
+```
+
+Initial result:
+
+```text
+6 failed, 1 passed, 23 deselected
+```
+
+Focused green run after implementation:
+
+```bash
+.venv/bin/python -m pytest tests/examples/damai_web/test_smoke_workflow.py -k 'action_rejects_invalid_name or action_rejects_non_string_name or action_allows_valid_name' --no-cov -q
+```
+
+Result:
+
+```text
+7 passed, 23 deselected
+```
+
+Example regression tests:
+
+```bash
+.venv/bin/python -m pytest tests/examples/damai_web/test_smoke_workflow.py tests/examples/damai_android/test_smoke_workflow.py --no-cov -q
+```
+
+Result:
+
+```text
+34 passed
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+278 passed
+Total coverage: 96.29%
+Required coverage: 80%
+```
+
+Whitespace check:
+
+```bash
+git diff --check
+```
+
+Result: no output.
+
+### Review
+
+Ran the required production code quality review scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- action validation remains in the example authoring layer.
+- `automation_core.actions.ActionRequest` remains generic and unchanged.
+- adapter-specific action vocabularies remain in adapters and examples.
+- invalid constructor inputs are covered by tests that failed before the fix.
+- valid action names and parameters remain backward compatible.
+
+### Next Phase
+
+Stage, commit, and push the finished slice.
+
 ## 2026-06-17: Workflow Step Artifact Name Validation
 
 ### Completed

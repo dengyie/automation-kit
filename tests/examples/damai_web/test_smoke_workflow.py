@@ -447,6 +447,26 @@ def test_run_workflow_steps_rejects_unknown_step_kind_and_preserves_prior_result
 
 
 @pytest.mark.parametrize("name", ["", "   ", ".", ".."])
+def test_workflow_step_action_rejects_invalid_name(name):
+    with pytest.raises(ValueError, match="invalid workflow action name"):
+        WorkflowStep.action(name)
+
+
+@pytest.mark.parametrize("name", [None, 123])
+def test_workflow_step_action_rejects_non_string_name(name):
+    with pytest.raises(ValueError, match="invalid workflow action name"):
+        WorkflowStep.action(name)
+
+
+def test_workflow_step_action_allows_valid_name():
+    step = WorkflowStep.action("open", url="https://example.test/damai")
+
+    assert step.kind == "action"
+    assert step.name == "open"
+    assert step.parameters == {"url": "https://example.test/damai"}
+
+
+@pytest.mark.parametrize("name", ["", "   ", ".", ".."])
 def test_workflow_step_artifact_rejects_invalid_name(name):
     with pytest.raises(ValueError, match="invalid workflow artifact name"):
         WorkflowStep.artifact("screenshot", name)

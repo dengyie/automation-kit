@@ -21,7 +21,11 @@ class WorkflowStep:
 
     @classmethod
     def action(cls, name: str, **parameters: object) -> "WorkflowStep":
-        return cls(kind="action", name=name, parameters=parameters)
+        return cls(
+            kind="action",
+            name=_validate_workflow_action_name(name),
+            parameters=parameters,
+        )
 
     @classmethod
     def artifact(cls, artifact_type: str, name: str) -> "WorkflowStep":
@@ -61,6 +65,15 @@ def _validate_workflow_artifact_name(name: str) -> str:
     cleaned = name.replace("\\", "/").split("/")[-1].strip()
     if cleaned in {"", ".", ".."}:
         raise ValueError("invalid workflow artifact name")
+    return name
+
+
+def _validate_workflow_action_name(name: str) -> str:
+    if not isinstance(name, str):
+        raise ValueError("invalid workflow action name")
+    cleaned = name.replace("\\", "/").split("/")[-1].strip()
+    if cleaned in {"", ".", ".."}:
+        raise ValueError("invalid workflow action name")
     return name
 
 
