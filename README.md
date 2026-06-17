@@ -32,10 +32,10 @@ business workflows.
 - core: [dengyie/automation-kit](https://github.com/dengyie/automation-kit)
 - app: [dengyie/automation-app-damai](https://github.com/dengyie/automation-app-damai)
 - app: [dengyie/automation-app-dianping](https://github.com/dengyie/automation-app-dianping)
-- plugin: [dengyie/automation-plugin-ocr](https://github.com/dengyie/automation-plugin-ocr)
+- visual platform: [dengyie/slidex](https://github.com/dengyie/slidex)
 
 All ecosystem repositories are intended to stay public so application and
-plugin authors can consume the same baseline contracts directly.
+capability authors can consume the same baseline contracts directly.
 
 ## Development
 

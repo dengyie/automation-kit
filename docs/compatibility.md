@@ -4,15 +4,16 @@
 
 - `automation-kit` publishes explicit versions.
 - application repositories pin a compatible `automation-kit` version.
-- plugin repositories document the `automation-kit` ranges they support when
-  they start depending on core-side contracts.
+- optional capability repositories document the `automation-kit` ranges they
+  support when they start depending on core-side contracts.
 
 ## Minimum Verification Matrix
 
 - `automation-kit`: offline unit and runner suite
 - `automation-app-damai`: offline workflow, config, and CLI suite
 - `automation-app-dianping`: offline workflow and config suite
-- `automation-plugin-ocr`: offline plugin API suite
+- `slidex`: visual challenge API, OCR API, and optional automation-kit
+  integration suite once its platform API lands
 
 ## Current Local Verification Commands
 
@@ -26,6 +27,6 @@ automation-app-damai:
 automation-app-dianping:
   /Users/mango/project/codex/automation-app-dianping/.venv/bin/python -m pytest -q
 
-automation-plugin-ocr:
-  /Users/mango/project/codex/automation-plugin-ocr/.venv/bin/python -m pytest -q
+slidex:
+  /Users/mango/project/codex/slidex/.venv/bin/python -m pytest -q
 ```

@@ -108,3 +108,16 @@ def test_compatibility_doc_exists():
     path = Path(__file__).resolve().parents[2] / "docs" / "compatibility.md"
 
     assert path.exists()
+
+
+def test_ecosystem_docs_use_slidex_as_visual_platform():
+    docs_text = "\n".join(
+        [
+            (ROOT / "README.md").read_text(encoding="utf-8"),
+            (ROOT / "docs" / "ecosystem.md").read_text(encoding="utf-8"),
+            (ROOT / "docs" / "compatibility.md").read_text(encoding="utf-8"),
+        ]
+    ).lower()
+
+    assert "dengyie/slidex" in docs_text
+    assert "automation-plugin-ocr" not in docs_text
