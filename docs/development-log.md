@@ -187,6 +187,80 @@ Proceed to thin adapter and example shells:
 - `examples/damai_web`
 - `examples/damai_android`
 
+## 2026-06-17: Task Runner Cancellation
+
+### Completed
+
+- Added a new `automation_core.tasks.TaskCancelledError` to represent
+  intentional task cancellation.
+- Extended `automation_core.tasks.TaskResult` with an explicit terminal
+  `state` field so task results can distinguish succeeded, failed, and
+  cancelled outcomes.
+- Updated `TaskRunner.run(...)` so `TaskCancelledError` returns a cancelled
+  result with `task.end` outcome `cancelled` instead of a normal failure.
+- Kept ordinary exception handling and `KeyboardInterrupt` propagation
+  unchanged.
+- Documented the cancelled task outcome in `docs/adding-a-workflow.md`.
+- Added import coverage and task runner tests for the cancelled path.
+
+### Verification
+
+Focused task/import verification:
+
+```bash
+.venv/bin/python -m pytest tests/tasks/test_runner.py tests/test_imports.py --no-cov -q
+```
+
+Result:
+
+```text
+10 passed
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+259 passed
+Total coverage: 96.22%
+Required coverage: 80%
+```
+
+Whitespace check:
+
+```bash
+git diff --check
+```
+
+Result: no output.
+
+### Review
+
+Ran the required production code quality review scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- cancellation stays inside `automation_core.tasks`.
+- cancelled tasks are represented explicitly instead of being converted into a
+  generic failure.
+- `KeyboardInterrupt` still propagates.
+- `automation_core` remains business-agnostic.
+
+### Next Phase
+
+Commit and push the finished slice, then continue with the next roadmap slice.
+
 ## 2026-06-16: Thin Adapter And Example Shells
 
 ### Completed

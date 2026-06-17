@@ -276,7 +276,11 @@ runner does not serialize raw `WorkflowOptions` as a top-level report object.
 - `task.start` when the workflow session starts executing.
 - `artifact` for each captured artifact.
 - `error` when workflow execution raises an exception.
-- `task.end` with `outcome` set to `succeeded` or `failed`.
+- `task.end` with `outcome` set to `succeeded`, `failed`, or `cancelled`.
+
+Core task helpers may also treat intentional stops as first-class cancellation.
+`automation_core.tasks.TaskCancelledError` marks a task as cancelled without
+converting it into an ordinary failure result.
 
 If a workflow result already includes an `artifact` event for a returned
 artifact handle, `ExampleWorkflow` preserves that event and does not add a

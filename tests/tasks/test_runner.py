@@ -1,6 +1,6 @@
 import pytest
 
-from automation_core.tasks import TaskResult, TaskRunner
+from automation_core.tasks import TaskCancelledError, TaskResult, TaskRunner
 
 
 def test_task_runner_returns_success_result_and_events():
@@ -46,6 +46,26 @@ def test_task_runner_returns_failure_result_and_error_event():
         "error_type": "RuntimeError",
     }
     assert result.events[-1].payload["outcome"] == "failed"
+
+
+def test_task_runner_returns_cancelled_result_and_terminal_events():
+    runner = TaskRunner(task_name="stop-now", task_id="task-1")
+
+    def cancel():
+        raise TaskCancelledError("user requested stop")
+
+    result = runner.run(cancel)
+
+    assert isinstance(result, TaskResult)
+    assert result.success is False
+    assert result.state.value == "cancelled"
+    assert result.value is None
+    assert result.error is None
+    assert [event.event_type for event in result.events] == [
+        "task.start",
+        "task.end",
+    ]
+    assert result.events[-1].payload["outcome"] == "cancelled"
 
 
 def test_task_runner_does_not_swallow_keyboard_interrupt():

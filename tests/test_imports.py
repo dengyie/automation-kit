@@ -20,8 +20,9 @@ def test_automation_core_driver_element_imports():
 
 
 def test_automation_core_task_runner_imports():
-    from automation_core.tasks import TaskResult, TaskRunner
+    from automation_core.tasks import TaskCancelledError, TaskResult, TaskRunner
 
+    assert TaskCancelledError
     assert TaskResult
     assert TaskRunner
 
