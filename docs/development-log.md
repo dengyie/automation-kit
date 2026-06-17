@@ -226,8 +226,8 @@ Full suite:
 Result:
 
 ```text
-259 passed
-Total coverage: 96.22%
+262 passed
+Total coverage: 96.26%
 Required coverage: 80%
 ```
 
@@ -2603,6 +2603,83 @@ and the report contract remains backward compatible.
 ### Next Phase
 
 Stage, commit, and push the finished slice.
+
+## 2026-06-17: Runner Task Cancellation
+
+### Completed
+
+- Added a design note and implementation plan for runner-level task
+  cancellation propagation.
+- Extended `examples.workflows.ExampleWorkflowResult` with explicit terminal
+  `state` tracking so workflow, runner, and report layers can distinguish
+  succeeded, failed, and cancelled outcomes.
+- Updated `ExampleWorkflow.run()` so `TaskCancelledError` produces a cancelled
+  workflow result with `task.start` and `task.end` events, without a synthetic
+  error event.
+- Updated `automation_runner.cli` to map cancelled workflow results to
+  `RunState.cancel(...)`.
+- Updated `automation_runner.reports.build_report()` so top-level report
+  `status` becomes `cancelled` when the run state is cancelled.
+- Documented cancelled report behavior in `README.md` and
+  `docs/adding-a-workflow.md`.
+
+### Verification
+
+Focused examples/runner verification:
+
+```bash
+.venv/bin/python -m pytest tests/examples/damai_web/test_smoke_workflow.py tests/examples/damai_android/test_smoke_workflow.py tests/runner/test_cli.py tests/runner/test_reports.py tests/runner/test_report_schema.py --no-cov -q
+```
+
+Result:
+
+```text
+83 passed
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+259 passed
+Total coverage: 96.22%
+Required coverage: 80%
+```
+
+Whitespace check:
+
+```bash
+git diff --check
+```
+
+Result: no output.
+
+### Review
+
+Ran the required production code quality review scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- cancellation stays expressed as a core runtime signal and is only serialized
+  into CLI/report policy at the runner layer.
+- cancelled workflows are no longer flattened into failed reports.
+- ordinary failure and startup-failure behavior remains unchanged.
+- `automation_core` remains business-agnostic.
+
+### Next Phase
+
+Commit and push the finished slice, then continue with the next roadmap slice.
 
 ## 2026-06-17: Element Lookup Session Contract Alignment
 

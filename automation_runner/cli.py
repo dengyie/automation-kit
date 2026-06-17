@@ -14,6 +14,7 @@ from automation_core.config import ConfigSource, EnvConfigSource
 from automation_core.drivers import SessionInfo
 from automation_core.events import ErrorEvent, TaskEndEvent, TaskStartEvent
 from automation_core.state import RunState
+from automation_core.tasks.lifecycle import TaskState
 from automation_runner.context import WorkflowContext, WorkflowOptions
 from automation_runner import WorkflowRunner
 from automation_runner.config import RunnerConfig, load_runner_config
@@ -395,7 +396,9 @@ def main(
         elapsed_seconds = time.monotonic() - started_at
         run_state = RunState(run_id=result.session.identifier)
         run_state.start(started_at=wall_started_at)
-        if result.success:
+        if result.state == TaskState.CANCELLED:
+            run_state.cancel(finished_at=wall_finished_at)
+        elif result.success:
             run_state.succeed(finished_at=wall_finished_at)
         else:
             run_state.fail(finished_at=wall_finished_at)

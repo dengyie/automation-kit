@@ -281,6 +281,9 @@ runner does not serialize raw `WorkflowOptions` as a top-level report object.
 Core task helpers may also treat intentional stops as first-class cancellation.
 `automation_core.tasks.TaskCancelledError` marks a task as cancelled without
 converting it into an ordinary failure result.
+When a workflow is cancelled, runner reports keep `success=false` for backward
+compatibility but use top-level `status="cancelled"` and
+`run_state.status="cancelled"`.
 
 If a workflow result already includes an `artifact` event for a returned
 artifact handle, `ExampleWorkflow` preserves that event and does not add a

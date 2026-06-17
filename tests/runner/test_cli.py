@@ -1014,6 +1014,35 @@ def test_cli_emits_json_report_when_workflow_fails(tmp_path, capsys):
     assert fixtures.CREATED_SESSIONS[0].stopped is True
 
 
+def test_cli_emits_json_report_when_workflow_is_cancelled(capsys):
+    fixtures.reset()
+
+    exit_code = main(
+        [
+            "run",
+            "--workflow-factory",
+            "tests.runner.fixtures:create_cancelled_workflow",
+            "--json",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    report = json.loads(captured.out)
+
+    assert exit_code == 1
+    assert report["workflow"] == "tests.runner.fixtures:create_cancelled_workflow"
+    assert report["workflow_factory"] == "tests.runner.fixtures:create_cancelled_workflow"
+    assert report["success"] is False
+    assert report["status"] == "cancelled"
+    assert report["run_state"]["status"] == "cancelled"
+    assert report["run_state"]["outcome"] == "cancelled"
+    assert [event["event_type"] for event in report["events"]] == [
+        "task.start",
+        "task.end",
+    ]
+    assert report["events"][-1]["payload"]["outcome"] == "cancelled"
+
+
 def test_cli_emits_json_report_when_session_factory_fails(tmp_path, capsys):
     fixtures.reset()
     report_path = tmp_path / "startup-failed.json"

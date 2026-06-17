@@ -9,6 +9,8 @@ from automation_core.drivers import (
     SessionInfo,
 )
 from automation_core.events import ArtifactEvent, ErrorEvent, EventEnvelope, TaskEndEvent, TaskStartEvent
+from automation_core.tasks import TaskCancelledError
+from automation_core.tasks.lifecycle import TaskState
 
 
 @dataclass(frozen=True)
@@ -32,6 +34,7 @@ class ExampleWorkflowResult:
     success: bool
     actions: List[ActionResult]
     artifacts: List[ArtifactHandle]
+    state: TaskState = TaskState.SUCCEEDED
     batch_result: Optional[ActionBatchResult] = None
     error: Optional[str] = None
     events: List[EventEnvelope] = field(default_factory=list)
@@ -142,6 +145,7 @@ def run_workflow_steps(
             except Exception as exc:
                 return ExampleWorkflowResult(
                     session=session.info,
+                    state=TaskState.FAILED,
                     success=False,
                     actions=actions,
                     artifacts=artifacts,
@@ -156,6 +160,7 @@ def run_workflow_steps(
         batch_result = current_batch_result()
         return ExampleWorkflowResult(
             session=session.info,
+            state=TaskState.SUCCEEDED if (batch_result is None or batch_result.success) else TaskState.FAILED,
             success=(batch_result.success if batch_result is not None else True),
             actions=actions,
             artifacts=artifacts,
@@ -219,7 +224,10 @@ class ExampleWorkflow:
                         error_type=error_type,
                     ).to_envelope()
                 )
-            outcome = "succeeded" if result.success else "failed"
+            if result.state == TaskState.CANCELLED:
+                outcome = "cancelled"
+            else:
+                outcome = "succeeded" if result.success else "failed"
             if not _has_task_end_event(
                 result.events,
                 task_id=session.info.identifier,
@@ -235,11 +243,36 @@ class ExampleWorkflow:
                 )
             return ExampleWorkflowResult(
                 session=result.session,
+                state=result.state,
                 success=result.success,
                 actions=result.actions,
                 artifacts=result.artifacts,
                 batch_result=result.batch_result,
                 error=result.error,
+                events=events,
+            )
+        except TaskCancelledError:
+            events = [
+                TaskStartEvent(
+                    task_name=self.name,
+                    task_id=session.info.identifier,
+                ).to_envelope()
+            ]
+            events.append(
+                TaskEndEvent(
+                    task_name=self.name,
+                    task_id=session.info.identifier,
+                    outcome="cancelled",
+                ).to_envelope()
+            )
+            return ExampleWorkflowResult(
+                session=session.info,
+                state=TaskState.CANCELLED,
+                success=False,
+                actions=[],
+                artifacts=[],
+                batch_result=None,
+                error=None,
                 events=events,
             )
         except Exception as exc:
@@ -266,6 +299,7 @@ class ExampleWorkflow:
             )
             return ExampleWorkflowResult(
                 session=session.info,
+                state=TaskState.FAILED,
                 success=False,
                 actions=[],
                 artifacts=[],

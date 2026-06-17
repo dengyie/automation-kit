@@ -132,6 +132,33 @@ def test_build_report_serializes_run_state():
     }
 
 
+def test_build_report_serializes_cancelled_run_state():
+    result = ExampleWorkflowResult(
+        session=SessionInfo(
+            driver_name="fake",
+            platform="web",
+            identifier="run-1",
+        ),
+        success=False,
+        actions=[],
+        artifacts=[],
+    )
+
+    run_state = RunState(
+        run_id="run-1",
+        status=RunStatus.CANCELLED,
+        started_at=1.25,
+        finished_at=2.5,
+        outcome="cancelled",
+    )
+
+    report = build_report("damai-web-smoke", result, run_state=run_state).to_dict()
+
+    assert report["status"] == "cancelled"
+    assert report["run_state"]["status"] == "cancelled"
+    assert report["run_state"]["outcome"] == "cancelled"
+
+
 def test_build_report_serializes_artifact_metadata():
     result = ExampleWorkflowResult(
         session=SessionInfo(

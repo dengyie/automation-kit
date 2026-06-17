@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Optional
 
 from automation_core.actions import ActionBatchResult
 from automation_core.drivers import ActionResult, ArtifactHandle, SessionInfo
-from automation_core.state import RunState
+from automation_core.state import RunState, RunStatus
 from automation_runner.context import WorkflowContext
 from examples.workflows import ExampleWorkflowResult
 
@@ -124,6 +124,12 @@ def _serialize_workflow_context(context: WorkflowContext) -> Dict[str, object]:
     return context.to_dict()
 
 
+def _report_status(success: bool, state: RunState) -> str:
+    if state.status == RunStatus.CANCELLED:
+        return "cancelled"
+    return "succeeded" if success else "failed"
+
+
 def build_report(
     workflow: str,
     result: ExampleWorkflowResult,
@@ -156,7 +162,7 @@ def build_report(
             )
         ),
         success=result.success,
-        status="succeeded" if result.success else "failed",
+        status=_report_status(result.success, state),
         run_id=result.session.identifier,
         run_state={
             "run_id": state.run_id,

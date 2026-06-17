@@ -78,7 +78,8 @@
     "status": {
       "enum": [
         "succeeded",
-        "failed"
+        "failed",
+        "cancelled"
       ]
     },
     "run_id": {

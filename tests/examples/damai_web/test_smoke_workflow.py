@@ -5,6 +5,7 @@ import pytest
 from automation_core.actions import ActionBatchResult, ActionRequest
 from automation_core.drivers import ActionResult, ArtifactHandle, SessionInfo
 from automation_core.events import ArtifactEvent, ErrorEvent, RetryAttemptEvent, TaskEndEvent
+from automation_core.tasks import TaskCancelledError
 from examples.damai_web import create_workflow, run_smoke_workflow
 from examples.workflows import (
     ExampleWorkflow,
@@ -168,6 +169,27 @@ def test_example_workflow_emits_error_event_for_returned_failure_result():
         "error_type": "RuntimeError",
     }
     assert result.events[-1].payload["outcome"] == "failed"
+
+
+def test_example_workflow_returns_cancelled_result_when_run_function_cancels():
+    session = FakeSession()
+    workflow = ExampleWorkflow(
+        name="custom-workflow",
+        session_factory=lambda: session,
+        run_fn=lambda current_session: (_ for _ in ()).throw(
+            TaskCancelledError("user requested stop")
+        ),
+    )
+
+    result = workflow.run()
+
+    assert result.success is False
+    assert result.error is None
+    assert [event.event_type for event in result.events] == [
+        "task.start",
+        "task.end",
+    ]
+    assert result.events[-1].payload["outcome"] == "cancelled"
 
 
 def test_example_workflow_does_not_duplicate_returned_error_events():

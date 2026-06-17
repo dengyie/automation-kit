@@ -107,6 +107,11 @@ def test_report_schema_v1_documents_safe_nested_report_sections():
     schema = _load_schema()
     properties = schema["properties"]
 
+    assert properties["status"]["enum"] == [
+        "succeeded",
+        "failed",
+        "cancelled",
+    ]
     assert properties["session"]["required"] == [
         "driver_name",
         "platform",

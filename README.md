@@ -104,6 +104,9 @@ JSON reports include a safe `workflow_context` summary for runner metadata.
 Custom workflow inputs can use repeated `--param KEY=VALUE` flags. The runner
 passes those strings through as `options.parameters` and leaves workflow-specific
 validation to the workflow package.
+Cancelled workflows keep `success=false`, but their top-level report `status`
+and `run_state.status` are both `cancelled` so orchestrators can distinguish an
+intentional stop from a failure.
 Use either a built-in workflow name or `--workflow-factory`, not both. A
 positional workflow name overrides a config-provided workflow factory because
 CLI arguments take precedence over environment defaults.

@@ -2,6 +2,7 @@ from pathlib import Path
 
 from automation_core.actions import ActionBatchResult, ActionRequest
 from automation_core.drivers import ActionResult, ArtifactHandle, SessionInfo
+from automation_core.tasks import TaskCancelledError
 from examples.workflows import ExampleWorkflow, ExampleWorkflowResult
 
 
@@ -135,6 +136,17 @@ def create_kwargs_context_workflow(session_factory, **kwargs):
 
 def create_raising_workflow(session_factory):
     raise RuntimeError("workflow construction failed")
+
+
+def create_cancelled_workflow(session_factory):
+    def run_fn(session):
+        raise TaskCancelledError("user requested stop")
+
+    return ExampleWorkflow(
+        name="cancelled-workflow",
+        session_factory=session_factory,
+        run_fn=run_fn,
+    )
 
 
 def reset():
