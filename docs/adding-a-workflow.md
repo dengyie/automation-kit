@@ -148,7 +148,8 @@ Dictionary-backed runner config must provide string values for `factory`,
 loaded.
 
 Custom workflow parameters can also come from config. Environment values use a
-JSON object string:
+JSON object string. Config-backed parameter keys must contain at least one
+non-whitespace character:
 
 ```bash
 AUTOMATION_RUNNER_JSON=true \

@@ -84,6 +84,22 @@ def test_load_runner_config_rejects_non_string_parameter_values():
         load_runner_config(DictConfigSource({"parameters": {"count": 3}}))
 
 
+def test_load_runner_config_rejects_blank_parameter_key():
+    with pytest.raises(
+        ValueError,
+        match="config parameters expected string keys and values",
+    ):
+        load_runner_config(DictConfigSource({"parameters": {"   ": "value"}}))
+
+
+def test_load_runner_config_rejects_blank_json_parameter_key():
+    with pytest.raises(
+        ValueError,
+        match="config parameters expected string keys and values",
+    ):
+        load_runner_config(DictConfigSource({"parameters": '{"   ":"value"}'}))
+
+
 def test_load_runner_config_rejects_invalid_bool():
     with pytest.raises(ValueError, match="config live expected bool"):
         load_runner_config(DictConfigSource({"live": "maybe"}))

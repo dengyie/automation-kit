@@ -5928,3 +5928,100 @@ Follow-up inspection confirmed:
 ### Next Phase
 
 Stage, commit, and push the finished slice.
+
+## 2026-06-17: Runner Config Param Key Validation
+
+### Completed
+
+- Added a design note and implementation plan for rejecting whitespace-only
+  config-backed workflow parameter keys.
+- Added focused runner-config regression tests for blank keys in dictionary and
+  JSON-string parameter inputs.
+- Tightened `_optional_parameters(...)` in `automation_runner.config` so blank
+  keys are rejected before workflow construction.
+- Documented the non-whitespace key requirement for config-backed workflow
+  parameters in `README.md` and `docs/adding-a-workflow.md`.
+- Left `automation_core` unchanged and business-agnostic.
+
+### Verification
+
+Focused red run before implementation:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_config.py -k 'blank_parameter_key' --no-cov -q
+```
+
+Initial result:
+
+```text
+1 failed, 11 deselected
+```
+
+Focused green config run after implementation:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_config.py -k 'blank_parameter_key or reads_json_parameters or rejects_non_string_parameter_values' --no-cov -q
+```
+
+Result:
+
+```text
+3 passed, 9 deselected
+```
+
+Focused CLI compatibility run:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_cli.py -k 'config_parameters or blank_workflow_param_key or tab_only_workflow_param_key' --no-cov -q
+```
+
+Result:
+
+```text
+4 passed, 46 deselected
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+282 passed
+Total coverage: 96.29%
+Required coverage: 80%
+```
+
+Whitespace check:
+
+```bash
+git diff --check
+```
+
+Result: no output.
+
+### Review
+
+Ran the required production code quality review scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- `automation_runner.config` now rejects blank parameter keys from dictionary
+  and environment-backed JSON config sources.
+- valid keys, empty string values, and CLI-over-config override behavior remain
+  unchanged.
+- config-backed and CLI-backed workflow parameter boundaries are now aligned.
+- `automation_core` remains unchanged and business-agnostic.
+
+### Next Phase
+
+Stage, commit, and push the finished slice.

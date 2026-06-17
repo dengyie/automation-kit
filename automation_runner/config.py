@@ -55,7 +55,11 @@ def _optional_parameters(source: ConfigSource, key: str) -> Dict[str, str]:
         raise ValueError(f"config {key} expected object")
     parameters = {}
     for parameter_key, parameter_value in value.items():
-        if not isinstance(parameter_key, str) or not isinstance(parameter_value, str):
+        if (
+            not isinstance(parameter_key, str)
+            or not parameter_key.strip()
+            or not isinstance(parameter_value, str)
+        ):
             raise ValueError(f"config {key} expected string keys and values")
         parameters[parameter_key] = parameter_value
     return parameters
