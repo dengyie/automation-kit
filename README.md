@@ -27,6 +27,16 @@ External repositories should depend on:
 Built-in examples remain thin references and are not the long-term home for
 business workflows.
 
+## Repositories
+
+- core: [dengyie/automation-kit](https://github.com/dengyie/automation-kit)
+- app: [dengyie/automation-app-damai](https://github.com/dengyie/automation-app-damai)
+- app: [dengyie/automation-app-dianping](https://github.com/dengyie/automation-app-dianping)
+- plugin: [dengyie/automation-plugin-ocr](https://github.com/dengyie/automation-plugin-ocr)
+
+All ecosystem repositories are intended to stay public so application and
+plugin authors can consume the same baseline contracts directly.
+
 ## Development
 
 ```bash
