@@ -2604,6 +2604,108 @@ and the report contract remains backward compatible.
 
 Stage, commit, and push the finished slice.
 
+## 2026-06-17: Workflow Step Kind Validation
+
+### Completed
+
+- Added a design note and implementation plan for explicit
+  `WorkflowStep.kind` validation.
+- Added a web example regression test covering an unsupported step kind after
+  earlier action and artifact steps already completed.
+- Updated `run_workflow_steps(...)` so unsupported step kinds return a failed
+  `ExampleWorkflowResult` with a direct structured error instead of falling
+  into the artifact branch.
+- Preserved already completed action and artifact evidence when the invalid
+  step is reached.
+- Documented the authoring boundary in `docs/adding-a-workflow.md`.
+- Left `automation_core` unchanged and business-agnostic.
+
+### Verification
+
+Focused red run before implementation:
+
+```bash
+.venv/bin/python -m pytest tests/examples/damai_web/test_smoke_workflow.py::test_run_workflow_steps_rejects_unknown_step_kind_and_preserves_prior_results --no-cov -q
+```
+
+Initial result:
+
+```text
+1 failed
+```
+
+Focused green run after implementation:
+
+```bash
+.venv/bin/python -m pytest tests/examples/damai_web/test_smoke_workflow.py::test_run_workflow_steps_rejects_unknown_step_kind_and_preserves_prior_results --no-cov -q
+```
+
+Result:
+
+```text
+1 passed
+```
+
+Example regression tests:
+
+```bash
+.venv/bin/python -m pytest tests/examples/damai_web/test_smoke_workflow.py tests/examples/damai_android/test_smoke_workflow.py --no-cov -q
+```
+
+Result:
+
+```text
+20 passed
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+264 passed
+Total coverage: 96.29%
+Required coverage: 80%
+```
+
+Whitespace check:
+
+```bash
+git diff --check
+```
+
+Result: no output.
+
+### Review
+
+Ran the required production code quality review scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- step-kind validation stays in `examples.workflows`, where the
+  `WorkflowStep` authoring helper lives.
+- `automation_core` remains unchanged and business-agnostic.
+- unsupported workflow step kinds now fail with a direct structured error
+  instead of surfacing an indirect `KeyError`.
+- already completed actions and artifacts are preserved when the invalid step
+  is reached.
+- existing action, artifact, and action-batch failure behavior remains covered
+  by the example regression tests.
+
+### Next Phase
+
+Stage, commit, and push the finished slice.
+
 ## 2026-06-17: Runner Cancelled Exit Code
 
 ### Completed

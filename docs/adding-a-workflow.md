@@ -55,6 +55,9 @@ and it does not move URLs, selectors, package names, or business flow into
 If an artifact step fails after earlier actions or artifacts completed,
 `run_workflow_steps(...)` returns a failed result that preserves the evidence
 captured before the failure.
+If a workflow step uses an unsupported `kind`, `run_workflow_steps(...)`
+returns a failed result with a direct structured error instead of treating that
+step as an artifact step.
 
 ## Creating A New Workflow
 

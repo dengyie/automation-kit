@@ -423,6 +423,29 @@ def test_run_workflow_steps_allows_artifact_only_sequences():
     assert session.artifacts == [("screenshot", "home.png")]
 
 
+def test_run_workflow_steps_rejects_unknown_step_kind_and_preserves_prior_results():
+    session = FakeSession()
+
+    result = run_workflow_steps(
+        session,
+        [
+            WorkflowStep.action("open", url="https://example.test/damai"),
+            WorkflowStep.artifact("screenshot", "home.png"),
+            WorkflowStep(kind="navigate", name="next"),
+        ],
+    )
+
+    assert result.success is False
+    assert result.error == "ValueError: unsupported workflow step kind: navigate"
+    assert [action.message for action in result.actions] == ["open"]
+    assert result.batch_result is not None
+    assert [action.message for action in result.batch_result.results] == ["open"]
+    assert [artifact.path for artifact in result.artifacts] == [Path("home.png")]
+    assert session.actions == [("open", {"url": "https://example.test/damai"})]
+    assert session.artifacts == [("screenshot", "home.png")]
+    assert session.stopped is True
+
+
 def test_damai_web_smoke_workflow_returns_failure_when_action_raises():
     class FailingSession(FakeSession):
         def execute_action(self, action_name, **kwargs):

@@ -135,6 +135,19 @@ def run_workflow_steps(
                 )
                 continue
 
+            if step.kind != "artifact":
+                if not flush_actions():
+                    break
+                return ExampleWorkflowResult(
+                    session=session.info,
+                    state=TaskState.FAILED,
+                    success=False,
+                    actions=actions,
+                    artifacts=artifacts,
+                    batch_result=current_batch_result(),
+                    error=f"ValueError: unsupported workflow step kind: {step.kind}",
+                )
+
             if not flush_actions():
                 break
             try:
