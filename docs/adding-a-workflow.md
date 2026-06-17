@@ -145,7 +145,8 @@ automation-runner run damai-web-smoke
 
 Dictionary-backed runner config must provide string values for `factory`,
 `workflow_factory`, `url`, and `app_id`; invalid types fail before factories are
-loaded.
+loaded. Those config-backed string values must contain at least one
+non-whitespace character.
 
 Custom workflow parameters can also come from config. Environment values use a
 JSON object string. Config-backed parameter keys must contain at least one

@@ -211,6 +211,27 @@ def test_cli_uses_config_source_for_dry_workflow_defaults(capsys):
     assert fixtures.CREATED_SESSIONS == []
 
 
+def test_cli_rejects_blank_config_url_for_builtin_workflow(capsys):
+    fixtures.reset()
+
+    exit_code = main(
+        ["run", "damai-web-smoke"],
+        config_source=DictConfigSource(
+            {
+                "json": "true",
+                "url": "   ",
+            }
+        ),
+    )
+
+    captured = capsys.readouterr()
+
+    assert exit_code == 2
+    assert captured.out == ""
+    assert "config url expected string" in captured.err
+    assert fixtures.CREATED_SESSIONS == []
+
+
 def test_cli_reads_runner_environment_defaults(monkeypatch, capsys):
     fixtures.reset()
     monkeypatch.setenv("AUTOMATION_RUNNER_JSON", "true")

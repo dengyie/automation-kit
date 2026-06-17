@@ -6025,3 +6025,127 @@ Follow-up inspection confirmed:
 ### Next Phase
 
 Stage, commit, and push the finished slice.
+
+## 2026-06-17: Runner Config Blank String Validation
+
+### Completed
+
+- Added a design note and implementation plan for rejecting whitespace-only
+  config strings for `factory`, `workflow_factory`, `url`, and `app_id`.
+- Added focused runner-config regression tests covering blank strings across all
+  four runtime string fields.
+- Added a CLI regression test proving a blank config `url` now fails during
+  config loading instead of being treated as a valid workflow input.
+- Tightened `_optional_string(...)` in `automation_runner.config` so blank
+  strings are rejected before runner execution proceeds.
+- Documented the non-whitespace requirement for config-backed runtime strings in
+  `README.md` and `docs/adding-a-workflow.md`.
+- Left `automation_core` unchanged and business-agnostic.
+
+### Verification
+
+Focused red config run before implementation:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_config.py -k 'blank_string_fields' --no-cov -q
+```
+
+Initial result:
+
+```text
+4 failed, 12 deselected
+```
+
+Focused red CLI run before implementation:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_cli.py::test_cli_rejects_blank_config_url_for_builtin_workflow --no-cov -q
+```
+
+Initial result:
+
+```text
+1 failed
+```
+
+Focused green config run after implementation:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_config.py -k 'blank_string_fields or reads_runtime_values or rejects_non_string_fields' --no-cov -q
+```
+
+Result:
+
+```text
+9 passed, 7 deselected
+```
+
+Focused green CLI compatibility run:
+
+```bash
+.venv/bin/python -m pytest tests/runner/test_cli.py::test_cli_rejects_blank_config_url_for_builtin_workflow tests/runner/test_cli.py -k 'config_parameters or blank_config_url_for_builtin_workflow' --no-cov -q
+```
+
+Result:
+
+```text
+3 passed, 48 deselected
+```
+
+Runner regression tests:
+
+```bash
+.venv/bin/python -m pytest tests/runner --no-cov -q
+```
+
+Result:
+
+```text
+94 passed
+```
+
+Full suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+287 passed
+Total coverage: 96.29%
+Required coverage: 80%
+```
+
+Whitespace check:
+
+```bash
+git diff --check
+```
+
+Result: no output.
+
+### Review
+
+Ran the required production code quality review scripts against
+`/Users/mango/project/codex/automation-kit`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Follow-up inspection confirmed:
+
+- `automation_runner.config` now rejects blank runtime strings for config-backed
+  `factory`, `workflow_factory`, `url`, and `app_id` values.
+- valid non-empty strings, config parameter parsing, and CLI overrides remain
+  unchanged.
+- config-backed runtime validation now matches the CLI expectation that these
+  fields carry meaningful values.
+- `automation_core` remains unchanged and business-agnostic.
+
+### Next Phase
+
+Stage, commit, and push the finished slice.
