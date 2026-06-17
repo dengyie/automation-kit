@@ -132,4 +132,5 @@ adapter rules. `automation-runner report-schema --version 1` prints the
 packaged machine-readable runner report contract, which is also documented in
 `docs/report-schema-v1.json`. See `docs/artifacts.md` for screenshot,
 page-source, UI-tree, trace, and log artifact conventions. See
-`docs/ecosystem.md` for repository roles.
+`docs/ecosystem.md` for repository roles and `docs/compatibility.md` for
+cross-repo versioning and verification expectations.

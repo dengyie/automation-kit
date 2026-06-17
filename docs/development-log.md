@@ -391,6 +391,75 @@ Follow-up inspection confirmed:
 - The compatibility shim in `examples.workflows` should not become permanent
   technical debt.
 
+## 2026-06-17: Cross-Repo Compatibility And CI Baseline
+
+### Completed
+
+- Added `docs/compatibility.md` describing cross-repo versioning and the
+  current verification matrix.
+- Added `.github/workflows/ci.yml` to `automation-kit`.
+- Extended structure tests so compatibility documentation becomes part of the
+  repo boundary contract.
+- Updated the root README to point readers to compatibility guidance in
+  addition to ecosystem guidance.
+
+### Decision Record
+
+#### Decision: keep CI minimal and offline-first
+
+- Problem: the ecosystem now spans multiple repositories, but default tests
+  must still stay deterministic and not depend on browsers, devices, or
+  network-side targets.
+- Choice: define one simple Python CI job per repository that runs install plus
+  offline pytest only.
+- Reason: this matches the current documented baseline and avoids silently
+  promoting live-system dependencies into default verification.
+- Risk: future live integration coverage will need separate opt-in jobs instead
+  of being folded into this baseline.
+
+### Verification
+
+Focused compatibility check:
+
+```bash
+/Users/mango/project/codex/automation-kit/.venv/bin/python -m pytest \
+  tests/structure/test_boundaries.py::test_compatibility_doc_exists \
+  --no-cov -q
+```
+
+Result:
+
+```text
+1 passed
+```
+
+Full suite:
+
+```bash
+/Users/mango/project/codex/automation-kit/.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+301 passed
+Total coverage: 94.65%
+Required coverage: 80%
+```
+
+### Review
+
+Production code quality review outcome:
+
+- Severe issues: none
+- Improvement suggestions:
+  - later add a matrix version table once published package versions begin to
+    diverge
+  - keep CI scoped to offline checks unless a repository explicitly introduces
+    opt-in live jobs
+- Quality score: 91
+- Pass status: pass
+
 Commit and push the finished slice, then continue with the next roadmap slice.
 
 ## 2026-06-16: Thin Adapter And Example Shells

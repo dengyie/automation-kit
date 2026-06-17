@@ -102,3 +102,9 @@ def test_examples_readme_declares_thin_shell_boundary():
 
     assert "thin" in readme
     assert "not production business apps" in readme
+
+
+def test_compatibility_doc_exists():
+    path = Path(__file__).resolve().parents[2] / "docs" / "compatibility.md"
+
+    assert path.exists()
