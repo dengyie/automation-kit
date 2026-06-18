@@ -19,7 +19,7 @@ telemetry, and manual visual fallback contracts.
 
 ## Latest Slidex Contract
 
-The current committed slidex baseline is commit
+The reviewed slidex implementation baseline is commit
 `39d021e docs(阶段10): 记录 github 发布闭环`.
 
 Slidex now includes `docs/automation-kit-vision-platform.md` as the committed
@@ -240,8 +240,9 @@ PYTHONPATH=/Users/mango/project/codex/automation-app-dianping:/Users/mango/proje
    Real target-site browser and Appium/ADB E2E validation remains opt-in and
    outside default tests.
 7. The slidex canonical document and automation-kit integration baseline now
-   point at the same committed slidex head, so the previous "pending slidex
-   commit" risk is closed.
+   point at the same reviewed slidex implementation baseline, so the previous
+   "pending slidex commit" risk is closed. Later documentation-only commits may
+   move repository heads without changing this API review baseline.
 
 ## Remaining Follow-Up Plan
 

@@ -7103,7 +7103,8 @@ Stage, commit, and push the finished slice.
   - `slidex.ocr`
   - `slidex.integrations.automation_kit`
 - Updated `docs/slidex-visual-platform.md` so automation-kit points to the
-  committed slidex head rather than the earlier `b5e6521` design baseline.
+  reviewed slidex implementation baseline rather than the earlier `b5e6521`
+  design baseline.
 - Confirmed the app-layer helper contracts still match the committed slidex
   API:
   - Damai constructs `PLAYWRIGHT_PAGE` slider requests and converts slidex
@@ -7119,12 +7120,14 @@ Problem: automation-kit previously documented slidex while the latest slidex
 platform document and GitHub-publication closure were not yet the committed
 remote baseline.
 
-Choice: treat `39d021e` as the reviewed slidex baseline for automation-kit
-development docs.
+Choice: treat `39d021e` as the reviewed slidex implementation baseline for
+automation-kit development docs.
 
 Reason: slidex has now committed the canonical ecosystem document, optional
 automation-kit adapter, OCR API, visual challenge API, and publication-closure
 record. The automation-kit side can reference that committed state directly.
+Later documentation-only commits may move repository heads without changing the
+reviewed implementation contract.
 
 Risk: live Damai browser and Dianping Appium/ADB validation still depends on
 external target environments and remains opt-in production smoke coverage.
