@@ -2956,6 +2956,142 @@ Next phase should update app workflows to inject slidex at workflow boundaries
 and add optional compatibility tests without making default offline tests depend
 on browser, device, network, or slidex.
 
+## 2026-06-18: Phase 6 Application Slidex Injection Closure
+
+### Completed
+
+- Confirmed `automation-plugin-ocr` is archived and deprecated in favor of
+  `dengyie/slidex`.
+- Updated `automation-app-damai` with lazy app-layer helpers for
+  `PLAYWRIGHT_PAGE` slider challenge request construction and slidex result
+  conversion.
+- Updated `automation-app-dianping` with lazy app-layer helpers for
+  `ANDROID_SCREENSHOT_BYTES` image-text request construction and slidex result
+  conversion.
+- Confirmed both application repositories keep default offline tests free of
+  slidex/browser/device/network requirements.
+- Updated `docs/slidex-visual-platform.md` so the ecosystem status now reflects
+  completed app-level helper and compatibility-test work.
+
+### Decision Record
+
+#### Decision: close app-level helper work before live workflow execution
+
+Problem: the apps can now construct slidex requests and convert slidex results,
+but they still do not own real production browser pages or Android screenshot
+bytes in the offline smoke workflows.
+
+Choice: close this phase at the app-level helper boundary and leave live
+browser/Appium execution for future production workflow phases.
+
+Reason: this preserves the offline default test contract while making the
+slidex integration surface concrete and testable in each application repo.
+
+Risk: live production challenge behavior remains unproven until the app
+workflows own real page/screenshot resources.
+
+### Verification
+
+automation-plugin-ocr archived baseline:
+
+```bash
+/Users/mango/project/codex/automation-plugin-ocr/.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+2 passed
+Total coverage: 93.75%
+Required coverage: 80%
+```
+
+Damai default offline suite:
+
+```bash
+/Users/mango/project/codex/automation-app-damai/.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+9 passed, 2 skipped
+Total coverage: 85.29%
+Required coverage: 80%
+```
+
+Damai slidex compatibility slice:
+
+```bash
+PYTHONPATH=/Users/mango/project/codex/automation-app-damai:/Users/mango/project/codex/automation-kit:/Users/mango/project/codex/slidex /opt/homebrew/bin/pytest -q -o addopts='' tests/test_workflow.py -k 'visual_request or visual_result'
+```
+
+Result:
+
+```text
+2 passed, 4 deselected
+```
+
+Dianping default offline suite:
+
+```bash
+/Users/mango/project/codex/automation-app-dianping/.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+5 passed, 2 skipped
+Total coverage: 80.00%
+Required coverage: 80%
+```
+
+Dianping slidex compatibility slice:
+
+```bash
+PYTHONPATH=/Users/mango/project/codex/automation-app-dianping:/Users/mango/project/codex/automation-kit:/Users/mango/project/codex/slidex /opt/homebrew/bin/pytest -q -o addopts='' tests/test_workflow.py -k 'visual_request or visual_result'
+```
+
+Result:
+
+```text
+2 passed, 3 deselected
+```
+
+### Production Code Quality Review
+
+Mode: checkpoint.
+
+Findings: no P0/P1/P2 correctness, boundary, safety, or irreversible operation
+issues found across the application helper and documentation changes.
+
+Improvement suggestions:
+
+- Raise Dianping default-suite coverage above the 80% floor in the next Android
+  workflow slice.
+- Add live browser/Appium visual challenge tests only when those resources are
+  explicitly opt-in and owned by the application workflow.
+
+Quality score: 89/100.
+
+Status: passed.
+
+### Todo Status
+
+- automation-plugin-ocr archived path: done.
+- Damai app-level slidex helper and compatibility test: done.
+- Dianping app-level slidex helper and compatibility test: done.
+- automation-kit core dependency boundary: preserved.
+- Live Damai browser visual solving: pending future production workflow phase.
+- Live Dianping Android visual solving: pending future production workflow
+  phase.
+
+### Next Phase Risk
+
+The ecosystem has a stable optional slidex integration contract, but live
+end-to-end visual challenge execution still depends on production app workflows
+owning real browser pages or Android screenshot bytes.
+
 ## 2026-06-17: Runner Report Contract Consistency
 
 ### Completed

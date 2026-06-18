@@ -186,11 +186,23 @@ PYTHONPATH=/Users/mango/project/codex/automation-kit \
 Application repositories should add their own optional integration checks once
 they inject slidex in real workflows.
 
-## Current Follow-Up Plan
+## Current Ecosystem Status
 
-1. Keep automation-kit core unchanged.
-2. Update application repositories to inject slidex only at workflow boundaries.
-3. Add app-level compatibility tests that run with slidex and automation-kit on
-   the same Python path.
-4. Keep slidex as the single visual platform and do not restore a standalone
-   OCR plugin path.
+1. `automation-kit` core remains unchanged and does not import slidex.
+2. `automation-app-damai` provides lazy app-layer helpers for
+   `PLAYWRIGHT_PAGE` slider challenge requests and slidex result conversion.
+3. `automation-app-dianping` provides lazy app-layer helpers for
+   `ANDROID_SCREENSHOT_BYTES` image-text requests and slidex result conversion.
+4. Both application repositories keep default offline tests independent from
+   slidex and add optional compatibility slices that run with slidex and
+   automation-kit on the same Python path.
+5. The standalone OCR plugin path is archived in favor of slidex.
+
+## Remaining Follow-Up Plan
+
+1. Add real Damai live-browser visual challenge execution once a production
+   Playwright page ownership boundary is available.
+2. Add real Dianping Appium/ADB screenshot acquisition once a production
+   Android workflow owns screenshot bytes.
+3. Decide at each application report boundary whether to use slidex dict
+   adapter output or native automation-kit dataclasses.
