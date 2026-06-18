@@ -88,6 +88,20 @@ Examples:
 - Damai Android adapter
 - future Dianping examples
 
+### Visual Platform
+
+`slidex` is the ecosystem visual platform. It owns OCR, slider challenge
+solving, screenshot recognition, manual visual fallback, visual artifacts, and
+visual telemetry.
+
+`automation-kit` must only expose generic result, event, artifact, workflow, and
+driver contracts. It should not add visual challenge concepts to
+`automation_core`. Applications may install `slidex` and inject
+`VisualChallengeSolver` at workflow boundaries.
+
+The current slidex integration baseline is documented in
+`docs/slidex-visual-platform.md`.
+
 ### Examples
 
 Examples show how to compose the core for one business domain without moving

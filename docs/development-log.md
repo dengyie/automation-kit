@@ -2821,6 +2821,141 @@ and the report contract remains backward compatible.
 
 Stage, commit, and push the finished slice.
 
+## 2026-06-18: Phase 5 Slidex Visual Platform Baseline
+
+### Completed
+
+- Added `docs/slidex-visual-platform.md` as the automation-kit-side baseline
+  for consuming the latest `dengyie/slidex` visual platform.
+- Updated `README.md`, `docs/ecosystem.md`, `docs/compatibility.md`, and
+  `docs/development-system.md` to point to the new slidex integration baseline.
+- Documented the latest local slidex baseline:
+  `aa48a12 Fix visual solver cleanup and artifacts`.
+- Recorded the current slidex public consumer surface:
+  `VisualChallengeSolver`, `VisualChallengeRequest`, `VisualChallengeResult`,
+  `to_action_result`, `to_artifacts`, and `to_events`.
+- Captured resource ownership for Playwright page reuse: application owns the
+  page/browser lifecycle, while slidex owns and cleans its temporary listener
+  and CDP session.
+- Extended the structure boundary test so the new slidex baseline document is
+  checked with the ecosystem docs.
+
+### Decision Record
+
+#### Decision: keep slidex optional and outward-only
+
+Problem: slidex now exposes native automation-kit adapters, but importing
+slidex from `automation_core` would make the base depend on a visual platform.
+
+Choice: keep the dependency direction one-way. Applications may install and
+instantiate slidex, and slidex may convert its result outward to automation-kit
+objects when automation-kit is import-visible.
+
+Reason: preserves the core rule that `automation_core` stays business-agnostic
+and visual-platform-agnostic while still giving application repositories a
+stable integration path.
+
+Risk: application repositories must add their own optional integration tests
+once they inject slidex in real workflows.
+
+#### Decision: document dict and native adapter modes separately
+
+Problem: slidex has two adapter modes: JSON-safe dictionaries by default and
+native automation-kit dataclasses with `prefer_native=True`.
+
+Choice: document both modes explicitly instead of requiring automation-kit to
+wrap or normalize slidex output again.
+
+Reason: keeps automation-kit generic and lets applications choose between
+report-friendly dict payloads and native `ActionResult`, `ArtifactHandle`, and
+`EventEnvelope` values.
+
+Risk: downstream workflows must choose one mode consistently at report assembly
+boundaries.
+
+### Verification
+
+Structure boundary test without global coverage gate:
+
+```bash
+.venv/bin/python -m pytest -q -o addopts='' tests/structure/test_boundaries.py
+```
+
+Result:
+
+```text
+9 passed
+```
+
+Full automation-kit suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+302 passed
+Total coverage: 95.12%
+Required coverage: 80%
+```
+
+Slidex optional native adapter compatibility:
+
+```bash
+PYTHONPATH=/Users/mango/project/codex/automation-kit /opt/homebrew/bin/pytest -q tests/test_automation_kit_integration.py
+```
+
+Result:
+
+```text
+6 passed
+```
+
+Whitespace check:
+
+```bash
+git diff --check
+```
+
+Result: no output.
+
+### Production Code Quality Review
+
+Mode: checkpoint.
+
+Scope: documentation and structure-test updates for the slidex visual platform
+integration baseline.
+
+Findings: no P0/P1/P2 correctness, safety, boundary, or irreversible operation
+issues found in the current diff.
+
+Improvement suggestions:
+
+- Keep app-level slidex integration tests in application repositories, not in
+  automation-kit default tests.
+- Continue treating slidex compatibility as optional and explicit at workflow
+  construction boundaries.
+
+Quality score: 92/100.
+
+Status: passed.
+
+### Todo Status
+
+- Phase 5 documentation baseline: done.
+- automation-kit core implementation changes: not needed for this phase.
+- application repository slidex injection: pending next phase.
+- app-level compatibility tests with slidex: pending next phase.
+
+### Next Phase Risk
+
+Application repositories may still use old local visual or OCR assumptions.
+Next phase should update app workflows to inject slidex at workflow boundaries
+and add optional compatibility tests without making default offline tests depend
+on browser, device, network, or slidex.
+
 ## 2026-06-17: Runner Report Contract Consistency
 
 ### Completed

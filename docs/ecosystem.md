@@ -26,3 +26,6 @@ private coordination.
 `slidex` remains optional. `automation-kit` must not import it directly, and
 applications should inject visual challenge solvers only when a workflow needs
 OCR, captcha solving, screenshot recognition, or manual visual fallback.
+
+See `docs/slidex-visual-platform.md` for the current adapter contract,
+resource-ownership boundary, and compatibility checks.

@@ -116,8 +116,10 @@ def test_ecosystem_docs_use_slidex_as_visual_platform():
             (ROOT / "README.md").read_text(encoding="utf-8"),
             (ROOT / "docs" / "ecosystem.md").read_text(encoding="utf-8"),
             (ROOT / "docs" / "compatibility.md").read_text(encoding="utf-8"),
+            (ROOT / "docs" / "slidex-visual-platform.md").read_text(encoding="utf-8"),
         ]
     ).lower()
 
     assert "dengyie/slidex" in docs_text
+    assert "visualchallengesolver" in docs_text
     assert "automation-plugin-ocr" not in docs_text

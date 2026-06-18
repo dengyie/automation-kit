@@ -37,6 +37,9 @@ business workflows.
 All ecosystem repositories are intended to stay public so application and
 capability authors can consume the same baseline contracts directly.
 
+The current slidex integration baseline is documented in
+[`docs/slidex-visual-platform.md`](docs/slidex-visual-platform.md).
+
 ## Development
 
 ```bash

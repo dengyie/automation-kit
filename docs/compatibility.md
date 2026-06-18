@@ -12,8 +12,8 @@
 - `automation-kit`: offline unit and runner suite
 - `automation-app-damai`: offline workflow, config, and CLI suite
 - `automation-app-dianping`: offline workflow and config suite
-- `slidex`: visual challenge API, OCR API, and optional automation-kit
-  integration suite once its platform API lands
+- `slidex`: visual challenge API, OCR API, manual fallback model, artifact
+  contract, and optional automation-kit adapter suite
 
 ## Current Local Verification Commands
 
@@ -28,5 +28,9 @@ automation-app-dianping:
   /Users/mango/project/codex/automation-app-dianping/.venv/bin/python -m pytest -q
 
 slidex:
-  /Users/mango/project/codex/slidex/.venv/bin/python -m pytest -q
+  cd /Users/mango/project/codex/slidex
+  /opt/homebrew/bin/pytest -q
+  PYTHONPATH=/Users/mango/project/codex/automation-kit /opt/homebrew/bin/pytest -q tests/test_automation_kit_integration.py
 ```
+
+See `docs/slidex-visual-platform.md` for the current integration baseline.
