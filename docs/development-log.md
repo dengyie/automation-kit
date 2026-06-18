@@ -7091,3 +7091,87 @@ Follow-up inspection confirmed:
 ### Next Phase
 
 Stage, commit, and push the finished slice.
+
+## 2026-06-18: Slidex Committed Baseline Re-Review
+
+### Completed
+
+- Re-read the latest committed `slidex` implementation at
+  `39d021e docs(阶段10): 记录 github 发布闭环`.
+- Re-checked the public consumer surfaces used by automation-kit applications:
+  - `slidex.vision`
+  - `slidex.ocr`
+  - `slidex.integrations.automation_kit`
+- Updated `docs/slidex-visual-platform.md` so automation-kit points to the
+  committed slidex head rather than the earlier `b5e6521` design baseline.
+- Confirmed the app-layer helper contracts still match the committed slidex
+  API:
+  - Damai constructs `PLAYWRIGHT_PAGE` slider requests and converts slidex
+    results.
+  - Dianping constructs `ANDROID_SCREENSHOT_BYTES` image-text requests and
+    converts slidex results.
+
+### Decision Record
+
+#### Decision: close the previous pending-slidex-commit risk
+
+Problem: automation-kit previously documented slidex while the latest slidex
+platform document and GitHub-publication closure were not yet the committed
+remote baseline.
+
+Choice: treat `39d021e` as the reviewed slidex baseline for automation-kit
+development docs.
+
+Reason: slidex has now committed the canonical ecosystem document, optional
+automation-kit adapter, OCR API, visual challenge API, and publication-closure
+record. The automation-kit side can reference that committed state directly.
+
+Risk: live Damai browser and Dianping Appium/ADB validation still depends on
+external target environments and remains opt-in production smoke coverage.
+
+### Verification
+
+Static evidence reviewed:
+
+```text
+slidex/slidex/vision/models.py
+slidex/slidex/vision/solver.py
+slidex/slidex/ocr/__init__.py
+slidex/slidex/integrations/automation_kit.py
+slidex/tests/test_automation_kit_integration.py
+automation-app-damai/automation_app_damai/workflow.py
+automation-app-dianping/automation_app_dianping/workflow.py
+```
+
+Documentation checks:
+
+```bash
+git diff --check
+.venv/bin/python -m pytest tests/structure --no-cov -q
+```
+
+Result:
+
+```text
+git diff --check: passed
+tests/structure --no-cov: 9 passed
+```
+
+Note: `tests/structure -q` without `--no-cov` ran 9 passing tests but failed
+the repository-wide 80% coverage threshold because only structure tests were
+selected.
+
+### Review
+
+Ran the required production code quality review setup against
+`/Users/mango/project/codex/automation-kit` and
+`/Users/mango/project/codex/slidex`:
+
+- `collect-review-context.py`
+- `diff-line-map.py`
+- `detect-stack.py`
+- `run-safe-checks.py`
+
+Checkpoint review result: no P0/P1/P2 correctness, boundary, safety, or
+documentation-contract issues found. The changes only replace stale baseline
+references and record the committed slidex review evidence.

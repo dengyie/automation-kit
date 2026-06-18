@@ -19,11 +19,17 @@ telemetry, and manual visual fallback contracts.
 
 ## Latest Slidex Contract
 
-The current local slidex baseline is commit
-`b5e6521 docs(阶段8): 固化 automation-kit 视觉平台基线`.
+The current committed slidex baseline is commit
+`39d021e docs(阶段10): 记录 github 发布闭环`.
 
 Slidex now includes `docs/automation-kit-vision-platform.md` as the committed
 slidex-side canonical design document for this ecosystem boundary.
+
+This baseline was re-reviewed after slidex committed and pushed its latest
+vision-platform work. The committed implementation still matches the
+automation-kit boundary: `slidex.vision` owns visual challenge contracts,
+`slidex.ocr` owns OCR extraction, and `slidex.integrations.automation_kit`
+performs one-way optional conversion into automation-kit-shaped results.
 
 The public surfaces automation-kit consumers should use are:
 
@@ -233,6 +239,9 @@ PYTHONPATH=/Users/mango/project/codex/automation-app-dianping:/Users/mango/proje
 6. Live helper boundaries are implemented in the application repositories.
    Real target-site browser and Appium/ADB E2E validation remains opt-in and
    outside default tests.
+7. The slidex canonical document and automation-kit integration baseline now
+   point at the same committed slidex head, so the previous "pending slidex
+   commit" risk is closed.
 
 ## Remaining Follow-Up Plan
 
