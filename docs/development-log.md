@@ -3241,11 +3241,79 @@ issues found in the documentation sync.
 
 Improvement suggestions:
 
-- Push sibling repository commits before remote consumers depend on the new
-  helper names.
 - Keep real browser/device validation opt-in and environment-specific.
 
 Quality score: 92/100.
+
+Status: passed.
+
+## 2026-06-18: Phase 9 GitHub Publication Closure
+
+### Completed
+
+- Pushed the latest local commits to GitHub for:
+  - `automation-kit`
+  - `automation-app-damai`
+  - `automation-app-dianping`
+  - `slidex`
+- Confirmed all five ecosystem repositories are public on GitHub.
+- Confirmed `automation-plugin-ocr` is archived on GitHub and remains public.
+- Confirmed all five local repositories are clean and aligned with
+  `origin/main`.
+
+### Decision Record
+
+#### Decision: treat external E2E as environment validation, not local code todo
+
+Problem: the only remaining incomplete item depends on real target-site CAPTCHA
+availability or a real Android/Appium device state.
+
+Choice: keep those checks as opt-in production validation and close the local
+code/documentation baseline once repositories are public, pushed, tested, and
+reviewed.
+
+Reason: default tests intentionally avoid browser/device/network dependencies,
+and the app-layer helper boundaries are already implemented and verified with
+fake resources.
+
+Risk: production rollout still needs one environment-specific smoke run before
+using the helpers against live targets.
+
+### Verification
+
+GitHub repository state:
+
+```text
+automation-kit: public, not archived
+automation-app-damai: public, not archived
+automation-app-dianping: public, not archived
+automation-plugin-ocr: public, archived
+slidex: public, not archived
+```
+
+Local repository state:
+
+```text
+automation-kit: main...origin/main
+automation-app-damai: main...origin/main
+automation-app-dianping: main...origin/main
+automation-plugin-ocr: main...origin/main
+slidex: main...origin/main
+```
+
+### Production Code Quality Review
+
+Mode: checkpoint.
+
+Findings: no P0/P1/P2 correctness, boundary, safety, or irreversible operation
+issues found in the publication closure.
+
+Improvement suggestions:
+
+- Run target-site/device smoke tests only in the owner-controlled production
+  environment.
+
+Quality score: 94/100.
 
 Status: passed.
 
