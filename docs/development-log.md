@@ -3041,8 +3041,8 @@ Dianping default offline suite:
 Result:
 
 ```text
-5 passed, 2 skipped
-Total coverage: 80.00%
+6 passed, 2 skipped
+Total coverage: 100.00%
 Required coverage: 80%
 ```
 
@@ -3055,7 +3055,7 @@ PYTHONPATH=/Users/mango/project/codex/automation-app-dianping:/Users/mango/proje
 Result:
 
 ```text
-2 passed, 3 deselected
+2 passed, 4 deselected
 ```
 
 ### Production Code Quality Review
@@ -3091,6 +3091,89 @@ Status: passed.
 The ecosystem has a stable optional slidex integration contract, but live
 end-to-end visual challenge execution still depends on production app workflows
 owning real browser pages or Android screenshot bytes.
+
+## 2026-06-18: Phase 7 Slidex Contract Re-Review
+
+### Completed
+
+- Re-read the latest committed slidex implementation at
+  `aa48a12 Fix visual solver cleanup and artifacts`.
+- Checked the current slidex working-tree documentation draft for
+  `docs/automation-kit-vision-platform.md` and confirmed it is directionally
+  aligned with the automation-kit boundary model.
+- Updated `docs/slidex-visual-platform.md` with implementation-level facts:
+  OCR and image-text route through the configured OCR extractor, slider solving
+  supports `cdp` and `playwright_page`, unsupported paths return failed
+  `VisualChallengeResult` values, and slider resources are closed in `finally`.
+- Extended `docs/compatibility.md` so the cross-repository verification list
+  includes the Damai and Dianping optional slidex slices.
+
+### Decision Record
+
+#### Decision: keep slidex draft docs non-authoritative until committed
+
+Problem: slidex has pending documentation changes that introduce a broader
+automation-kit vision platform design document, but those changes are still
+uncommitted in the slidex working tree.
+
+Choice: automation-kit references the committed slidex code baseline and records
+that the slidex draft document is aligned but not yet part of the committed
+baseline.
+
+Reason: this keeps automation-kit development docs tied to reproducible code
+while still acknowledging the newest design direction.
+
+Risk: once slidex commits the draft document, automation-kit should re-check
+whether any examples or status lines changed.
+
+### Verification
+
+Focused documentation boundary test:
+
+```bash
+.venv/bin/python -m pytest -q -o addopts='' tests/structure/test_boundaries.py
+```
+
+Result:
+
+```text
+9 passed
+```
+
+Full automation-kit suite:
+
+```bash
+.venv/bin/python -m pytest -q
+```
+
+Result:
+
+```text
+302 passed
+Total coverage: 95.12%
+Required coverage: 80%
+```
+
+### Production Code Quality Review
+
+Mode: checkpoint.
+
+Scope: development documentation re-review after slidex latest code and
+documentation draft inspection.
+
+Findings: no P0/P1/P2 correctness, boundary, safety, or irreversible operation
+issues found in the documentation diff.
+
+Improvement suggestions:
+
+- Re-run this review after slidex commits and pushes its currently uncommitted
+  documentation draft.
+- Keep live browser/Appium visual execution out of the core baseline until the
+  application repositories own those resources explicitly.
+
+Quality score: 93/100.
+
+Status: passed.
 
 ## 2026-06-17: Runner Report Contract Consistency
 

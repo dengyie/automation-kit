@@ -22,6 +22,11 @@ telemetry, and manual visual fallback contracts.
 The current local slidex baseline is commit
 `aa48a12 Fix visual solver cleanup and artifacts`.
 
+Local slidex also has pending documentation edits that introduce
+`docs/automation-kit-vision-platform.md`. Those edits are directionally aligned
+with this baseline, but they are not part of the committed slidex baseline until
+the slidex repository commits them.
+
 The public surfaces automation-kit consumers should use are:
 
 ```python
@@ -58,6 +63,17 @@ Supported contexts:
 
 `VisualChallengeResult.to_dict()` redacts cookies and sensitive metadata keys.
 The compatibility adapters preserve that rule.
+
+Implementation notes from the latest code review:
+
+- `VisualChallengeSolver.solve()` routes `ocr_text` and `image_text` through the
+  configured OCR extractor, defaulting to `FakeOcrExtractor` for offline tests.
+- `slider_captcha` routes to `SliderSolver` through either `cdp` or
+  `playwright_page` context.
+- Unsupported challenge types and slider contexts return failed
+  `VisualChallengeResult` values instead of raising as the default path.
+- Slider solving closes the underlying `SliderSolver` in `finally`, including
+  awaitable close methods.
 
 ## Adapter Shape
 
@@ -183,8 +199,21 @@ PYTHONPATH=/Users/mango/project/codex/automation-kit \
   /opt/homebrew/bin/pytest -q tests/test_automation_kit_integration.py
 ```
 
-Application repositories should add their own optional integration checks once
-they inject slidex in real workflows.
+Application repositories must keep their own optional integration checks close
+to the app-layer helpers that construct slidex requests and convert slidex
+results.
+
+Current app compatibility slices:
+
+```bash
+cd /Users/mango/project/codex/automation-app-damai
+PYTHONPATH=/Users/mango/project/codex/automation-app-damai:/Users/mango/project/codex/automation-kit:/Users/mango/project/codex/slidex \
+  /opt/homebrew/bin/pytest -q -o addopts='' tests/test_workflow.py -k 'visual_request or visual_result'
+
+cd /Users/mango/project/codex/automation-app-dianping
+PYTHONPATH=/Users/mango/project/codex/automation-app-dianping:/Users/mango/project/codex/automation-kit:/Users/mango/project/codex/slidex \
+  /opt/homebrew/bin/pytest -q -o addopts='' tests/test_workflow.py -k 'visual_request or visual_result'
+```
 
 ## Current Ecosystem Status
 
@@ -197,6 +226,9 @@ they inject slidex in real workflows.
    slidex and add optional compatibility slices that run with slidex and
    automation-kit on the same Python path.
 5. The standalone OCR plugin path is archived in favor of slidex.
+6. Live browser/Appium visual execution is still intentionally pending; the
+   current app workflows expose request/result boundaries but do not yet own
+   production Playwright pages or Android screenshot acquisition.
 
 ## Remaining Follow-Up Plan
 

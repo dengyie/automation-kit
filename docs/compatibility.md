@@ -31,6 +31,14 @@ slidex:
   cd /Users/mango/project/codex/slidex
   /opt/homebrew/bin/pytest -q
   PYTHONPATH=/Users/mango/project/codex/automation-kit /opt/homebrew/bin/pytest -q tests/test_automation_kit_integration.py
+
+Damai slidex compatibility:
+  cd /Users/mango/project/codex/automation-app-damai
+  PYTHONPATH=/Users/mango/project/codex/automation-app-damai:/Users/mango/project/codex/automation-kit:/Users/mango/project/codex/slidex /opt/homebrew/bin/pytest -q -o addopts='' tests/test_workflow.py -k 'visual_request or visual_result'
+
+Dianping slidex compatibility:
+  cd /Users/mango/project/codex/automation-app-dianping
+  PYTHONPATH=/Users/mango/project/codex/automation-app-dianping:/Users/mango/project/codex/automation-kit:/Users/mango/project/codex/slidex /opt/homebrew/bin/pytest -q -o addopts='' tests/test_workflow.py -k 'visual_request or visual_result'
 ```
 
 See `docs/slidex-visual-platform.md` for the current integration baseline.
