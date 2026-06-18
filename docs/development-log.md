@@ -3175,6 +3175,80 @@ Quality score: 93/100.
 
 Status: passed.
 
+## 2026-06-18: Phase 8 Application Live Visual Helper Sync
+
+### Completed
+
+- Re-read the latest application commits:
+  - `automation-app-damai`: `3ccd788 feat(阶段5): 补齐 damai live 视觉调用边界`
+  - `automation-app-dianping`: `3a1c94e feat(阶段5): 补齐 dianping 截图视觉调用边界`
+  - `slidex`: `b5e6521 docs(阶段8): 固化 automation-kit 视觉平台基线`
+- Updated `docs/slidex-visual-platform.md` so the current ecosystem status now
+  distinguishes implemented app-layer live helpers from still-pending opt-in
+  target-site/device E2E validation.
+- Updated `docs/compatibility.md` with the new focused live-helper slices:
+  `solve_slider_visual_challenge` and
+  `solve_android_screenshot_visual_challenge`.
+
+### Decision Record
+
+#### Decision: keep live helper completion separate from real E2E completion
+
+Problem: Damai and Dianping now expose production-callable helpers, but neither
+repository can prove target-site CAPTCHA availability or real Android device
+state in default tests.
+
+Choice: mark the app-layer live helper boundary as done and keep real
+Playwright/Appium E2E as opt-in validation.
+
+Reason: this closes the code-owned integration boundary without weakening the
+no-live-default policy or adding browser/Appium concepts to `automation_core`.
+
+Risk: production rollout still needs a user-side target environment smoke run.
+
+### Verification
+
+Damai live-helper slice:
+
+```bash
+PYTHONPATH=/Users/mango/project/codex/automation-app-damai:/Users/mango/project/codex/automation-kit:/Users/mango/project/codex/slidex /opt/homebrew/bin/pytest -q -o addopts='' tests/test_workflow.py -k 'solve_slider_visual_challenge'
+```
+
+Result:
+
+```text
+2 passed, 6 deselected
+```
+
+Dianping live-helper slice:
+
+```bash
+PYTHONPATH=/Users/mango/project/codex/automation-app-dianping:/Users/mango/project/codex/automation-kit:/Users/mango/project/codex/slidex /opt/homebrew/bin/pytest -q -o addopts='' tests/test_workflow.py -k 'solve_android_screenshot_visual_challenge'
+```
+
+Result:
+
+```text
+3 passed, 6 deselected
+```
+
+### Production Code Quality Review
+
+Mode: checkpoint.
+
+Findings: no P0/P1/P2 correctness, boundary, safety, or irreversible operation
+issues found in the documentation sync.
+
+Improvement suggestions:
+
+- Push sibling repository commits before remote consumers depend on the new
+  helper names.
+- Keep real browser/device validation opt-in and environment-specific.
+
+Quality score: 92/100.
+
+Status: passed.
+
 ## 2026-06-17: Runner Report Contract Consistency
 
 ### Completed

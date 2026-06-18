@@ -20,12 +20,10 @@ telemetry, and manual visual fallback contracts.
 ## Latest Slidex Contract
 
 The current local slidex baseline is commit
-`aa48a12 Fix visual solver cleanup and artifacts`.
+`b5e6521 docs(阶段8): 固化 automation-kit 视觉平台基线`.
 
-Local slidex also has pending documentation edits that introduce
-`docs/automation-kit-vision-platform.md`. Those edits are directionally aligned
-with this baseline, but they are not part of the committed slidex baseline until
-the slidex repository commits them.
+Slidex now includes `docs/automation-kit-vision-platform.md` as the committed
+slidex-side canonical design document for this ecosystem boundary.
 
 The public surfaces automation-kit consumers should use are:
 
@@ -209,32 +207,38 @@ Current app compatibility slices:
 cd /Users/mango/project/codex/automation-app-damai
 PYTHONPATH=/Users/mango/project/codex/automation-app-damai:/Users/mango/project/codex/automation-kit:/Users/mango/project/codex/slidex \
   /opt/homebrew/bin/pytest -q -o addopts='' tests/test_workflow.py -k 'visual_request or visual_result'
+PYTHONPATH=/Users/mango/project/codex/automation-app-damai:/Users/mango/project/codex/automation-kit:/Users/mango/project/codex/slidex \
+  /opt/homebrew/bin/pytest -q -o addopts='' tests/test_workflow.py -k 'solve_slider_visual_challenge'
 
 cd /Users/mango/project/codex/automation-app-dianping
 PYTHONPATH=/Users/mango/project/codex/automation-app-dianping:/Users/mango/project/codex/automation-kit:/Users/mango/project/codex/slidex \
   /opt/homebrew/bin/pytest -q -o addopts='' tests/test_workflow.py -k 'visual_request or visual_result'
+PYTHONPATH=/Users/mango/project/codex/automation-app-dianping:/Users/mango/project/codex/automation-kit:/Users/mango/project/codex/slidex \
+  /opt/homebrew/bin/pytest -q -o addopts='' tests/test_workflow.py -k 'solve_android_screenshot_visual_challenge'
 ```
 
 ## Current Ecosystem Status
 
 1. `automation-kit` core remains unchanged and does not import slidex.
-2. `automation-app-damai` provides lazy app-layer helpers for
-   `PLAYWRIGHT_PAGE` slider challenge requests and slidex result conversion.
-3. `automation-app-dianping` provides lazy app-layer helpers for
-   `ANDROID_SCREENSHOT_BYTES` image-text requests and slidex result conversion.
+2. `automation-app-damai` provides lazy app-layer helpers and
+   `solve_slider_visual_challenge(...)` for production workflows that already
+   own a real Playwright page.
+3. `automation-app-dianping` provides lazy app-layer helpers and
+   `solve_android_screenshot_visual_challenge(...)` for production workflows
+   that already own Android screenshot bytes.
 4. Both application repositories keep default offline tests independent from
    slidex and add optional compatibility slices that run with slidex and
    automation-kit on the same Python path.
 5. The standalone OCR plugin path is archived in favor of slidex.
-6. Live browser/Appium visual execution is still intentionally pending; the
-   current app workflows expose request/result boundaries but do not yet own
-   production Playwright pages or Android screenshot acquisition.
+6. Live helper boundaries are implemented in the application repositories.
+   Real target-site browser and Appium/ADB E2E validation remains opt-in and
+   outside default tests.
 
 ## Remaining Follow-Up Plan
 
-1. Add real Damai live-browser visual challenge execution once a production
-   Playwright page ownership boundary is available.
-2. Add real Dianping Appium/ADB screenshot acquisition once a production
-   Android workflow owns screenshot bytes.
+1. Add opt-in Damai target-site Playwright E2E once a real challenge page is
+   available.
+2. Add opt-in Dianping Appium/ADB E2E once a real device workflow can capture
+   screenshot bytes at the target moment.
 3. Decide at each application report boundary whether to use slidex dict
    adapter output or native automation-kit dataclasses.
