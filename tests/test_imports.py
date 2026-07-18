@@ -50,6 +50,20 @@ def test_automation_core_capability_imports():
     assert CapabilityResult
 
 
+def test_automation_core_execution_imports():
+    from automation_core.execution import (
+        ExecutionContext,
+        ExecutionFailure,
+        StepExecutionResult,
+        WorkflowResult,
+    )
+
+    assert ExecutionContext
+    assert ExecutionFailure
+    assert StepExecutionResult
+    assert WorkflowResult
+
+
 def test_example_workflow_factories_import_without_live_dependencies():
     from examples.damai_android import create_workflow as create_android_workflow
     from examples.damai_web import create_workflow as create_web_workflow
