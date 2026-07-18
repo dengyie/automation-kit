@@ -123,13 +123,13 @@ def test_cli_prints_report_schema_v1(capsys):
 
 
 def test_cli_rejects_unknown_report_schema_version(capsys):
-    exit_code = main(["report-schema", "--version", "2"])
+    exit_code = main(["report-schema", "--version", "99"])
 
     captured = capsys.readouterr()
 
     assert exit_code == 2
     assert captured.out == ""
-    assert "unsupported report schema version: 2" in captured.err
+    assert "unsupported report schema version: 99" in captured.err
 
 
 def test_pyproject_exposes_runner_script():
