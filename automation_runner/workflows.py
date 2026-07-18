@@ -24,27 +24,7 @@ from automation_core.tasks import TaskCancelledError
 from automation_core.tasks.lifecycle import TaskState
 
 
-@dataclass(frozen=True)
-class WorkflowStep:
-    kind: str
-    name: str
-    parameters: Dict[str, object] = field(default_factory=dict)
-
-    @classmethod
-    def action(cls, name: str, **parameters: object) -> "WorkflowStep":
-        return cls(
-            kind="action",
-            name=_validate_workflow_action_name(name),
-            parameters=parameters,
-        )
-
-    @classmethod
-    def artifact(cls, artifact_type: str, name: str) -> "WorkflowStep":
-        return cls(
-            kind="artifact",
-            name=artifact_type,
-            parameters={"name": _validate_workflow_artifact_name(name)},
-        )
+from automation_runner.steps import WorkflowStep
 
 
 @dataclass(frozen=True)
@@ -68,24 +48,6 @@ def _split_error(error: str) -> Tuple[str, str]:
     if separator:
         return error_type, message
     return "Error", error
-
-
-def _validate_workflow_artifact_name(name: str) -> str:
-    if not isinstance(name, str):
-        raise ValueError("invalid workflow artifact name")
-    cleaned = name.replace("\\", "/").split("/")[-1].strip()
-    if cleaned in {"", ".", ".."}:
-        raise ValueError("invalid workflow artifact name")
-    return name
-
-
-def _validate_workflow_action_name(name: str) -> str:
-    if not isinstance(name, str):
-        raise ValueError("invalid workflow action name")
-    cleaned = name.replace("\\", "/").split("/")[-1].strip()
-    if cleaned in {"", ".", ".."}:
-        raise ValueError("invalid workflow action name")
-    return name
 
 
 def _has_artifact_event(
