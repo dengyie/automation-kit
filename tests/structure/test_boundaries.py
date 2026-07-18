@@ -27,6 +27,7 @@ def test_core_has_no_business_or_concrete_driver_terms():
         "webdriver",
         "selenium",
         "appium",
+        "slidex",
     ]
 
     for term in forbidden:
@@ -104,22 +105,36 @@ def test_examples_readme_declares_thin_shell_boundary():
     assert "not production business apps" in readme
 
 
-def test_compatibility_doc_exists():
-    path = Path(__file__).resolve().parents[2] / "docs" / "compatibility.md"
+def test_development_baseline_doc_exists():
+    path = Path(__file__).resolve().parents[2] / "docs" / "development.md"
 
     assert path.exists()
 
 
-def test_ecosystem_docs_use_slidex_as_visual_platform():
+def test_development_baseline_uses_slidex_as_visual_platform():
     docs_text = "\n".join(
         [
             (ROOT / "README.md").read_text(encoding="utf-8"),
-            (ROOT / "docs" / "ecosystem.md").read_text(encoding="utf-8"),
-            (ROOT / "docs" / "compatibility.md").read_text(encoding="utf-8"),
-            (ROOT / "docs" / "slidex-visual-platform.md").read_text(encoding="utf-8"),
+            (ROOT / "docs" / "development.md").read_text(encoding="utf-8"),
         ]
     ).lower()
 
-    assert "dengyie/slidex" in docs_text
-    assert "visualchallengesolver" in docs_text
-    assert "automation-plugin-ocr" not in docs_text
+    assert "slidex" in docs_text
+    assert "slidexvisualcapability" in docs_text
+    assert "automation-plugin-ocr" in docs_text
+    assert "归档" in docs_text
+
+
+def test_retired_development_docs_are_not_present():
+    retired_paths = [
+        ROOT / "docs" / "development-log.md",
+        ROOT / "docs" / "development-system.md",
+        ROOT / "docs" / "ecosystem.md",
+        ROOT / "docs" / "compatibility.md",
+        ROOT / "docs" / "slidex-visual-platform.md",
+        ROOT / "docs" / "technical-landscape.md",
+        ROOT / "docs" / "superpowers",
+    ]
+
+    for path in retired_paths:
+        assert not path.exists()

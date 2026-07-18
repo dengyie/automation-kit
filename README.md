@@ -16,8 +16,9 @@ Android app workflows.
 - structured events
 - artifacts
 
-AI assistance, business workflows, selectors, and platform-specific
-capabilities belong in adapters or examples, not in `automation_core`.
+AI implementations, business workflows, selectors, and platform-specific
+dependencies belong in providers, adapters, or applications. Only the generic
+capability contract, registry, and executor belong in `automation_core`.
 
 External repositories should depend on:
 
@@ -37,8 +38,8 @@ business workflows.
 All ecosystem repositories are intended to stay public so application and
 capability authors can consume the same baseline contracts directly.
 
-The current slidex integration baseline is documented in
-[`docs/slidex-visual-platform.md`](docs/slidex-visual-platform.md).
+The current cross-repository development baseline is documented in
+[`docs/development.md`](docs/development.md).
 
 ## Development
 
@@ -49,6 +50,40 @@ poetry run pytest -q
 
 Default tests must not require Chrome, Appium, ADB, Android devices, or
 network.
+
+## Capability Platform
+
+Applications call optional high-level capabilities through the core contract,
+without importing provider internals:
+
+```python
+from automation_core.capabilities import (
+    CapabilityExecutor,
+    CapabilityRegistry,
+    CapabilityRequest,
+)
+
+registry = CapabilityRegistry()
+registry.register(visual_provider)
+executor = CapabilityExecutor(registry)
+
+result = await executor.aexecute(
+    CapabilityRequest(
+        capability="visual.challenge",
+        operation="solve",
+        parameters={
+            "challenge_type": "image_text",
+            "context": "image_bytes",
+            "image_bytes": image_bytes,
+        },
+        metadata={"run_id": run_id, "task_id": task_id},
+    )
+)
+```
+
+Providers declare a `CapabilityManifest` and implement `execute()` or
+`aexecute()`. Slidex exposes the recommended visual implementation through
+`slidex.integrations.automation_kit.SlidexVisualCapability`.
 
 ## Workflow Shape
 
@@ -145,5 +180,5 @@ adapter rules. `automation-runner report-schema --version 1` prints the
 packaged machine-readable runner report contract, which is also documented in
 `docs/report-schema-v1.json`. See `docs/artifacts.md` for screenshot,
 page-source, UI-tree, trace, and log artifact conventions. See
-`docs/ecosystem.md` for repository roles and `docs/compatibility.md` for
-cross-repo versioning and verification expectations.
+`docs/development.md` for repository roles, architecture boundaries,
+cross-repository verification, and current project status.
