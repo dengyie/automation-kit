@@ -14,6 +14,7 @@ from examples.workflows import ExampleWorkflowResult
 
 
 SCHEMA_PATH = Path("docs/report-schema-v1.json")
+DEVELOPMENT_DOC_PATH = Path("docs/development.md")
 
 
 def _load_schema():
@@ -73,9 +74,9 @@ def _sample_report():
 
 
 def _documented_report_fields():
-    content = Path("docs/adding-a-workflow.md").read_text(encoding="utf-8")
-    start = content.index("JSON reports currently include:")
-    end = content.index("Each artifact entry contains:", start)
+    content = DEVELOPMENT_DOC_PATH.read_text(encoding="utf-8")
+    start = content.index("下列字段是 v1 报告的完整顶层集合：")
+    end = content.index("v1 的每个 artifact entry 只允许以下字段：", start)
     fields = []
     for line in content[start:end].splitlines():
         stripped = line.strip()
@@ -85,9 +86,9 @@ def _documented_report_fields():
 
 
 def _documented_artifact_report_fields():
-    content = Path("docs/artifacts.md").read_text(encoding="utf-8")
-    start = content.index("serialize only:")
-    end = content.index("Raw bytes", start)
+    content = DEVELOPMENT_DOC_PATH.read_text(encoding="utf-8")
+    start = content.index("v1 的每个 artifact entry 只允许以下字段：")
+    end = content.index("v1 的 artifact metadata", start)
     fields = []
     for line in content[start:end].splitlines():
         stripped = line.strip()
@@ -109,23 +110,24 @@ def test_report_schema_v1_matches_current_top_level_report_contract():
     assert set(schema["properties"]) == set(report)
 
 
-def test_workflow_guide_documents_current_top_level_report_fields():
+def test_development_guide_documents_current_top_level_report_fields():
     report = _sample_report()
 
     assert set(_documented_report_fields()) == set(report)
 
 
-def test_artifact_guide_documents_current_artifact_report_fields():
+def test_development_guide_documents_current_artifact_report_fields():
     report = _sample_report()
 
     assert set(_documented_artifact_report_fields()) == set(report["artifacts"][0])
 
 
-def test_artifact_guide_documents_metadata_safety_rules():
-    content = Path("docs/artifacts.md").read_text(encoding="utf-8")
+def test_development_guide_documents_metadata_safety_rules():
+    content = DEVELOPMENT_DOC_PATH.read_text(encoding="utf-8")
 
     assert "metadata" in content
-    assert "redact" in content.lower()
+    lowered = content.lower()
+    assert "redact" in lowered or "脱敏" in content
 
 
 def test_report_schema_v1_documents_safe_nested_report_sections():

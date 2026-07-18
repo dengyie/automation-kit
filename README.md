@@ -175,10 +175,8 @@ Use either a built-in workflow name or `--workflow-factory`, not both. A
 positional workflow name overrides a config-provided workflow factory because
 CLI arguments take precedence over environment defaults.
 
-See `docs/adding-a-workflow.md` for package boundaries, report fields, and
-adapter rules. `automation-runner report-schema --version 1` prints the
-packaged machine-readable runner report contract, which is also documented in
-`docs/report-schema-v1.json`. See `docs/artifacts.md` for screenshot,
-page-source, UI-tree, trace, and log artifact conventions. See
-`docs/development.md` for repository roles, architecture boundaries,
-cross-repository verification, and current project status.
+`automation-runner report-schema --version 1` prints the packaged
+machine-readable runner report contract, which is also published as
+`docs/report-schema-v1.json`. See `docs/development.md` for workflow authoring,
+provider and adapter boundaries, artifact conventions, repository architecture,
+the implementation plan, cross-repository verification, and current status.
