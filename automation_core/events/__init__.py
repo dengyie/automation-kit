@@ -2,6 +2,7 @@
 
 from automation_core.events.models import (
     ArtifactEvent,
+    CapabilityEndEvent,
     ErrorEvent,
     EventEnvelope,
     EventType,
@@ -13,6 +14,7 @@ from automation_core.events.models import (
 
 __all__ = [
     "ArtifactEvent",
+    "CapabilityEndEvent",
     "ErrorEvent",
     "EventEnvelope",
     "EventType",

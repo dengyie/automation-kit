@@ -80,7 +80,7 @@ def _documented_report_fields():
     for line in content[start:end].splitlines():
         stripped = line.strip()
         if stripped.startswith("- `") and stripped.endswith("`"):
-            fields.append(stripped.removeprefix("- `").removesuffix("`"))
+            fields.append(stripped[3:-1])
     return fields
 
 
@@ -92,7 +92,7 @@ def _documented_artifact_report_fields():
     for line in content[start:end].splitlines():
         stripped = line.strip()
         if stripped.startswith("- `") and stripped.endswith("`"):
-            fields.append(stripped.removeprefix("- `").removesuffix("`"))
+            fields.append(stripped[3:-1])
     return fields
 
 
@@ -183,7 +183,7 @@ def test_unknown_report_schema_version_raises_clear_error():
 def test_packaged_report_schema_loader_supports_python_38_resources(monkeypatch):
     import automation_runner.schemas as schemas
 
-    monkeypatch.delattr(schemas.resources, "files")
+    monkeypatch.delattr(schemas.resources, "files", raising=False)
 
     assert schemas.load_report_schema("1") == _load_schema()
 

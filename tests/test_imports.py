@@ -1,7 +1,7 @@
 def test_automation_core_imports():
     import automation_core
 
-    assert automation_core.__version__ == "0.1.0"
+    assert automation_core.__version__ == "0.2.0"
 
 
 def test_automation_core_actions_imports():

@@ -1,4 +1,3 @@
-import asyncio
 import inspect
 
 from automation_core.capabilities.errors import (
@@ -43,15 +42,16 @@ class CapabilityExecutor:
             if callable(aexecute):
                 result = aexecute(request)
             elif callable(execute):
-                loop = asyncio.get_running_loop()
-                result = await loop.run_in_executor(None, execute, request)
+                raise CapabilityExecutionModeError(
+                    f"capability {request.capability} is sync-only; use execute"
+                )
             else:
                 raise CapabilityProtocolError(
                     "provider must define execute or aexecute"
                 )
             if inspect.isawaitable(result):
                 result = await result
-        except CapabilityProtocolError:
+        except (CapabilityExecutionModeError, CapabilityProtocolError):
             raise
         except Exception as exc:
             return self._provider_failure(provider, exc)

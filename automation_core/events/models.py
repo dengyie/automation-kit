@@ -12,6 +12,7 @@ class EventType(str, Enum):
     RETRY_ATTEMPT = "retry.attempt"
     ERROR = "error"
     ARTIFACT = "artifact"
+    CAPABILITY_END = "capability.end"
 
 
 @dataclass(frozen=True)
@@ -54,6 +55,23 @@ class TaskEndEvent:
     def to_envelope(self) -> EventEnvelope:
         return EventEnvelope(
             event_type=EventType.TASK_END.value,
+            task_id=self.task_id,
+            payload=_payload(self),
+        )
+
+
+@dataclass(frozen=True)
+class CapabilityEndEvent:
+    capability: str
+    operation: str
+    provider: str
+    success: bool
+    task_id: Optional[str] = None
+    error_code: Optional[str] = None
+
+    def to_envelope(self) -> EventEnvelope:
+        return EventEnvelope(
+            event_type=EventType.CAPABILITY_END.value,
             task_id=self.task_id,
             payload=_payload(self),
         )

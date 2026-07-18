@@ -1,5 +1,6 @@
 from automation_core.events import (
     ArtifactEvent,
+    CapabilityEndEvent,
     ErrorEvent,
     EventEnvelope,
     EventType,
@@ -46,6 +47,7 @@ def test_all_event_types_have_stable_values():
     assert EventType.RETRY_ATTEMPT.value == "retry.attempt"
     assert EventType.ERROR.value == "error"
     assert EventType.ARTIFACT.value == "artifact"
+    assert EventType.CAPABILITY_END.value == "capability.end"
 
 
 def test_task_start_event_fields():
@@ -115,3 +117,24 @@ def test_artifact_event_fields():
 
     assert event.path.endswith("screen.png")
     assert event.to_envelope().event_type == EventType.ARTIFACT.value
+
+
+def test_capability_end_event_has_capability_scope():
+    envelope = CapabilityEndEvent(
+        capability="visual.challenge",
+        operation="solve",
+        provider="slidex",
+        success=True,
+        task_id="task-1",
+    ).to_envelope()
+
+    assert envelope.event_type == EventType.CAPABILITY_END.value
+    assert envelope.task_id == "task-1"
+    assert envelope.payload == {
+        "capability": "visual.challenge",
+        "operation": "solve",
+        "provider": "slidex",
+        "success": True,
+        "task_id": "task-1",
+        "error_code": None,
+    }

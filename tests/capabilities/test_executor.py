@@ -1,5 +1,4 @@
 import asyncio
-import time
 
 import pytest
 
@@ -68,35 +67,15 @@ def test_sync_executor_rejects_async_only_provider():
         _executor(AsyncProvider()).execute(_request())
 
 
-def test_async_executor_calls_async_and_sync_providers():
+def test_async_executor_calls_async_provider():
     async_result = asyncio.run(_executor(AsyncProvider()).aexecute(_request()))
-    sync_result = asyncio.run(_executor(SyncProvider()).aexecute(_request()))
 
     assert async_result.provider == "async-provider"
-    assert sync_result.provider == "sync-provider"
 
 
-def test_async_executor_does_not_block_event_loop_for_sync_provider():
-    marks = []
-
-    class BlockingProvider(SyncProvider):
-        def execute(self, request):
-            time.sleep(0.05)
-            marks.append("provider")
-            return super().execute(request)
-
-    async def run_with_heartbeat():
-        execution = asyncio.create_task(
-            _executor(BlockingProvider()).aexecute(_request())
-        )
-        await asyncio.sleep(0.01)
-        marks.append("heartbeat")
-        return await execution
-
-    result = asyncio.run(run_with_heartbeat())
-
-    assert result.success is True
-    assert marks == ["heartbeat", "provider"]
+def test_async_executor_rejects_sync_only_provider():
+    with pytest.raises(CapabilityExecutionModeError, match="sync-only"):
+        asyncio.run(_executor(SyncProvider()).aexecute(_request()))
 
 
 def test_executor_normalizes_provider_exception_to_failed_result():
@@ -116,17 +95,19 @@ def test_executor_normalizes_provider_exception_to_failed_result():
 
 
 def test_executor_propagates_protocol_errors_from_both_entrypoints():
-    class InvalidProvider(SyncProvider):
+    class InvalidSyncProvider(SyncProvider):
         def execute(self, request):
             raise CapabilityProtocolError("invalid provider state")
 
-    executor = _executor(InvalidProvider())
+    class InvalidAsyncProvider(AsyncProvider):
+        async def aexecute(self, request):
+            raise CapabilityProtocolError("invalid provider state")
 
     with pytest.raises(CapabilityProtocolError, match="invalid provider state"):
-        executor.execute(_request())
+        _executor(InvalidSyncProvider()).execute(_request())
 
     with pytest.raises(CapabilityProtocolError, match="invalid provider state"):
-        asyncio.run(executor.aexecute(_request()))
+        asyncio.run(_executor(InvalidAsyncProvider()).aexecute(_request()))
 
 
 def test_executor_rejects_non_result_provider_output():

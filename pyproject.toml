@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "automation-kit"
-version = "0.1.0"
+version = "0.2.0"
 description = "Python-first automation application toolkit for website and Android workflows"
 authors = ["mango"]
 readme = "README.md"
@@ -22,8 +22,6 @@ pytest = "^8.0.0"
 pytest-cov = "^5.0.0"
 
 [tool.poetry.scripts]
-test = "pytest:main"
-tests = "pytest:main"
 automation-runner = "automation_runner.cli:main"
 
 [build-system]
