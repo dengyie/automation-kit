@@ -1,23 +1,27 @@
 from typing import Protocol, runtime_checkable
 
 from automation_core.capabilities.models import (
+    CapabilityExecutionProfile,
     CapabilityManifest,
     CapabilityRequest,
     CapabilityResult,
 )
+from automation_core.execution import ExecutionContext
 
 
 @runtime_checkable
 class CapabilityProvider(Protocol):
     manifest: CapabilityManifest
 
-    def execute(self, request: CapabilityRequest) -> CapabilityResult:
+    def execution_profile(
+        self,
+        request: CapabilityRequest,
+    ) -> CapabilityExecutionProfile:
         ...
 
-
-@runtime_checkable
-class AsyncCapabilityProvider(Protocol):
-    manifest: CapabilityManifest
-
-    async def aexecute(self, request: CapabilityRequest) -> CapabilityResult:
+    async def execute(
+        self,
+        request: CapabilityRequest,
+        context: ExecutionContext,
+    ) -> CapabilityResult:
         ...

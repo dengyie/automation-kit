@@ -17,11 +17,13 @@ def test_manifest_declares_supported_operation_and_platform():
         version="1.0.0",
         operations=("solve",),
         platforms=("web", "android"),
+        default_cancellation="cooperative",
     )
 
     assert manifest.supports("solve", platform="web") is True
     assert manifest.supports("solve", platform="image") is False
     assert manifest.to_dict()["operations"] == ["solve"]
+    assert manifest.to_dict()["default_cancellation"] == "cooperative"
 
 
 @pytest.mark.parametrize(

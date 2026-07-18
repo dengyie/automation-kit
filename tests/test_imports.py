@@ -1,7 +1,7 @@
 def test_automation_core_imports():
     import automation_core
 
-    assert automation_core.__version__ == "0.2.0"
+    assert automation_core.__version__ == "0.3.0"
 
 
 def test_automation_core_actions_imports():
@@ -48,6 +48,14 @@ def test_automation_core_capability_imports():
     assert CapabilityRegistry
     assert CapabilityRequest
     assert CapabilityResult
+
+    from automation_core.capabilities import (
+        CapabilityExecutionProfile,
+        CapabilityResolver,
+    )
+
+    assert CapabilityExecutionProfile
+    assert CapabilityResolver
 
 
 def test_automation_core_execution_imports():

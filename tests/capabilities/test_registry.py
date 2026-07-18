@@ -16,9 +16,15 @@ class FakeProvider:
         version="1.0.0",
         operations=("solve",),
         platforms=("web", "android"),
+        default_cancellation="cooperative",
     )
 
-    def execute(self, request):
+    def execution_profile(self, request):
+        from automation_core.capabilities import CapabilityExecutionProfile
+
+        return CapabilityExecutionProfile(cancellation="cooperative")
+
+    async def execute(self, request, context):
         return CapabilityResult(success=True, provider="fake")
 
 
@@ -49,16 +55,13 @@ def test_registry_rejects_provider_without_execution_entrypoint():
     class InvalidProvider:
         manifest = FakeProvider.manifest
 
-    with pytest.raises(CapabilityRegistrationError, match="execute or aexecute"):
+    with pytest.raises(CapabilityRegistrationError, match="execute"):
         CapabilityRegistry().register(InvalidProvider())
 
 
-def test_registry_resolve_distinguishes_missing_capability_and_operation():
+def test_registry_get_distinguishes_missing_capability():
     registry = CapabilityRegistry()
     registry.register(FakeProvider())
 
     with pytest.raises(CapabilityNotFoundError, match="document.extract"):
-        registry.resolve("document.extract", "extract")
-
-    with pytest.raises(CapabilityOperationNotSupportedError, match="inspect"):
-        registry.resolve("visual.challenge", "inspect")
+        registry.get("document.extract")

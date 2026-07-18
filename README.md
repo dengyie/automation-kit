@@ -65,9 +65,16 @@ from automation_core.capabilities import (
 
 registry = CapabilityRegistry()
 registry.register(visual_provider)
-executor = CapabilityExecutor(registry)
+from automation_core.execution import ExecutionContext
 
-result = await executor.aexecute(
+executor = CapabilityExecutor(CapabilityResolver(registry))
+context = ExecutionContext(
+    run_id=run_id,
+    task_id=task_id,
+    workflow_name="smoke",
+)
+
+result = await executor.execute(
     CapabilityRequest(
         capability="visual.challenge",
         operation="solve",
@@ -76,13 +83,14 @@ result = await executor.aexecute(
             "context": "image_bytes",
             "image_bytes": image_bytes,
         },
-        metadata={"run_id": run_id, "task_id": task_id},
-    )
+    ),
+    context,
 )
 ```
 
-Providers declare a `CapabilityManifest` and implement `execute()` or
-`aexecute()`. Slidex exposes the recommended visual implementation through
+Providers declare a `CapabilityManifest`, expose `execution_profile(request)`,
+and implement a single async `execute(request, context)`. Slidex exposes the
+recommended visual implementation through
 `slidex.integrations.automation_kit.SlidexVisualCapability`.
 
 ## Workflow Shape

@@ -1,7 +1,4 @@
-from automation_core.capabilities.contracts import (
-    AsyncCapabilityProvider,
-    CapabilityProvider,
-)
+from automation_core.capabilities.contracts import CapabilityProvider
 from automation_core.capabilities.errors import (
     CapabilityError,
     CapabilityExecutionModeError,
@@ -12,17 +9,19 @@ from automation_core.capabilities.errors import (
 )
 from automation_core.capabilities.executor import CapabilityExecutor
 from automation_core.capabilities.models import (
+    CapabilityExecutionProfile,
     CapabilityManifest,
     CapabilityRequest,
     CapabilityResult,
 )
 from automation_core.capabilities.registry import CapabilityRegistry
+from automation_core.capabilities.resolver import CapabilityResolver
 
 
 __all__ = [
-    "AsyncCapabilityProvider",
     "CapabilityError",
     "CapabilityExecutionModeError",
+    "CapabilityExecutionProfile",
     "CapabilityExecutor",
     "CapabilityManifest",
     "CapabilityNotFoundError",
@@ -32,5 +31,6 @@ __all__ = [
     "CapabilityRegistrationError",
     "CapabilityRegistry",
     "CapabilityRequest",
+    "CapabilityResolver",
     "CapabilityResult",
 ]

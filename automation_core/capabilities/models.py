@@ -55,6 +55,7 @@ class CapabilityManifest:
     version: str
     operations: Tuple[str, ...]
     platforms: Tuple[str, ...] = ()
+    default_cancellation: str = "cooperative"
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -72,10 +73,15 @@ class CapabilityManifest:
         for platform in platforms:
             _required_string(platform, "platform")
 
+        cancellation = _required_string(self.default_cancellation, "default_cancellation")
+        if cancellation not in {"cooperative", "unsupported"}:
+            raise ValueError("default_cancellation must be cooperative or unsupported")
+
         object.__setattr__(self, "name", name)
         object.__setattr__(self, "version", version)
         object.__setattr__(self, "operations", operations)
         object.__setattr__(self, "platforms", platforms)
+        object.__setattr__(self, "default_cancellation", cancellation)
         object.__setattr__(self, "metadata", dict(self.metadata))
 
     def supports(self, operation: str, platform: Optional[str] = None) -> bool:
@@ -89,7 +95,26 @@ class CapabilityManifest:
             "version": self.version,
             "operations": list(self.operations),
             "platforms": list(self.platforms),
+            "default_cancellation": self.default_cancellation,
             "metadata": _safe_value(self.metadata),
+        }
+
+
+@dataclass(frozen=True)
+class CapabilityExecutionProfile:
+    cancellation: str = "cooperative"
+    blocking: bool = False
+
+    def __post_init__(self) -> None:
+        cancellation = _required_string(self.cancellation, "cancellation")
+        if cancellation not in {"cooperative", "unsupported"}:
+            raise ValueError("cancellation must be cooperative or unsupported")
+        object.__setattr__(self, "cancellation", cancellation)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "cancellation": self.cancellation,
+            "blocking": self.blocking,
         }
 
 

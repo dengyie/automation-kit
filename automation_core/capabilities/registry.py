@@ -1,8 +1,7 @@
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from automation_core.capabilities.errors import (
     CapabilityNotFoundError,
-    CapabilityOperationNotSupportedError,
     CapabilityRegistrationError,
 )
 from automation_core.capabilities.models import CapabilityManifest
@@ -19,10 +18,14 @@ class CapabilityRegistry:
                 "provider manifest must be a CapabilityManifest"
             )
         execute = getattr(provider, "execute", None)
-        aexecute = getattr(provider, "aexecute", None)
-        if not callable(execute) and not callable(aexecute):
+        profile = getattr(provider, "execution_profile", None)
+        if not callable(execute):
             raise CapabilityRegistrationError(
-                "provider must define execute or aexecute"
+                "provider must define async execute"
+            )
+        if not callable(profile):
+            raise CapabilityRegistrationError(
+                "provider must define execution_profile"
             )
         if manifest.name in self._providers and not replace:
             raise CapabilityRegistrationError(
@@ -46,15 +49,6 @@ class CapabilityRegistry:
                 f"capability is not registered: {name}"
             ) from exc
 
-    def resolve(self, name: str, operation: str) -> object:
-        provider = self.get(name)
-        manifest = provider.manifest
-        if not manifest.supports(operation):
-            raise CapabilityOperationNotSupportedError(
-                f"capability {name} does not support operation: {operation}"
-            )
-        return provider
-
     def list_manifests(self) -> List[CapabilityManifest]:
         return [
             self._providers[name].manifest
@@ -65,7 +59,7 @@ class CapabilityRegistry:
         self,
         *,
         operation: str,
-        platform: str = None,
+        platform: Optional[str] = None,
     ) -> List[CapabilityManifest]:
         return [
             manifest

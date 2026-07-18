@@ -45,10 +45,10 @@ Android 和图像自动化应用提供底层能力的通用平台。
 
 ### 1.3 架构状态
 
-- 当前 `0.2.x`：提供 capability manifest/request/result、进程内 registry、同步/异步
-  provider 入口、executor 和 Slidex 纵向适配。
-- 目标 `0.3.x`：引入异步内核、同步外观、显式 `ExecutionContext`、一等 capability
-  workflow step、统一 `StepExecutionResult` 和 runtime-owned `ReportCollector`。
+- 当前 `0.3.x`：提供 `ExecutionContext` / `ExecutionFailure` / step result 模型，以及
+  Provider V2 的单一异步入口、`execution_profile`、registry/resolver/executor 分层。
+- 目标完整 `0.3.x`：继续补齐异步内核、同步外观、一等 capability workflow step、统一
+  `StepExecutionResult` 和 runtime-owned `ReportCollector`。
 - 目标 `1.0.x`：冻结 workflow、capability、错误和 report v2 公共契约；在此之前目标
   设计允许破坏性调整，不添加没有外部需求支撑的兼容包装。
 
@@ -56,7 +56,7 @@ Android 和图像自动化应用提供底层能力的通用平台。
 
 | 仓库 | 平台角色 | 拥有内容 | 禁止内容 | 当前版本/状态 |
 | --- | --- | --- | --- | --- |
-| `automation-kit` | 执行内核与公共 SDK | 核心模型、能力契约、runner、通用 adapter、报告 | 业务规则、Slidex 或厂商硬依赖 | `0.2.0` |
+| `automation-kit` | 执行内核与公共 SDK | 核心模型、能力契约、runner、通用 adapter、报告 | 业务规则、Slidex 或厂商硬依赖 | `0.3.0` |
 | `slidex` | 可选视觉能力 provider | slider、OCR、图像识别、人工兜底、视觉 telemetry | 点评/大麦流程、反向要求核心依赖 Slidex | `0.4.0` |
 | `automation-app-damai` | Web/业务应用 | 大麦配置、流程、业务验收、workflow step 声明 | 通用执行内核、视觉算法 | `0.2.0` |
 | `automation-app-dianping` | Android/业务应用 | 点评配置、流程、业务验收、workflow step 声明 | 通用执行内核、OCR 实现 | `0.2.0` |
@@ -298,11 +298,7 @@ CapabilityResult(
   `ExecutionContext` 显式传递。
 - provider 异常由 executor 归一化为 `CapabilityResult` 失败结果；注册、查找和协议错误
   使用明确异常，避免把平台配置错误误判为业务失败。
-- 同步 provider 实现 `execute(request)`；异步 provider 实现 `aexecute(request)`。
-- 同步入口不得隐式创建或嵌套事件循环；同步和异步 provider 必须分别通过对应入口
-  调用。异步入口拒绝同步 provider，避免无法可靠取消的后台线程继续产生副作用。
-
-`0.3.x` Provider V2 目标只保留一个异步入口：
+- Provider V2 只保留一个异步入口：
 
 ```python
 class CapabilityProvider(Protocol):

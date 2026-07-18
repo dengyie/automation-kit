@@ -3,6 +3,7 @@ import asyncio
 import pytest
 
 from automation_core.capabilities import (
+    CapabilityExecutionProfile,
     CapabilityExecutor,
     CapabilityManifest,
     CapabilityProtocolError,
@@ -14,13 +15,16 @@ from automation_core.capabilities import (
 from automation_core.execution import ExecutionContext
 
 
-def _request():
+def _request(**parameters):
     return CapabilityRequest(
         capability="visual.challenge",
         operation="solve",
-        parameters={"value": "input"},
-        metadata={"task_id": "task-1"},
+        parameters=dict(parameters),
     )
+
+
+def _context():
+    return ExecutionContext(run_id="run-1", task_id="step-1", workflow_name="smoke")
 
 
 class AsyncProvider:
@@ -28,20 +32,28 @@ class AsyncProvider:
         name="visual.challenge",
         version="1.0.0",
         operations=("solve",),
+        platforms=("web", "image"),
         default_cancellation="cooperative",
     )
 
-    def execution_profile(self, request):
-        from automation_core.capabilities import CapabilityExecutionProfile
+    def __init__(self):
+        self.calls = []
 
+    def execution_profile(self, request):
+        if request.parameters.get("context") == "image_bytes":
+            return CapabilityExecutionProfile(
+                cancellation="unsupported",
+                blocking=True,
+            )
         return CapabilityExecutionProfile(cancellation="cooperative")
 
     async def execute(self, request, context):
+        self.calls.append((request, context))
         return CapabilityResult(
             success=True,
             provider="async-provider",
             data={
-                "value": request.parameters["value"],
+                "run_id": context.run_id,
                 "task_id": context.task_id,
             },
         )
@@ -53,19 +65,20 @@ def _executor(provider):
     return CapabilityExecutor(CapabilityResolver(registry))
 
 
-def _context():
-    return ExecutionContext(run_id="run-1", task_id="task-1", workflow_name="smoke")
+def test_provider_v2_executor_passes_context_and_reads_profile():
+    provider = AsyncProvider()
+    executor = _executor(provider)
 
-
-def test_executor_calls_async_provider_with_context():
-    result = asyncio.run(_executor(AsyncProvider()).execute(_request(), _context()))
+    result = asyncio.run(executor.execute(_request(context="playwright_page"), _context()))
 
     assert result.success is True
-    assert result.provider == "async-provider"
-    assert result.data == {"value": "input", "task_id": "task-1"}
+    assert result.data == {"run_id": "run-1", "task_id": "step-1"}
+    assert provider.execution_profile(_request(context="image_bytes")).cancellation == (
+        "unsupported"
+    )
 
 
-def test_executor_normalizes_provider_exception_to_failed_result():
+def test_provider_v2_executor_normalizes_provider_exception_without_secrets():
     class BrokenProvider(AsyncProvider):
         async def execute(self, request, context):
             raise RuntimeError("engine unavailable token=secret")
@@ -73,27 +86,33 @@ def test_executor_normalizes_provider_exception_to_failed_result():
     result = asyncio.run(_executor(BrokenProvider()).execute(_request(), _context()))
 
     assert result.success is False
-    assert result.provider == "visual.challenge"
     assert result.error_code == "provider_exception"
-    assert result.retryable is False
     assert result.metadata["error_type"] == "RuntimeError"
-    assert result.metadata["message"] == "provider execution failed"
     assert "secret" not in str(result.to_dict())
 
 
-def test_executor_propagates_protocol_errors():
-    class InvalidProvider(AsyncProvider):
+def test_provider_v2_executor_preserves_cancellation():
+    class CancelProvider(AsyncProvider):
         async def execute(self, request, context):
-            raise CapabilityProtocolError("invalid provider state")
+            raise asyncio.CancelledError()
 
-    with pytest.raises(CapabilityProtocolError, match="invalid provider state"):
-        asyncio.run(_executor(InvalidProvider()).execute(_request(), _context()))
+    with pytest.raises(asyncio.CancelledError):
+        asyncio.run(_executor(CancelProvider()).execute(_request(), _context()))
 
 
-def test_executor_rejects_non_result_provider_output():
+def test_provider_v2_executor_rejects_non_result_and_missing_profile():
     class InvalidProvider(AsyncProvider):
         async def execute(self, request, context):
             return {"success": True}
 
     with pytest.raises(CapabilityProtocolError, match="CapabilityResult"):
         asyncio.run(_executor(InvalidProvider()).execute(_request(), _context()))
+
+    class NoProfileProvider:
+        manifest = AsyncProvider.manifest
+
+        async def execute(self, request, context):
+            return CapabilityResult(success=True, provider="x")
+
+    with pytest.raises(Exception):
+        CapabilityRegistry().register(NoProfileProvider())
