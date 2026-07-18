@@ -32,6 +32,8 @@ class SeleniumSession:
         self._started = True
 
     def stop(self) -> None:
+        if not self._started:
+            return
         quit_method = getattr(self.driver, "quit", None)
         if callable(quit_method):
             quit_method()
