@@ -46,9 +46,10 @@ Android 和图像自动化应用提供底层能力的通用平台。
 ### 1.3 架构状态
 
 - 当前 `0.3.x`：提供 `ExecutionContext` / `ExecutionFailure` / step result 模型，以及
-  Provider V2 的单一异步入口、`execution_profile`、registry/resolver/executor 分层。
-- 目标完整 `0.3.x`：继续补齐异步内核、同步外观、一等 capability workflow step、统一
-  `StepExecutionResult` 和 runtime-owned `ReportCollector`。
+  Provider V2 的单一异步入口、`WorkflowRuntime`、runtime-owned `ReportCollector` 和
+  report schema v2；CLI/examples 仍可通过 `LegacyWorkflowResult` 过渡。
+- 目标完整 `0.3.x`：把 CLI/examples 完全切到 runtime 结果模型，删除 legacy
+  ManagedWorkflow 结果路径。
 - 目标 `1.0.x`：冻结 workflow、capability、错误和 report v2 公共契约；在此之前目标
   设计允许破坏性调整，不添加没有外部需求支撑的兼容包装。
 

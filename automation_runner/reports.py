@@ -5,9 +5,8 @@ from automation_core.actions import ActionBatchResult
 from automation_core.drivers import ActionResult, ArtifactHandle, SessionInfo
 from automation_core.state import RunState, RunStatus
 from automation_runner.context import WorkflowContext
-from automation_runner.workflows import WorkflowResult
-
 from automation_core.execution import WorkflowResult as ExecutionWorkflowResult
+from automation_runner.workflows import LegacyWorkflowResult as WorkflowResult
 
 from automation_runner.collector import ReportCollector
 

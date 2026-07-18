@@ -13,6 +13,7 @@ from automation_core.execution.failures import ExecutionFailure
 class StepKind(str, Enum):
     ACTION = "action"
     CAPABILITY = "capability"
+    ARTIFACT = "artifact"
 
 
 class StepStatus(str, Enum):
@@ -64,6 +65,7 @@ class StepExecutionResult:
     context: ExecutionContext
     action_result: Optional[ActionResult] = None
     capability_result: Optional[CapabilityResult] = None
+    artifact_result: Optional[ArtifactHandle] = None
     error: Optional[ExecutionFailure] = None
 
     def __post_init__(self) -> None:
@@ -80,12 +82,18 @@ class StepExecutionResult:
 
         has_action = self.action_result is not None
         has_capability = self.capability_result is not None
-        if has_action == has_capability:
-            raise ValueError("step result requires exactly one of action_result or capability_result")
+        has_artifact = self.artifact_result is not None
+        present = sum(1 for flag in (has_action, has_capability, has_artifact) if flag)
+        if present != 1:
+            raise ValueError(
+                "step result requires exactly one of action_result, capability_result, or artifact_result"
+            )
         if kind is StepKind.ACTION and not has_action:
             raise ValueError("action step requires action_result")
         if kind is StepKind.CAPABILITY and not has_capability:
             raise ValueError("capability step requires capability_result")
+        if kind is StepKind.ARTIFACT and not has_artifact:
+            raise ValueError("artifact step requires artifact_result")
 
         object.__setattr__(self, "step_id", _required_string(self.step_id, "step_id"))
         object.__setattr__(self, "step_name", _required_string(self.step_name, "step_name"))
@@ -111,6 +119,11 @@ class StepExecutionResult:
                 if self.capability_result is not None
                 else None
             ),
+            "artifact_result": (
+                _serialize_artifact(self.artifact_result)
+                if self.artifact_result is not None
+                else None
+            ),
             "error": self.error.to_dict() if self.error is not None else None,
         }
 
@@ -121,7 +134,7 @@ class WorkflowResult:
     status: Union[WorkflowStatus, str]
     steps: Sequence[StepExecutionResult] = ()
     artifacts: Sequence[ArtifactHandle] = ()
-    events: Sequence[EventEnvelope] = field(default_factory=tuple)
+    events: Sequence[Any] = field(default_factory=tuple)
     failure: Optional[ExecutionFailure] = None
 
     def __post_init__(self) -> None:
@@ -166,12 +179,20 @@ class WorkflowResult:
         )
 
     def to_dict(self) -> Dict[str, Any]:
+        serialized_events = []
+        for event in self.events:
+            if hasattr(event, "to_dict"):
+                serialized_events.append(event.to_dict())
+            elif isinstance(event, dict):
+                serialized_events.append(dict(event))
+            else:
+                serialized_events.append({"value": str(event)})
         return {
             "context": self.context.to_dict(),
             "status": self.status.value,
             "success": self.success,
             "steps": [step.to_dict() for step in self.steps],
             "artifacts": [_serialize_artifact(item) for item in self.artifacts],
-            "events": [event.to_dict() for event in self.events],
+            "events": serialized_events,
             "failure": self.failure.to_dict() if self.failure is not None else None,
         }

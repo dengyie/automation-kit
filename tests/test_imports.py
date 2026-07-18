@@ -72,6 +72,15 @@ def test_automation_core_execution_imports():
     assert WorkflowResult
 
 
+def test_runner_exports_legacy_and_runtime_result_boundaries():
+    from automation_core.execution import WorkflowResult as ExecutionWorkflowResult
+    from automation_runner import LegacyWorkflowResult, WorkflowResult, WorkflowRuntime
+
+    assert WorkflowResult is LegacyWorkflowResult
+    assert ExecutionWorkflowResult is not LegacyWorkflowResult
+    assert WorkflowRuntime
+
+
 def test_example_workflow_factories_import_without_live_dependencies():
     from examples.damai_android import create_workflow as create_android_workflow
     from examples.damai_web import create_workflow as create_web_workflow

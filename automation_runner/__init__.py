@@ -7,6 +7,7 @@ from automation_runner.runtime import WorkflowRuntime
 from automation_runner.steps import WorkflowStep
 from automation_runner.workflows import (
     ManagedWorkflow,
+    LegacyWorkflowResult,
     WorkflowResult,
     run_workflow_steps,
 )
@@ -18,6 +19,7 @@ __all__ = [
     "CapabilityPolicy",
     "WorkflowRuntime",
     "ManagedWorkflow",
+    "LegacyWorkflowResult",
     "WorkflowResult",
     "WorkflowStep",
     "run_workflow_steps",

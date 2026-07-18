@@ -28,7 +28,7 @@ from automation_runner.steps import WorkflowStep
 
 
 @dataclass(frozen=True)
-class WorkflowResult:
+class LegacyWorkflowResult:
     session: SessionInfo
     success: bool
     actions: List[ActionResult]
@@ -37,6 +37,11 @@ class WorkflowResult:
     batch_result: Optional[ActionBatchResult] = None
     error: Optional[str] = None
     events: List[EventEnvelope] = field(default_factory=list)
+
+
+# Temporary compatibility alias for CLI/examples still on ManagedWorkflow.
+# New runtime/app code must use automation_core.execution.WorkflowResult.
+WorkflowResult = LegacyWorkflowResult
 
 
 def _format_error(exc: Exception) -> str:
@@ -326,10 +331,11 @@ class ManagedWorkflow:
 
 # Legacy aliases kept for built-in examples and older tests.
 ExampleWorkflow = ManagedWorkflow
-ExampleWorkflowResult = WorkflowResult
+ExampleWorkflowResult = LegacyWorkflowResult
 
 __all__ = [
     "ManagedWorkflow",
+    "LegacyWorkflowResult",
     "WorkflowResult",
     "WorkflowStep",
     "run_workflow_steps",

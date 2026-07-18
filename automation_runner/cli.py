@@ -21,7 +21,7 @@ from automation_runner.config import RunnerConfig, load_runner_config
 from automation_runner.dry_run import DryRunSession
 from automation_runner.reports import build_report
 from automation_runner.schemas import load_report_schema
-from automation_runner.workflows import WorkflowResult
+from automation_runner.workflows import LegacyWorkflowResult as WorkflowResult
 from examples.damai_android import create_workflow as create_damai_android_workflow
 from examples.damai_web import create_workflow as create_damai_web_workflow
 

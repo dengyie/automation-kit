@@ -76,3 +76,41 @@ def test_runtime_timeout_cancels_capability_and_closes_session():
     assert result.failure is not None
     assert result.failure.category.value == "timeout"
     assert session.stopped == 1
+
+
+def test_runtime_cancel_returns_cancelled_result_and_closes_session():
+    session = FakeSession()
+    registry = CapabilityRegistry()
+    registry.register(SlowProvider())
+    runtime = WorkflowRuntime(
+        session_factory=lambda: session,
+        capability_executor=CapabilityExecutor(CapabilityResolver(registry)),
+        workflow_name="cancel-smoke",
+    )
+
+    async def run_and_cancel():
+        task = asyncio.create_task(
+            runtime.arun(
+                [
+                    WorkflowStep.capability(
+                        "solve-captcha",
+                        request=CapabilityRequest(
+                            capability="visual.challenge",
+                            operation="solve",
+                        ),
+                        policy=CapabilityPolicy(timeout=5.0, max_attempts=1, backoff=0.0),
+                    )
+                ]
+            )
+        )
+        await asyncio.sleep(0.01)
+        task.cancel()
+        return await task
+
+    result = asyncio.run(run_and_cancel())
+
+    assert result.status is WorkflowStatus.CANCELLED
+    assert result.failure is not None
+    assert result.failure.category.value == "cancelled"
+    assert session.stopped == 1
+    assert [event["event_type"] for event in result.events][-1] == "workflow.end"

@@ -150,3 +150,27 @@ def test_sync_run_rejects_nested_event_loop():
             return "event loop" in str(exc).lower()
 
     assert asyncio.run(nested()) is True
+
+
+def test_runtime_runs_artifact_step_and_records_lifecycle_events():
+    runtime, session, _ = _runtime()
+
+    result = asyncio.run(
+        runtime.arun(
+            [
+                WorkflowStep.action("open", url="https://example.test"),
+                WorkflowStep.artifact("screenshot", "home.png"),
+            ]
+        )
+    )
+
+    assert result.status is WorkflowStatus.SUCCEEDED
+    assert len(result.steps) == 2
+    assert result.steps[1].kind is StepKind.ARTIFACT
+    assert result.artifacts[0].artifact_type == "screenshot"
+    event_types = [event["event_type"] for event in result.events]
+    assert event_types[0] == "workflow.start"
+    assert "step.start" in event_types
+    assert "step.end" in event_types
+    assert event_types[-1] == "workflow.end"
+    assert session.stopped == 1
