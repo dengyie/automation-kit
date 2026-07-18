@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/dengyie/automation-kit/docs/report-schema-v2.json",
+  "title": "Automation Kit Runner Report v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "context",
+    "status",
+    "success",
+    "steps",
+    "events",
+    "artifacts",
+    "failure",
+    "providers"
+  ],
+  "properties": {
+    "schema_version": {"const": "2"},
+    "context": {"type": "object"},
+    "status": {"enum": ["succeeded", "failed", "cancelled"]},
+    "success": {"type": "boolean"},
+    "steps": {"type": "array", "items": {"type": "object"}},
+    "events": {"type": "array", "items": {"type": "object"}},
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["artifact_type", "path", "metadata"],
+        "properties": {
+          "artifact_type": {"type": "string"},
+          "path": {"type": "string"},
+          "metadata": {"type": "object"}
+        }
+      }
+    },
+    "failure": {
+      "type": ["object", "null"]
+    },
+    "providers": {
+      "type": "array",
+      "items": {"type": "object"}
+    }
+  }
+}

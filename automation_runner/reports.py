@@ -7,6 +7,10 @@ from automation_core.state import RunState, RunStatus
 from automation_runner.context import WorkflowContext
 from automation_runner.workflows import WorkflowResult
 
+from automation_core.execution import WorkflowResult as ExecutionWorkflowResult
+
+from automation_runner.collector import ReportCollector
+
 
 SENSITIVE_REPORT_KEY_TERMS = (
     "authorization",
@@ -180,3 +184,34 @@ def build_report(
         artifacts=_serialize_artifacts(result.artifacts),
         error=error if error is not None else result.error,
     )
+
+
+@dataclass(frozen=True)
+class RunnerReportV2:
+    schema_version: str
+    context: Dict[str, object]
+    status: str
+    success: bool
+    steps: List[Dict[str, object]]
+    events: List[Dict[str, object]]
+    artifacts: List[Dict[str, object]]
+    failure: Optional[Dict[str, object]]
+    providers: List[Dict[str, object]]
+
+    def to_dict(self) -> Dict[str, object]:
+        return asdict(self)
+
+
+def build_report_v2(result: ExecutionWorkflowResult) -> RunnerReportV2:
+    collector = ReportCollector(result.context)
+    for step in result.steps:
+        collector.record_step(step)
+    for artifact in result.artifacts:
+        collector.attach_artifact(artifact)
+    for event in result.events:
+        if hasattr(event, "to_dict"):
+            collector.record_event(event.to_dict())
+        elif isinstance(event, dict):
+            collector.record_event(event)
+    payload = collector.finalize(status=result.status, failure=result.failure)
+    return RunnerReportV2(**payload)

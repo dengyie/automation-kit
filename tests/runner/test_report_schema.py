@@ -178,8 +178,8 @@ def test_packaged_report_schema_matches_docs_schema():
 
 
 def test_unknown_report_schema_version_raises_clear_error():
-    with pytest.raises(ValueError, match="unsupported report schema version: 2"):
-        load_report_schema("2")
+    with pytest.raises(ValueError, match="unsupported report schema version: 99"):
+        load_report_schema("99")
 
 
 def test_packaged_report_schema_loader_supports_python_38_resources(monkeypatch):
