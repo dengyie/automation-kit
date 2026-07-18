@@ -57,9 +57,9 @@ Android 和图像自动化应用提供底层能力的通用平台。
 | 仓库 | 平台角色 | 拥有内容 | 禁止内容 | 当前版本/状态 |
 | --- | --- | --- | --- | --- |
 | `automation-kit` | 执行内核与公共 SDK | 核心模型、能力契约、runner、通用 adapter、报告 | 业务规则、Slidex 或厂商硬依赖 | `0.3.0` |
-| `slidex` | 可选视觉能力 provider | slider、OCR、图像识别、人工兜底、视觉 telemetry | 点评/大麦流程、反向要求核心依赖 Slidex | `0.4.0` |
-| `automation-app-damai` | Web/业务应用 | 大麦配置、流程、业务验收、workflow step 声明 | 通用执行内核、视觉算法 | `0.2.0` |
-| `automation-app-dianping` | Android/业务应用 | 点评配置、流程、业务验收、workflow step 声明 | 通用执行内核、OCR 实现 | `0.2.0` |
+| `slidex` | 可选视觉能力 provider | slider、OCR、图像识别、人工兜底、视觉 telemetry | 点评/大麦流程、反向要求核心依赖 Slidex | `0.5.0` |
+| `automation-app-damai` | Web/业务应用 | 大麦配置、流程、业务验收、workflow step 声明 | 通用执行内核、视觉算法 | `0.3.0` |
+| `automation-app-dianping` | Android/业务应用 | 点评配置、流程、业务验收、workflow step 声明 | 通用执行内核、OCR 实现 | `0.3.0` |
 | `automation-plugin-ocr` | 归档仓库 | 仅保留迁移说明 | 任何新功能 | 已归档 |
 
 `automation-plugin-ocr` 的 GitHub remote 当前返回 `Repository not found`。除非管理者明确
@@ -660,7 +660,7 @@ source、图片、token、cookie、action data 或 skipped action parameters。a
 ## 9. 版本与兼容
 
 - automation-kit 公共契约采用语义化版本。
-- app 的发布元数据声明 `automation-kit>=0.2.0,<0.3.0`；Poetry 仅在开发锁中使用
+- app 的发布元数据声明 `automation-kit>=0.3.0,<0.4.0`；Poetry 仅在开发锁中使用
   sibling path 解析当前源码，wheel 不得包含本机路径。
 - Slidex 的 automation-kit extra 声明兼容范围并运行跨仓契约测试。
 - manifest 的 provider 版本描述 provider 行为版本，不替代 Python 包版本。
