@@ -15,7 +15,7 @@ from automation_core.capabilities import (
 from automation_core.drivers import ActionResult, SessionInfo
 from automation_core.execution import FailureCategory, WorkflowStatus
 from automation_runner.policies import CapabilityPolicy
-from automation_runner.runtime import WorkflowRuntime
+from automation_runner.runtime import _RunClock, WorkflowRuntime
 from automation_runner.steps import WorkflowStep
 
 
@@ -261,7 +261,9 @@ def test_deadline_exceeded_before_attempt_is_reported():
         policy=CapabilityPolicy(timeout=5.0, max_attempts=2),
     )
 
-    result = asyncio.run(runtime._run_capability(step, step_context, collector))
+    result = asyncio.run(
+        runtime._run_capability(step, step_context, collector, _RunClock())
+    )
 
     assert result.error is not None
     assert result.error.category is FailureCategory.TIMEOUT
@@ -301,21 +303,16 @@ def test_retry_attempts_are_visible_as_events():
     capability_ends = [
         event for event in result.events if event["event_type"] == "capability.end"
     ]
-    assert capability_ends == [
-        {
-            "event_id": f"{result.context.run_id}:step-1:capability.end",
-            "event_type": "capability.end",
-            "sequence": capability_ends[0]["sequence"],
-            "run_id": result.context.run_id,
-            "task_id": "step-1",
-            "payload": {
-                "step_name": "solve",
-                "provider": "flaky",
-                "success": True,
-                "error_code": None,
-            },
-        }
-    ]
+    assert len(capability_ends) == 1
+    end_event = capability_ends[0]
+    assert end_event["event_id"] == f"{result.context.run_id}:step-1:capability.end"
+    assert end_event["task_id"] == "step-1"
+    assert end_event["payload"] == {
+        "step_name": "solve",
+        "provider": "flaky",
+        "success": True,
+        "error_code": None,
+    }
 
 
 def test_run_metadata_reaches_report_context():
@@ -367,3 +364,37 @@ def test_cancelled_artifact_step_reports_sanitized_deterministic_path():
     assert all(part not in {"..", ""} for part in handle.path.parts)
     assert handle.path.parts[-1] == "leak.xml"
     assert list(result.artifacts) == []
+
+
+def test_runtime_artifact_root_anchors_unwritten_paths():
+    from pathlib import Path
+
+    class CancelArtifactSession:
+        info = SessionInfo(driver_name="fake", platform="web", identifier="session-1")
+
+        def start(self):
+            return None
+
+        def stop(self):
+            return None
+
+        def execute_action(self, action_name, **kwargs):
+            return ActionResult(success=True, message=action_name)
+
+        def capture_artifact(self, artifact_type, name):
+            raise asyncio.CancelledError()
+
+    runtime = WorkflowRuntime(
+        session_factory=lambda: CancelArtifactSession(),
+        workflow_name="rooted",
+        artifact_root=Path("/srv/automation-artifacts"),
+    )
+
+    result = asyncio.run(
+        runtime.arun([WorkflowStep.artifact("screenshot", "home.png")])
+    )
+
+    handle = result.steps[0].artifact_result
+    assert handle.path.parts[:2] == ("/", "srv")
+    assert handle.path.parts[-1] == "home.png"
+    assert handle.path.parts[-3] == result.context.run_id

@@ -23,12 +23,12 @@ from examples.damai_android import build_steps as build_damai_android_steps
 from examples.damai_web import build_steps as build_damai_web_steps
 
 
-def _damai_web_steps(url: Optional[str]) -> list:
-    return build_damai_web_steps(url=url or "")
+def _damai_web_steps(config: RunnerConfig) -> list:
+    return build_damai_web_steps(url=config.url)
 
 
-def _damai_android_steps(app_id: Optional[str]) -> list:
-    return build_damai_android_steps(app_id=app_id or "")
+def _damai_android_steps(config: RunnerConfig) -> list:
+    return build_damai_android_steps(app_id=config.app_id)
 
 
 BUILTIN_WORKFLOWS = {
@@ -196,6 +196,31 @@ def _workflow_name(args: argparse.Namespace, config: RunnerConfig) -> str:
     raise ValueError("workflow or --workflow-factory is required")
 
 
+_OPTION_CONFIG_FIELDS = {
+    "url": "url",
+    "app_id": "app_id",
+}
+
+
+def _missing_required_option(
+    workflow_name: str,
+    config: RunnerConfig,
+) -> Optional[str]:
+    """Validate a built-in workflow's required options against its metadata.
+
+    WORKFLOW_METADATA is the single source of truth for required options, so a
+    newly registered builtin cannot silently skip its guard.
+    """
+    metadata = WORKFLOW_METADATA.get(workflow_name)
+    if metadata is None:
+        return None
+    for option in metadata["required_options"]:
+        value = getattr(config, _OPTION_CONFIG_FIELDS[option], None)
+        if value is None or not str(value).strip():
+            return f"--{option.replace('_', '-')} is required for {workflow_name}"
+    return None
+
+
 def _workflow_context(
     workflow_name: str,
     config: RunnerConfig,
@@ -340,12 +365,9 @@ def main(
             return _print_error("--report-file requires --json")
         if config.live and not config.factory:
             return _print_error("--factory is required for live workflows")
-        if workflow_name == "damai-web-smoke":
-            if not config.url:
-                return _print_error("--url is required for damai-web-smoke")
-        elif workflow_name == "damai-android-smoke":
-            if not config.app_id:
-                return _print_error("--app-id is required for damai-android-smoke")
+        missing_option = _missing_required_option(workflow_name, config)
+        if missing_option is not None:
+            return _print_error(missing_option)
         try:
             options = _workflow_options(config, args)
         except ValueError as exc:
@@ -417,9 +439,7 @@ def _build_workflow(
             context,
             options,
         )
-    steps = BUILTIN_WORKFLOWS[workflow_name](
-        config.url if workflow_name == "damai-web-smoke" else config.app_id
-    )
+    steps = BUILTIN_WORKFLOWS[workflow_name](config)
     runtime = WorkflowRuntime(
         session_factory=session_factory,
         workflow_name=workflow_name,

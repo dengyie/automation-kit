@@ -55,20 +55,6 @@ def _capability_error_category(exc: Exception) -> FailureCategory:
     return FailureCategory.CONFIG
 
 
-def _cancelled_artifact_path(context: ExecutionContext, step: WorkflowStep) -> Path:
-    """Deterministic never-written path for an artifact step cancelled mid-run.
-
-    Goes through ``ArtifactStore`` so the fabricated handle cannot carry path
-    separators or traversal segments into the report.
-    """
-    name = str(step.parameters.get("name") or step.name)
-    return ArtifactStore(Path("artifacts")).build_path(
-        context.run_id,
-        step.name,
-        name,
-    )
-
-
 class WorkflowRuntime:
     def __init__(
         self,
@@ -80,6 +66,7 @@ class WorkflowRuntime:
         correlation_id: Optional[str] = None,
         deadline: Optional[float] = None,
         metadata: Optional[Dict[str, Any]] = None,
+        artifact_root: Optional[Path] = None,
     ) -> None:
         self.session_factory = session_factory
         self.capability_executor = capability_executor
@@ -88,6 +75,9 @@ class WorkflowRuntime:
         self.correlation_id = correlation_id
         self.deadline = deadline
         self.metadata = metadata
+        # Root for runtime-fabricated (never-written) artifact paths; align it
+        # with the adapter's artifact root in the composition root.
+        self.artifact_store = ArtifactStore(artifact_root or Path("artifacts"))
 
     def run(self, steps: Sequence[WorkflowStep]) -> WorkflowResult:
         try:
@@ -158,7 +148,7 @@ class WorkflowRuntime:
                     )
                     try:
                         result = await self._execute_step(
-                            session, step, step_context, collector
+                            session, step, step_context, collector, clock
                         )
                     except asyncio.CancelledError:
                         failure = ExecutionFailure(
@@ -345,11 +335,12 @@ class WorkflowRuntime:
         step: WorkflowStep,
         context: ExecutionContext,
         collector: ReportCollector,
+        clock: _RunClock,
     ) -> StepExecutionResult:
         if step.kind == "action":
             return await self._run_action(session, step, context)
         if step.kind == "capability":
-            return await self._run_capability(step, context, collector)
+            return await self._run_capability(step, context, collector, clock)
         if step.kind == "artifact":
             return await self._run_artifact(session, step, context)
         return self._unsupported_step(step, context)
@@ -461,11 +452,12 @@ class WorkflowRuntime:
         step: WorkflowStep,
         context: ExecutionContext,
         collector: ReportCollector,
+        clock: _RunClock,
     ) -> StepExecutionResult:
-        if self.capability_executor is None:
+        executor = self.capability_executor
+        if executor is None:
             return self._capability_missing_executor_step(step, context)
 
-        assert self.capability_executor is not None
         policy = step.policy or CapabilityPolicy()
         started = time.monotonic()
         attempts = 0
@@ -473,13 +465,12 @@ class WorkflowRuntime:
         last_error: Optional[ExecutionFailure] = None
 
         try:
-            profile = self.capability_executor.execution_profile(step.request)
+            profile = executor.execution_profile(step.request)
         except asyncio.CancelledError:
             raise
         except Exception as exc:
             return self._capability_wiring_failure(step, context, started, exc)
 
-        clock = _RunClock()
         while attempts < policy.max_attempts:
             remaining = clock.remaining(context)
             if remaining is not None and remaining <= 0:
@@ -501,12 +492,12 @@ class WorkflowRuntime:
             try:
                 if profile.cancellation == "cooperative":
                     last_result = await self._execute_cooperative(
-                        step, context, policy, remaining
+                        executor, step, context, policy, remaining
                     )
                 else:
                     # Unsupported cancellation: no hard timeout may be promised
                     # to a provider that cannot honor it (development.md §4.4).
-                    last_result = await self.capability_executor.execute(
+                    last_result = await executor.execute(
                         step.request,
                         context,
                     )
@@ -604,13 +595,13 @@ class WorkflowRuntime:
 
     async def _execute_cooperative(
         self,
+        executor: CapabilityExecutor,
         step: WorkflowStep,
         context: ExecutionContext,
         policy: CapabilityPolicy,
         remaining: Optional[float],
     ) -> CapabilityResult:
-        assert self.capability_executor is not None
-        execution = self.capability_executor.execute(step.request, context)
+        execution = executor.execute(step.request, context)
         timeout = self._merge_timeout(policy.timeout, remaining)
         if timeout is None:
             return await execution
@@ -684,25 +675,77 @@ class WorkflowRuntime:
             ),
         )
 
+    def _synthetic_step_result(
+        self,
+        step: WorkflowStep,
+        context: ExecutionContext,
+        *,
+        status: StepStatus,
+        failure: ExecutionFailure,
+        action_message: str,
+        capability_error_code: str,
+        attempts: int = 1,
+        duration_ms: int = 0,
+    ) -> StepExecutionResult:
+        """Fabricate a step result for a step that never produced one (cancelled
+        mid-run, or an unhandled failure caught by the runtime's last-resort
+        normalization). Paths and codes are sanitized; nothing is written."""
+        base = dict(
+            step_id=context.task_id or step.name,
+            step_name=step.name,
+            status=status,
+            attempts=attempts,
+            duration_ms=duration_ms,
+            context=context,
+            error=failure,
+        )
+        if step.kind == "capability":
+            return StepExecutionResult(
+                kind=StepKind.CAPABILITY,
+                capability_result=CapabilityResult(
+                    success=False,
+                    provider="runtime",
+                    error_code=capability_error_code,
+                ),
+                **base,
+            )
+        if step.kind == "artifact":
+            return StepExecutionResult(
+                kind=StepKind.ARTIFACT,
+                artifact_result=ArtifactHandle(
+                    artifact_type=step.name,
+                    path=self._unwritten_artifact_path(context, step),
+                ),
+                **base,
+            )
+        return StepExecutionResult(
+            kind=StepKind.ACTION,
+            action_result=ActionResult(success=False, message=action_message),
+            **base,
+        )
+
+    def _unwritten_artifact_path(
+        self,
+        context: ExecutionContext,
+        step: WorkflowStep,
+    ) -> Path:
+        """Deterministic never-written path for a step that ended before its
+        artifact was captured; goes through ArtifactStore so the fabricated
+        handle cannot carry separators or traversal segments into a report."""
+        name = str(step.parameters.get("name") or step.name)
+        return self.artifact_store.build_path(context.run_id, step.name, name)
+
     def _unhandled_step_failure(
         self,
         step: WorkflowStep,
         context: ExecutionContext,
         exc: Exception,
     ) -> StepExecutionResult:
-        return StepExecutionResult(
-            step_id=context.task_id or step.name,
-            step_name=step.name,
-            kind=StepKind.ACTION,
+        return self._synthetic_step_result(
+            step,
+            context,
             status=StepStatus.FAILED,
-            attempts=1,
-            duration_ms=0,
-            context=context,
-            action_result=ActionResult(
-                success=False,
-                message=f"{step.name} failed",
-            ),
-            error=ExecutionFailure(
+            failure=ExecutionFailure(
                 category=FailureCategory.PROVIDER,
                 code="step_execution_failed",
                 message=f"step failed: {step.name}",
@@ -710,98 +753,28 @@ class WorkflowRuntime:
                 source="runtime",
                 details={"error_type": type(exc).__name__},
             ),
+            action_message=f"{step.name} failed",
+            capability_error_code="step_execution_failed",
         )
 
-    @staticmethod
-    def _unsupported_step(
-        step: WorkflowStep,
-        context: ExecutionContext,
-    ) -> StepExecutionResult:
-        return StepExecutionResult(
-            step_id=context.task_id or step.name,
-            step_name=step.name,
-            kind=StepKind.ACTION,
-            status=StepStatus.FAILED,
-            attempts=1,
-            duration_ms=0,
-            context=context,
-            action_result=ActionResult(
-                success=False,
-                message=f"unsupported workflow step kind: {step.kind}",
-            ),
-            error=ExecutionFailure(
-                category=FailureCategory.CONFIG,
-                code="unsupported_step_kind",
-                message=f"unsupported workflow step kind: {step.kind}",
-                retryable=False,
-                source="runtime",
-            ),
-        )
-
-    @staticmethod
     def _cancelled_step(
+        self,
         step: WorkflowStep,
         context: ExecutionContext,
     ) -> StepExecutionResult:
-        if step.kind == "capability":
-            return StepExecutionResult(
-                step_id=context.task_id or step.name,
-                step_name=step.name,
-                kind=StepKind.CAPABILITY,
-                status=StepStatus.CANCELLED,
-                attempts=1,
-                duration_ms=0,
-                context=context,
-                capability_result=CapabilityResult(
-                    success=False,
-                    provider="runtime",
-                    error_code="cancelled",
-                ),
-                error=ExecutionFailure(
-                    category=FailureCategory.CANCELLED,
-                    code="cancelled",
-                    message="step cancelled",
-                    retryable=False,
-                    source="runtime",
-                ),
-            )
-        if step.kind == "artifact":
-            return StepExecutionResult(
-                step_id=context.task_id or step.name,
-                step_name=step.name,
-                kind=StepKind.ARTIFACT,
-                status=StepStatus.CANCELLED,
-                attempts=1,
-                duration_ms=0,
-                context=context,
-                artifact_result=ArtifactHandle(
-                    artifact_type=step.name,
-                    path=_cancelled_artifact_path(context, step),
-                ),
-                error=ExecutionFailure(
-                    category=FailureCategory.CANCELLED,
-                    code="cancelled",
-                    message="step cancelled",
-                    retryable=False,
-                    source="runtime",
-                ),
-            )
-        return StepExecutionResult(
-            step_id=context.task_id or step.name,
-            step_name=step.name,
-            kind=StepKind.ACTION,
+        return self._synthetic_step_result(
+            step,
+            context,
             status=StepStatus.CANCELLED,
-            attempts=1,
-            duration_ms=0,
-            context=context,
-            action_result=ActionResult(success=False, message="cancelled"),
-            error=ExecutionFailure(
+            failure=ExecutionFailure(
                 category=FailureCategory.CANCELLED,
                 code="cancelled",
                 message="step cancelled",
                 retryable=False,
                 source="runtime",
             ),
+            action_message="cancelled",
+            capability_error_code="cancelled",
         )
 
     @staticmethod
