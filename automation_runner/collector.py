@@ -4,6 +4,7 @@ from uuid import uuid4
 from automation_core.drivers import ArtifactHandle
 from automation_core.execution import (
     ExecutionContext,
+    ExecutionFailure,
     StepExecutionResult,
     WorkflowStatus,
 )
