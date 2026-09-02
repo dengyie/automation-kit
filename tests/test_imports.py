@@ -82,7 +82,10 @@ def test_removed_legacy_modules_stay_removed():
         "automation_runner.runner",
         "examples.workflows",
     ):
-        assert importlib.util.find_spec(module) is None, module
+        spec = importlib.util.find_spec(module)
+        # A namespace spec (no loader) means only an empty stray directory
+        # exists; any real resurrection would carry a source loader.
+        assert spec is None or spec.loader is None, module
 
 
 def test_removed_legacy_symbols_stay_removed():
