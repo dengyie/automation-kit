@@ -1,6 +1,6 @@
 # automation-kit 平台开发总纲
 
-最后更新：2026-07-19
+最后更新：2026-09-03
 
 本文是 automation-kit 生态唯一维护的开发、架构、状态与协作基线。README
 只承担安装和使用入口，稳定的用户参考可以独立保留；架构决策、跨仓状态、开发计划、
@@ -45,11 +45,14 @@ Android 和图像自动化应用提供底层能力的通用平台。
 
 ### 1.3 架构状态
 
-- 当前 `0.3.x`：提供 `ExecutionContext` / `ExecutionFailure` / step result 模型，以及
-  Provider V2 的单一异步入口、`WorkflowRuntime`、runtime-owned `ReportCollector` 和
-  report schema v2；CLI/examples 仍可通过 `LegacyWorkflowResult` 过渡。
-- 目标完整 `0.3.x`：把 CLI/examples 完全切到 runtime 结果模型，删除 legacy
-  ManagedWorkflow 结果路径。
+- 当前 `0.3.x`（2026-09-03 完成 runtime 模型收口）：`ExecutionContext` /
+  `ExecutionFailure` / step result 模型、Provider V2 单一异步入口、`WorkflowRuntime`、
+  runtime-owned `ReportCollector` 和 report schema v2 已是唯一路径；CLI/examples 已完全
+  切到 runtime 结果模型，legacy `ManagedWorkflow` / `LegacyWorkflowResult` /
+  `run_workflow_steps` / `WorkflowRunner` / task runner / action batch / `RunState` /
+  task event 模型已删除。
+- CLI 只产出 report schema v2；`report-schema-v1.json` 保持冻结，仅作为已发布的历史
+  schema 资源继续可查询（`automation-runner report-schema --version 1`）。
 - 目标 `1.0.x`：冻结 workflow、capability、错误和 report v2 公共契约；在此之前目标
   设计允许破坏性调整，不添加没有外部需求支撑的兼容包装。
 
@@ -260,7 +263,7 @@ runtime，而不是由 app 在 workflow 外部手动调用 executor。
 
 ### 4.4 能力协议
 
-当前 `0.2.x` 公共协议使用以下语义：
+公共协议使用以下语义：
 
 ```python
 CapabilityManifest(
@@ -447,9 +450,9 @@ sequenceDiagram
 4. Runtime 在成功、失败或取消后统一关闭自己拥有的资源。
 5. Collector 生成不可变 `WorkflowResult` 和 report v2。
 
-当前 `0.2.x` 仍允许 app 在 workflow 外部直接调用 executor，作为纵向能力验证入口；该
-入口不是目标 workflow 组合模型，迁移到 `WorkflowStep.capability(...)` 后应从业务模板中
-删除。
+app 不得在 workflow 外部直接调用 executor 充当业务流程；capability 一律通过
+`WorkflowStep.capability(...)` 进入 runtime 生命周期。纵向能力验证通过带 fake provider
+的离线 workflow 测试完成。
 
 ## 6. Slidex 视觉能力
 
@@ -510,8 +513,7 @@ tests/
   test_imports.py
 ```
 
-当前 `0.2.x` 应用可以通过通用 helper 验证 capability 纵向链路，但不得把 helper 当成
-最终 workflow 编排模型。目标 `0.3.x` 应用必须：
+应用必须：
 
 - 通过 `automation_runner.workflows` 构建 workflow。
 - 在 workflow 中声明 `WorkflowStep.action(...)` 或 `WorkflowStep.capability(...)`，不在
@@ -545,10 +547,11 @@ workflow authoring/runtime/CLI，`adapters` 提供 Selenium/Appium session，业
 5. 返回带有 context、steps、events 和 artifacts 的 `WorkflowResult`，不通过业务字典
    重新定义平台生命周期。
 
-当前 V1 runner 仍支持 `create_workflow(session_factory)` 和
-`create_workflow(session_factory, context, options)` 两种 factory 形状；V2 迁移完成后
-统一使用 typed context/options。CLI 的优先级固定为：显式 CLI > 环境变量 > 配置源 >
-代码默认值。`--param KEY=VALUE` 的值保持字符串，由业务 workflow 负责解析；空 key、
+workflow factory 的 CLI 契约：`create_workflow(session_factory=..., context=...,
+options=...)` 返回 `ComposedWorkflow`（或任何 `run()` 产出
+`automation_core.execution.WorkflowResult` 的对象）；factory 应把 context 中的
+live/factory 信息写入 runtime 的 `metadata`，使 v2 报告带可公开的运行配置摘要。
+CLI 的优先级固定为：显式 CLI > 环境变量 > 配置源 > 代码默认值。`--param KEY=VALUE` 的值保持字符串，由业务 workflow 负责解析；空 key、
 空 factory、空 URL、空 app id 在 factory 加载前拒绝。built-in workflow name 与
 `--workflow-factory` 不能同时提供。
 
@@ -567,9 +570,11 @@ session factory 前完成类型和空字符串校验。业务参数由 app 校�
 
 ### 8.2 报告
 
-报告 schema 必须带版本。当前 `report-schema-v1.json` 继续冻结；目标 `report-schema-v2`
-以 `steps` 为中心。新增可选字段保持向后兼容；删除或改变字段语义必须提升主版本。
-报告只写安全序列化后的数据，不直接序列化 page、driver、bytes 或任意对象。
+报告 schema 必须带版本。runner 与 CLI 只产出 `report-schema-v2`（以 `steps` 为中心）；
+`report-schema-v1.json` 冻结为历史发布资源，不再有生产者。新增可选字段保持向后兼容；
+删除或改变字段语义必须提升主版本。报告只写安全序列化后的数据，不直接序列化 page、
+driver、bytes 或任意对象。workflow factory 装配失败发生在运行开始之前，没有 run
+identity 可报告——此时 CLI 以 stderr 报错并返回退出码，不产出报告。
 
 目标 v2 报告至少包含：
 
@@ -581,8 +586,8 @@ session factory 前完成类型和空字符串校验。业务参数由 app 校�
 
 #### 8.2.1 v1 冻结字段
 
-`report-schema-v1.json` 仍描述当前 V1 runner 输出，字段必须与实际序列化结果保持一致。
-下列字段是 v1 报告的完整顶层集合：
+`report-schema-v1.json` 冻结了 legacy runner 时代报告的完整顶层集合（该路径已删除，
+schema 仅作为历史发布资源保留）。下列字段是 v1 报告的完整顶层集合：
 
 - `schema_version`
 - `workflow`
@@ -610,7 +615,8 @@ v1 的每个 artifact entry 只允许以下字段：
 
 v1 的 artifact metadata、event payload 和 workflow context 必须递归脱敏；不得把 raw bytes、
 page/driver 对象、cookie、token、action data 或 skipped action parameters 写入公开报告。
-新增或改变 v1 字段只能通过兼容扩展或新 schema 版本完成，不能静默修改语义。
+新增或改变 v1 字段只能通过兼容扩展或新 schema 版本完成，不能静默修改语义；v1 schema
+文件本身不再随功能演进修改。
 
 ### 8.3 事件与报告收集
 
@@ -637,7 +643,9 @@ Runtime 默认按声明顺序串行执行 step。并行 step 必须由 workflow 
 ### 8.4 脱敏
 
 以下键名及其大小写变体必须递归脱敏：`authorization`、`cookie`、`password`、
-`secret`、`token`、`x5sec`、`x5secdata`。原始图片和页面源也可能包含个人信息，
+`secret`、`token`、`x5sec`、`x5secdata`。唯一实现是 `automation_core.redaction.redact`；
+所有报告、事件、artifact metadata、capability 参数/结果/action data 序列化边界都必须
+经过它，禁止在边界处复制私有脱敏实现。原始图片和页面源也可能包含个人信息，
 artifact 保留策略由部署方配置，默认不得上传公共 CI。
 
 ### 8.5 Artifact 契约
@@ -731,6 +739,15 @@ automation-kit 后执行完整测试。Python 3.8/3.11 测试环境统一用 pip
 | wheel 构建与隔离安装 | 四仓 wheel 构建通过；Python 3.8/3.12 隔离安装通过 |
 | 五仓 `git diff --check` | 通过 |
 
+### 10.4 2026-09-03 验证基线
+
+| 范围 | 结果 |
+| --- | --- |
+| automation-kit 全量离线测试 | `297 passed`，coverage `>= 80%`（pytest 门禁） |
+| legacy 结果路径 | `automation-kit` 内已删除；CLI/examples 只产出 report schema v2 |
+| wheel 构建与隔离安装 | 通过（`pip wheel --no-deps`） |
+| `git diff --check` | 通过 |
+
 ## 11. 当前状态与差距
 
 ### 11.1 已实现
@@ -745,6 +762,13 @@ automation-kit 后执行完整测试。Python 3.8/3.11 测试环境统一用 pip
 - Slidex 已通过 `SlidexVisualCapability` 实现通用视觉能力 provider。
 - 大麦和点评只保留通用 capability 入口和跨仓纵向测试；旧 Slidex helper 已删除。
 - OCR 独立插件已归档。
+- runtime 模型收口（2026-09-03）：CLI/examples 只产出 runtime `WorkflowResult` 与
+  report schema v2；legacy 结果路径删除；`automation_core.redaction` 成为唯一脱敏实现
+  （v1 词表遗漏的 `x5sec`/`x5secdata` 一并补齐）；runtime 对 action/artifact 异常做
+  归一化（异常不再逃出 `arun`），capability 装配错误按 registration/resolution/config
+  分类，`execution_profile` 的取消能力由 runtime 消费（unsupported 不承诺硬超时），
+  `retry.attempt` / `action.end` / `capability.end` / `artifact` 事件进入报告流，
+  deadline 在单调钟上执行。
 
 ### 11.2 本轮已完成交付
 
@@ -762,13 +786,13 @@ automation-kit 后执行完整测试。Python 3.8/3.11 测试环境统一用 pip
 
 ### 11.3 后续阶段
 
-#### 阶段 2：执行上下文与 workflow capability step
+#### 阶段 2：执行上下文与 workflow capability step（✅ 已完成，含 CLI/examples 收口）
 
-交付：统一 `ExecutionContext`、`ExecutionFailure`、`StepExecutionResult`；实现异步
-`WorkflowRuntime` 和同步外观；增加 `WorkflowStep.capability(...)`、单一异步 Provider V2
-入口、runtime-owned policy 和 `ReportCollector`；输出 report schema v2。验收：同步和
-异步 workflow 各有端到端离线测试，成功、业务失败、异常、timeout、取消和清理失败路径
-均可验证，`run_id`/`task_id` 在所有 step/event/artifact 中一致。
+交付：统一 `ExecutionContext`、`ExecutionFailure`、`StepExecutionResult`；异步
+`WorkflowRuntime` 和同步外观；`WorkflowStep.capability(...)`、单一异步 Provider V2
+入口、runtime-owned policy 和 `ReportCollector`；report schema v2 为 CLI 唯一输出。
+验收：同步和异步 workflow 各有端到端离线测试，成功、业务失败、异常、timeout、取消和
+清理失败路径均可验证，`run_id`/`task_id` 在所有 step/event/artifact 中一致。
 对应详细任务：Task 1、Task 2、Task 3、Task 4、Task 5。
 
 #### 阶段 3：发布与兼容矩阵

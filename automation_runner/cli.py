@@ -362,6 +362,8 @@ def main(
             workflow = _build_workflow(
                 args, config, options, session_factory, workflow_name
             )
+        except ValueError as exc:
+            return _print_error(str(exc))
         except Exception as exc:
             return _print_run_error(f"{type(exc).__name__}: {exc}")
 

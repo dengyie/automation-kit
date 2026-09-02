@@ -1,386 +1,138 @@
 from pathlib import Path
 
-from automation_core.actions import ActionBatchResult, ActionRequest
-from automation_core.drivers import ActionResult, ArtifactHandle, SessionInfo
-from automation_core.events import EventEnvelope, TaskStartEvent
-from automation_core.state import RunState, RunStatus
-from automation_runner.context import WorkflowContext
-from automation_runner.reports import build_report
-from examples.workflows import ExampleWorkflowResult
+from automation_core.capabilities import CapabilityResult
+from automation_core.drivers import ActionResult, ArtifactHandle
+from automation_core.execution import (
+    ExecutionContext,
+    StepExecutionResult,
+    StepKind,
+    StepStatus,
+    WorkflowResult,
+    WorkflowStatus,
+)
+from automation_runner.reports import RunnerReportV2, build_report_v2
 
 
-def test_build_report_serializes_safe_workflow_summary():
-    started_at = 1.5
-    result = ExampleWorkflowResult(
-        session=SessionInfo(
-            driver_name="fake",
-            platform="web",
-            identifier="run-1",
+def _context():
+    return ExecutionContext(
+        run_id="run-1",
+        task_id=None,
+        workflow_name="smoke",
+        metadata={"live": True, "x5sec": "leak"},
+    )
+
+
+def _step(step_id, **overrides):
+    values = dict(
+        step_id=step_id,
+        step_name=f"step-{step_id}",
+        kind=StepKind.ACTION,
+        status=StepStatus.SUCCEEDED,
+        attempts=1,
+        duration_ms=5,
+        context=_context().for_step(step_id),
+        action_result=ActionResult(
+            success=True,
+            message="open",
+            data={"url": "https://example.test", "cookie": "leak"},
         ),
+    )
+    values.update(overrides)
+    return StepExecutionResult(**values)
+
+
+def test_build_report_v2_round_trips_a_runtime_result():
+    result = WorkflowResult(
+        context=_context(),
+        status=WorkflowStatus.SUCCEEDED,
+        steps=[_step("step-1")],
+    )
+
+    report = build_report_v2(result)
+    payload = report.to_dict()
+
+    assert isinstance(report, RunnerReportV2)
+    assert payload["schema_version"] == "2"
+    assert payload["status"] == "succeeded"
+    assert payload["success"] is True
+    assert payload["failure"] is None
+    assert payload["steps"][0]["action_result"]["data"] == {
+        "url": "https://example.test",
+        "cookie": "[redacted]",
+    }
+
+
+def test_build_report_v2_redacts_metadata_and_artifact_metadata():
+    capability_result = CapabilityResult(
         success=True,
-        actions=[
-            ActionResult(
-                success=True,
-                message="get",
-                data={"token": "do-not-serialize"},
-            ),
-        ],
+        provider="slidex",
         artifacts=[
             ArtifactHandle(
-                artifact_type="screenshot",
-                path=Path("artifacts/run-1/screenshot/home.png"),
-                metadata={"source": "driver"},
-            ),
-        ],
-    )
-
-    run_state = RunState(run_id="run-1", started_at=started_at)
-    run_state.succeed(finished_at=2.5)
-
-    report = build_report(
-        "damai-web-smoke",
-        result,
-        run_state=run_state,
-        live=True,
-    ).to_dict()
-
-    assert report["schema_version"] == "1"
-    assert report["workflow"] == "damai-web-smoke"
-    assert report["workflow_factory"] is None
-    assert report["success"] is True
-    assert report["status"] == "succeeded"
-    assert report["run_id"] == "run-1"
-    assert report["run_state"]["run_id"] == "run-1"
-    assert report["run_state"]["status"] == "succeeded"
-    assert report["run_state"]["started_at"] == started_at
-    assert report["run_state"]["finished_at"] == 2.5
-    assert report["run_state"]["outcome"] == "succeeded"
-    assert report["live"] is True
-    assert report["elapsed_seconds"] is None
-    assert report["events"] == []
-    assert report["session"] == {
-        "driver_name": "fake",
-        "platform": "web",
-        "identifier": "run-1",
-    }
-    assert report["actions"] == [
-        {
-            "success": True,
-            "message": "get",
-        },
-    ]
-    assert report["artifacts"] == [
-        {
-            "artifact_type": "screenshot",
-            "path": "artifacts/run-1/screenshot/home.png",
-            "metadata": {"source": "driver"},
-        },
-    ]
-    assert report["error"] is None
-
-
-def test_build_report_defaults_to_non_live():
-    result = ExampleWorkflowResult(
-        session=SessionInfo(
-            driver_name="fake",
-            platform="web",
-            identifier="run-1",
-        ),
-        success=False,
-        actions=[],
-        artifacts=[],
-    )
-
-    report = build_report("damai-web-smoke", result).to_dict()
-
-    assert report["live"] is False
-    assert report["run_id"] == "run-1"
-    assert report["status"] == "failed"
-    assert report["run_state"]["status"] == "failed"
-    assert report["run_state"]["outcome"] == "failed"
-    assert report["events"] == []
-
-
-def test_build_report_serializes_run_state():
-    result = ExampleWorkflowResult(
-        session=SessionInfo(
-            driver_name="fake",
-            platform="web",
-            identifier="run-1",
-        ),
-        success=True,
-        actions=[],
-        artifacts=[],
-    )
-
-    run_state = RunState(
-        run_id="run-1",
-        status=RunStatus.SUCCEEDED,
-        started_at=1.25,
-        finished_at=2.5,
-        outcome="ok",
-    )
-
-    report = build_report("damai-web-smoke", result, run_state=run_state).to_dict()
-
-    assert report["run_state"] == {
-        "run_id": "run-1",
-        "status": "succeeded",
-        "started_at": 1.25,
-        "finished_at": 2.5,
-        "outcome": "ok",
-    }
-
-
-def test_build_report_serializes_cancelled_run_state():
-    result = ExampleWorkflowResult(
-        session=SessionInfo(
-            driver_name="fake",
-            platform="web",
-            identifier="run-1",
-        ),
-        success=False,
-        actions=[],
-        artifacts=[],
-    )
-
-    run_state = RunState(
-        run_id="run-1",
-        status=RunStatus.CANCELLED,
-        started_at=1.25,
-        finished_at=2.5,
-        outcome="cancelled",
-    )
-
-    report = build_report("damai-web-smoke", result, run_state=run_state).to_dict()
-
-    assert report["status"] == "cancelled"
-    assert report["run_state"]["status"] == "cancelled"
-    assert report["run_state"]["outcome"] == "cancelled"
-
-
-def test_build_report_serializes_artifact_metadata():
-    result = ExampleWorkflowResult(
-        session=SessionInfo(
-            driver_name="fake",
-            platform="web",
-            identifier="run-1",
-        ),
-        success=True,
-        actions=[],
-        artifacts=[
-            ArtifactHandle(
-                artifact_type="trace",
-                path=Path("artifacts/run-1/trace/trace.json"),
-                metadata={
-                    "source": "driver",
-                    "kind": "trace",
-                    "auth_token": "secret-token",
-                },
-            ),
-        ],
-    )
-
-    report = build_report("damai-web-smoke", result).to_dict()
-
-    assert report["artifacts"] == [
-        {
-            "artifact_type": "trace",
-            "path": "artifacts/run-1/trace/trace.json",
-            "metadata": {
-                "auth_token": "[redacted]",
-                "kind": "trace",
-                "source": "driver",
-            },
-        },
-    ]
-
-
-def test_build_report_serializes_workflow_events():
-    result = ExampleWorkflowResult(
-        session=SessionInfo(
-            driver_name="fake",
-            platform="web",
-            identifier="run-1",
-        ),
-        success=True,
-        actions=[],
-        artifacts=[],
-        events=[
-            TaskStartEvent(
-                task_name="damai-web-smoke",
-                task_id="run-1",
-            ).to_envelope()
-        ],
-    )
-
-    report = build_report("damai-web-smoke", result).to_dict()
-
-    assert report["events"][0]["event_type"] == "task.start"
-    assert report["events"][0]["task_id"] == "run-1"
-    assert report["events"][0]["payload"] == {
-        "task_name": "damai-web-smoke",
-        "task_id": "run-1",
-    }
-
-
-def test_build_report_redacts_sensitive_event_payload_fields():
-    result = ExampleWorkflowResult(
-        session=SessionInfo(
-            driver_name="fake",
-            platform="web",
-            identifier="run-1",
-        ),
-        success=False,
-        actions=[],
-        artifacts=[],
-        events=[
-            EventEnvelope(
-                event_type="error",
-                task_id="run-1",
-                payload={
-                    "task_name": "checkout",
-                    "auth_token": "secret-token",
-                    "details": {
-                        "cookie": "session=abc",
-                        "attempt": 1,
-                    },
-                    "attempts": [
-                        {
-                            "password": "secret",
-                            "status": "failed",
-                        }
-                    ],
-                },
+                artifact_type="telemetry",
+                path=Path("artifacts/run-1/telemetry.json"),
+                metadata={"x5secdata": "leak", "source": "unit"},
             )
         ],
     )
-
-    report = build_report("damai-web-smoke", result).to_dict()
-
-    assert report["events"][0]["payload"] == {
-        "task_name": "checkout",
-        "auth_token": "[redacted]",
-        "details": {
-            "cookie": "[redacted]",
-            "attempt": 1,
-        },
-        "attempts": [
-            {
-                "password": "[redacted]",
-                "status": "failed",
-            }
-        ],
-    }
-
-
-def test_build_report_records_factory_elapsed_and_error_summary():
-    result = ExampleWorkflowResult(
-        session=SessionInfo(
-            driver_name="fake",
-            platform="web",
-            identifier="run-1",
-        ),
-        success=False,
-        actions=[],
-        artifacts=[],
+    step = StepExecutionResult(
+        step_id="step-1",
+        step_name="step-step-1",
+        kind=StepKind.CAPABILITY,
+        status=StepStatus.SUCCEEDED,
+        attempts=1,
+        duration_ms=5,
+        context=_context().for_step("step-1"),
+        capability_result=capability_result,
+    )
+    result = WorkflowResult(
+        context=_context(),
+        status=WorkflowStatus.SUCCEEDED,
+        steps=[step],
+        artifacts=list(step.capability_result.artifacts),
     )
 
-    report = build_report(
-        "damai-web-smoke",
-        result,
-        workflow_factory="tests.runner.fixtures:create_workflow",
-        session_factory="tests.runner.fixtures:make_session",
-        elapsed_seconds=0.25,
-        error="workflow failed",
-    ).to_dict()
+    payload = build_report_v2(result).to_dict()
 
-    assert report["workflow_factory"] == "tests.runner.fixtures:create_workflow"
-    assert report["session_factory"] == "tests.runner.fixtures:make_session"
-    assert report["elapsed_seconds"] == 0.25
-    assert report["error"] == "workflow failed"
-
-
-def test_build_report_serializes_workflow_context():
-    result = ExampleWorkflowResult(
-        session=SessionInfo(
-            driver_name="fake",
-            platform="web",
-            identifier="run-1",
-        ),
-        success=True,
-        actions=[],
-        artifacts=[],
-    )
-
-    report = build_report(
-        "custom",
-        result,
-        workflow_context=WorkflowContext(
-            workflow_name="custom",
-            live=True,
-            workflow_factory="pkg:create",
-            session_factory="pkg:session",
-        ),
-    ).to_dict()
-
-    assert report["workflow_context"] == {
-        "workflow_name": "custom",
-        "live": True,
-        "workflow_factory": "pkg:create",
-        "session_factory": "pkg:session",
+    assert payload["context"]["metadata"]["x5sec"] == "[redacted]"
+    assert payload["steps"][0]["capability_result"]["artifacts"][0]["metadata"] == {
+        "x5secdata": "[redacted]",
+        "source": "unit",
     }
+    assert payload["artifacts"][0]["metadata"] == {
+        "x5secdata": "[redacted]",
+        "source": "unit",
+    }
+    assert payload["providers"] == [
+        {"provider": "slidex", "step_id": "step-1", "success": True}
+    ]
 
 
-def test_build_report_serializes_action_batch_summary():
-    result = ExampleWorkflowResult(
-        session=SessionInfo(
-            driver_name="fake",
-            platform="web",
-            identifier="run-1",
-        ),
-        success=True,
-        actions=[
-            ActionResult(success=True, message="get"),
-        ],
-        artifacts=[],
-        batch_result=ActionBatchResult(
-            results=[
-                ActionResult(
-                    success=True,
-                    message="get",
-                    data={
-                        "auth_token": "secret-token",
-                        "url": "https://example.test",
-                    },
-                )
-            ],
-            skipped=[
-                ActionRequest(
-                    name="after",
-                    parameters={
-                        "password": "secret",
-                        "selector": "#buy",
-                    },
-                )
-            ],
+def test_build_report_v2_keeps_failure_and_sequence():
+    failing_step = _step(
+        "step-1",
+        status=StepStatus.FAILED,
+        action_result=ActionResult(success=False, message="open"),
+    )
+    from automation_core.execution import ExecutionFailure, FailureCategory
+
+    result = WorkflowResult(
+        context=_context(),
+        status=WorkflowStatus.FAILED,
+        steps=[failing_step],
+        failure=ExecutionFailure(
+            category=FailureCategory.BUSINESS,
+            code="action_failed",
+            message="action failed: open",
+            retryable=False,
+            source="action",
         ),
     )
 
-    report = build_report("damai-web-smoke", result).to_dict()
+    payload = build_report_v2(result).to_dict()
 
-    assert report["action_batch"] == {
-        "results": [
-            {
-                "success": True,
-                "message": "get",
-            },
-        ],
-        "skipped": [
-            {
-                "name": "after",
-                "stop_on_failure": True,
-            },
-        ],
-        "success": True,
-    }
+    assert payload["status"] == "failed"
+    assert payload["success"] is False
+    assert payload["failure"]["category"] == "business"
+    assert payload["failure"]["code"] == "action_failed"
+    sequences = [event["sequence"] for event in payload["events"]]
+    assert sequences == sorted(sequences)

@@ -99,16 +99,20 @@ Business workflows live outside `automation_core`. A workflow factory should
 return an object with a `run()` method:
 
 ```python
-from examples.damai_web import create_workflow
+from examples.damai_web import build_steps, create_workflow
 
 workflow = create_workflow(
     session_factory=make_session,
     url="https://example.test/damai",
 )
-result = workflow.run()
+result = workflow.run()  # automation_core.execution.WorkflowResult
+
+for step in result.steps:
+    print(step.step_name, step.status.value)
 ```
 
-The runner keeps live execution opt-in:
+`WorkflowRuntime.run()` returns the execution-model result whose `steps` are the single
+source of truth for reports (report schema v2). The runner keeps live execution opt-in:
 
 ```bash
 automation-runner examples --dry-run

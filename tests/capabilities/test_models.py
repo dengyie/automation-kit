@@ -8,7 +8,6 @@ from automation_core.capabilities import (
     CapabilityResult,
 )
 from automation_core.drivers import ArtifactHandle
-from automation_core.events import EventEnvelope
 
 
 def test_manifest_declares_supported_operation_and_platform():
@@ -64,11 +63,12 @@ def test_result_to_dict_redacts_metadata_and_serializes_contract_objects():
             )
         ],
         events=[
-            EventEnvelope(
-                event_type="capability.end",
-                task_id="task-1",
-                payload={"authorization": "secret", "success": True},
-            )
+            {
+                "event_id": "evt-1",
+                "event_type": "capability.end",
+                "task_id": "task-1",
+                "payload": {"authorization": "secret", "success": True},
+            }
         ],
         metadata={"cookie": "secret", "run_id": "run-1"},
     )

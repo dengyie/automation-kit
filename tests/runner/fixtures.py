@@ -1,9 +1,9 @@
+import asyncio
 from pathlib import Path
 
-from automation_core.actions import ActionBatchResult, ActionRequest
 from automation_core.drivers import ActionResult, ArtifactHandle, SessionInfo
-from automation_core.tasks import TaskCancelledError
-from examples.workflows import ExampleWorkflow, ExampleWorkflowResult
+from automation_runner.runtime import WorkflowRuntime
+from automation_runner.workflows import ComposedWorkflow, WorkflowStep
 
 
 CREATED_SESSIONS = []
@@ -22,6 +22,7 @@ class CliFakeSession:
         self.actions = []
         self.artifacts = []
         self.fail_actions = set()
+        self.cancel_actions = set()
 
     def start(self):
         self.started = True
@@ -31,7 +32,9 @@ class CliFakeSession:
 
     def execute_action(self, action_name, **kwargs):
         if action_name in self.fail_actions:
-            raise RuntimeError(f"{action_name} failed")
+            raise RuntimeError("driver socket closed")
+        if action_name in self.cancel_actions:
+            raise asyncio.CancelledError()
         self.actions.append((action_name, kwargs))
         return ActionResult(success=True, message=action_name, data=kwargs)
 
@@ -53,6 +56,13 @@ def make_failing_session():
     return session
 
 
+def make_cancelling_session():
+    session = CliFakeSession()
+    CREATED_SESSIONS.append(session)
+    session.cancel_actions.add("open")
+    return session
+
+
 def record_import():
     IMPORT_ATTEMPTS.append("loaded")
     return make_session
@@ -62,75 +72,61 @@ def raise_session_startup():
     raise RuntimeError("session startup failed")
 
 
-def create_custom_workflow(session_factory):
-    return ExampleWorkflow(
-        name="custom-smoke",
+def _context_metadata(context):
+    return {
+        "live": context.live,
+        "workflow_factory": context.workflow_factory,
+        "session_factory": context.session_factory,
+    }
+
+
+def _runtime(session_factory, context):
+    return WorkflowRuntime(
         session_factory=session_factory,
-        run_fn=lambda session: ExampleWorkflowResult(
-            session=session.info,
-            success=True,
-            actions=[session.execute_action("custom_action")],
-            artifacts=[],
-            batch_result=ActionBatchResult(
-                results=[ActionResult(success=True, message="custom_action")],
-                skipped=[],
-            ),
-        ),
+        workflow_name=context.workflow_name,
+        metadata=_context_metadata(context),
+    )
+
+
+def create_custom_workflow(session_factory, context, options):
+    return ComposedWorkflow(
+        _runtime(session_factory, context),
+        [WorkflowStep.action("custom_action")],
     )
 
 
 def create_context_workflow(session_factory, context, options):
-    return ExampleWorkflow(
-        name=context.workflow_name,
-        session_factory=session_factory,
-        run_fn=lambda session: ExampleWorkflowResult(
-            session=session.info,
-            success=True,
-            actions=[
-                session.execute_action(
-                    "context_action",
-                    workflow=context.workflow_name,
-                    live=context.live,
-                    workflow_factory=context.workflow_factory,
-                    session_factory=context.session_factory,
-                    url=options.url,
-                    app_id=options.app_id,
-                    emit_json=options.emit_json,
-                    report_file=options.report_file,
-                    parameters=options.parameters,
-                )
-            ],
-            artifacts=[],
-            batch_result=ActionBatchResult(
-                results=[ActionResult(success=True, message="context_action")],
-                skipped=[ActionRequest(name="after_context")],
-            ),
-        ),
+    return ComposedWorkflow(
+        _runtime(session_factory, context),
+        [
+            WorkflowStep.action(
+                "context_action",
+                workflow=context.workflow_name,
+                live=context.live,
+                workflow_factory=context.workflow_factory,
+                session_factory=context.session_factory,
+                url=options.url,
+                app_id=options.app_id,
+                emit_json=options.emit_json,
+                report_file=options.report_file,
+                parameters=options.parameters,
+            )
+        ],
     )
 
 
 def create_kwargs_context_workflow(session_factory, **kwargs):
     context = kwargs["context"]
     options = kwargs["options"]
-    return ExampleWorkflow(
-        name=context.workflow_name,
-        session_factory=session_factory,
-        run_fn=lambda session: ExampleWorkflowResult(
-            session=session.info,
-            success=True,
-            actions=[
-                session.execute_action(
-                    "kwargs_context_action",
-                    workflow=context.workflow_name,
-                    url=options.url,
-                )
-            ],
-            artifacts=[],
-            batch_result=ActionBatchResult(
-                results=[ActionResult(success=True, message="kwargs_context_action")],
-                skipped=[],
-            ),
-        ),
+    return ComposedWorkflow(
+        _runtime(session_factory, context),
+        [
+            WorkflowStep.action(
+                "kwargs_context_action",
+                workflow=context.workflow_name,
+                url=options.url,
+            )
+        ],
     )
 
 
@@ -138,14 +134,21 @@ def create_raising_workflow(session_factory):
     raise RuntimeError("workflow construction failed")
 
 
-def create_cancelled_workflow(session_factory):
-    def run_fn(session):
-        raise TaskCancelledError("user requested stop")
+def create_invalid_result_workflow(session_factory, context, options):
+    class NotAResult:
+        success = False
 
-    return ExampleWorkflow(
-        name="cancelled-workflow",
-        session_factory=session_factory,
-        run_fn=run_fn,
+    class Workflow:
+        def run(self):
+            return NotAResult()
+
+    return Workflow()
+
+
+def create_cancelling_workflow(session_factory, context, options):
+    return ComposedWorkflow(
+        _runtime(make_cancelling_session, context),
+        [WorkflowStep.action("open")],
     )
 
 

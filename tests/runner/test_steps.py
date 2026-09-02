@@ -38,3 +38,28 @@ def test_workflow_step_rejects_blank_names():
                 operation="solve",
             ),
         )
+
+
+def test_workflow_step_names_are_normalized_to_the_stored_value():
+    step = WorkflowStep.action(" open ")
+
+    assert step.name == "open"
+    assert WorkflowStep.action("a/b").name == "b"
+    assert WorkflowStep.artifact("shots/deep", "x/y.png").name == "deep"
+    assert WorkflowStep.artifact("shots", "x/y.png").parameters["name"] == "y.png"
+
+
+def test_workflow_step_rejects_traversal_names():
+    for name in ("..", ".", "a/.."):
+        with pytest.raises(ValueError):
+            WorkflowStep.action(name)
+        with pytest.raises(ValueError):
+            WorkflowStep.artifact(name, "x")
+        with pytest.raises(ValueError):
+            WorkflowStep.capability(
+                name,
+                request=CapabilityRequest(
+                    capability="visual.challenge",
+                    operation="solve",
+                ),
+            )

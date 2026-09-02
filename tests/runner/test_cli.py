@@ -75,9 +75,9 @@ def test_cli_lists_example_workflows_as_json_with_dry_run(capsys):
 
 
 def test_cli_examples_json_rejects_workflow_missing_metadata(monkeypatch, capsys):
-    workflows = dict(cli.WORKFLOWS)
+    workflows = dict(cli.BUILTIN_WORKFLOWS)
     workflows["missing-metadata"] = object()
-    monkeypatch.setattr(cli, "WORKFLOWS", workflows)
+    monkeypatch.setattr(cli, "BUILTIN_WORKFLOWS", workflows)
 
     exit_code = main(["examples", "--json"])
 
@@ -110,7 +110,19 @@ def test_cli_prints_runner_version(capsys):
     assert captured.err == ""
 
 
-def test_cli_prints_report_schema_v1(capsys):
+def test_cli_prints_report_schema_v2_by_default(capsys):
+    exit_code = main(["report-schema"])
+
+    captured = capsys.readouterr()
+    schema = json.loads(captured.out)
+
+    assert exit_code == 0
+    assert schema["title"] == "Automation Kit Runner Report v2"
+    assert schema["properties"]["schema_version"]["const"] == "2"
+    assert captured.err == ""
+
+
+def test_cli_prints_frozen_report_schema_v1_on_request(capsys):
     exit_code = main(["report-schema", "--version", "1"])
 
     captured = capsys.readouterr()
@@ -155,34 +167,42 @@ def test_cli_runs_dry_workflow_without_live_flag(capsys):
     report = json.loads(captured.out)
 
     assert exit_code == 0
-    assert report["schema_version"] == "1"
-    assert report["workflow"] == "damai-web-smoke"
+    assert report["schema_version"] == "2"
+    assert report["context"]["workflow_name"] == "damai-web-smoke"
+    assert report["context"]["metadata"] == {
+        "live": False,
+        "session_factory": None,
+        "workflow_factory": None,
+    }
+    assert report["status"] == "succeeded"
     assert report["success"] is True
-    assert report["live"] is False
-    assert report["workflow_factory"] is None
-    assert report["session_factory"] is None
-    assert report["session"] == {
-        "driver_name": "dry-run",
-        "platform": "dry",
-        "identifier": "damai-web-smoke-dry-run",
-    }
+    assert report["failure"] is None
+    assert [step["step_name"] for step in report["steps"]] == ["open", "screenshot"]
+    assert report["steps"][0]["kind"] == "action"
+    assert report["steps"][0]["status"] == "succeeded"
+    assert report["steps"][0]["context"]["task_id"] == "step-1"
+    assert report["steps"][0]["action_result"]["message"] == "open"
+    assert report["steps"][1]["kind"] == "artifact"
     assert [event["event_type"] for event in report["events"]] == [
-        "task.start",
+        "workflow.start",
+        "step.start",
+        "action.end",
+        "step.end",
+        "step.start",
         "artifact",
-        "task.end",
+        "step.end",
+        "workflow.end",
     ]
-    assert report["events"][0]["task_id"] == "damai-web-smoke-dry-run"
-    assert report["events"][0]["payload"]["task_name"] == "damai-web-smoke"
-    assert report["actions"] == [
-        {"success": True, "message": "open"},
+    assert report["events"][0]["task_id"] is None
+    assert report["events"][0]["payload"]["workflow_name"] == "damai-web-smoke"
+    assert report["events"][2]["payload"] == {"step_name": "open", "success": True}
+    assert report["artifacts"] == [
+        {
+            "artifact_type": "screenshot",
+            "path": "artifacts/damai-web-smoke-dry-run/screenshot/home.png",
+            "metadata": {},
+        },
     ]
-    assert report["action_batch"] == {
-        "results": [
-            {"success": True, "message": "open"},
-        ],
-        "skipped": [],
-        "success": True,
-    }
     assert fixtures.CREATED_SESSIONS == []
 
 
@@ -203,11 +223,9 @@ def test_cli_uses_config_source_for_dry_workflow_defaults(capsys):
     report = json.loads(captured.out)
 
     assert exit_code == 0
-    assert report["workflow"] == "damai-web-smoke"
-    assert report["live"] is False
-    assert report["actions"] == [
-        {"success": True, "message": "open"},
-    ]
+    assert report["context"]["workflow_name"] == "damai-web-smoke"
+    assert report["context"]["metadata"]["live"] is False
+    assert report["steps"][0]["action_result"]["message"] == "open"
     assert fixtures.CREATED_SESSIONS == []
 
 
@@ -311,8 +329,8 @@ def test_cli_reads_runner_environment_defaults(monkeypatch, capsys):
     report = json.loads(captured.out)
 
     assert exit_code == 0
-    assert report["workflow"] == "damai-web-smoke"
-    assert report["live"] is False
+    assert report["context"]["workflow_name"] == "damai-web-smoke"
+    assert report["context"]["metadata"]["live"] is False
     assert fixtures.CREATED_SESSIONS == []
 
 
@@ -332,17 +350,14 @@ def test_cli_runs_custom_workflow_factory_in_dry_mode(capsys):
     report = json.loads(captured.out)
 
     assert exit_code == 0
-    assert report["workflow"] == "tests.runner.fixtures:create_custom_workflow"
-    assert report["workflow_factory"] == "tests.runner.fixtures:create_custom_workflow"
-    assert report["session_factory"] is None
-    assert report["session"] == {
-        "driver_name": "dry-run",
-        "platform": "dry",
-        "identifier": "tests.runner.fixtures:create_custom_workflow-dry-run",
-    }
-    assert report["actions"] == [
-        {"success": True, "message": "custom_action"},
-    ]
+    assert report["context"]["workflow_name"] == (
+        "tests.runner.fixtures:create_custom_workflow"
+    )
+    assert report["context"]["metadata"]["workflow_factory"] == (
+        "tests.runner.fixtures:create_custom_workflow"
+    )
+    assert report["context"]["metadata"]["session_factory"] is None
+    assert report["steps"][0]["action_result"]["message"] == "custom_action"
     assert fixtures.CREATED_SESSIONS == []
 
 
@@ -378,16 +393,29 @@ def test_cli_passes_context_and_options_to_custom_workflow_factory(tmp_path, cap
     report = json.loads(captured.out)
 
     assert exit_code == 0
-    assert report["workflow"] == "tests.runner.fixtures:create_context_workflow"
-    assert report["workflow_factory"] == "tests.runner.fixtures:create_context_workflow"
-    assert report["session_factory"] == "tests.runner.fixtures:make_session"
-    assert report["actions"] == [
-        {
-            "success": True,
-            "message": "context_action",
+    assert report["context"]["metadata"]["live"] is True
+    assert report["context"]["metadata"]["session_factory"] == (
+        "tests.runner.fixtures:make_session"
+    )
+    assert report["context"]["metadata"]["workflow_factory"] == (
+        "tests.runner.fixtures:create_context_workflow"
+    )
+    assert report["steps"][0]["action_result"]["message"] == "context_action"
+    assert report["steps"][0]["action_result"]["data"] == {
+        "app_id": "cn.damai",
+        "emit_json": True,
+        "live": True,
+        "report_file": str(report_path),
+        "session_factory": "tests.runner.fixtures:make_session",
+        "url": "https://example.test/damai",
+        "workflow": "tests.runner.fixtures:create_context_workflow",
+        "workflow_factory": "tests.runner.fixtures:create_context_workflow",
+        "parameters": {
+            "account": "test-user",
+            "city": "shanghai",
+            "token": "[redacted]",
         },
-    ]
-    assert "data" not in report["actions"][0]
+    }
     assert fixtures.CREATED_SESSIONS[0].actions == [
         (
             "context_action",
@@ -428,12 +456,7 @@ def test_cli_passes_context_to_custom_workflow_factory_with_kwargs(capsys):
     report = json.loads(captured.out)
 
     assert exit_code == 0
-    assert report["actions"] == [
-        {
-            "success": True,
-            "message": "kwargs_context_action",
-        },
-    ]
+    assert report["steps"][0]["action_result"]["message"] == "kwargs_context_action"
 
 
 def test_cli_reads_custom_workflow_factory_from_config(capsys):
@@ -453,7 +476,9 @@ def test_cli_reads_custom_workflow_factory_from_config(capsys):
     report = json.loads(captured.out)
 
     assert exit_code == 0
-    assert report["workflow"] == "tests.runner.fixtures:create_custom_workflow"
+    assert report["context"]["workflow_name"] == (
+        "tests.runner.fixtures:create_custom_workflow"
+    )
 
 
 def test_cli_workflow_name_overrides_config_workflow_factory(capsys):
@@ -478,11 +503,9 @@ def test_cli_workflow_name_overrides_config_workflow_factory(capsys):
     report = json.loads(captured.out)
 
     assert exit_code == 0
-    assert report["workflow"] == "damai-web-smoke"
-    assert report["workflow_factory"] is None
-    assert report["actions"] == [
-        {"success": True, "message": "open"},
-    ]
+    assert report["context"]["workflow_name"] == "damai-web-smoke"
+    assert report["context"]["metadata"]["workflow_factory"] is None
+    assert report["steps"][0]["action_result"]["message"] == "open"
     assert fixtures.CREATED_SESSIONS == []
 
 
@@ -649,9 +672,11 @@ def test_cli_uses_config_source_for_live_workflow(capsys):
     report = json.loads(captured.out)
 
     assert exit_code == 0
-    assert report["live"] is True
-    assert report["workflow_factory"] is None
-    assert report["session_factory"] == "tests.runner.fixtures:make_session"
+    assert report["context"]["metadata"]["live"] is True
+    assert report["context"]["metadata"]["workflow_factory"] is None
+    assert report["context"]["metadata"]["session_factory"] == (
+        "tests.runner.fixtures:make_session"
+    )
     assert len(fixtures.CREATED_SESSIONS) == 1
 
 
@@ -740,7 +765,7 @@ def test_cli_dry_workflow_does_not_load_factory(capsys):
     report = json.loads(captured.out)
 
     assert exit_code == 0
-    assert report["live"] is False
+    assert report["context"]["metadata"]["live"] is False
     assert fixtures.CREATED_SESSIONS == []
 
 
@@ -1032,46 +1057,43 @@ def test_cli_can_emit_json_report_for_live_workflow(capsys):
     report = json.loads(captured.out)
 
     assert exit_code == 0
-    assert report["workflow"] == "damai-web-smoke"
-    assert report["workflow_factory"] is None
-    assert report["session_factory"] == "tests.runner.fixtures:make_session"
-    assert report["success"] is True
+    assert report["schema_version"] == "2"
+    assert report["context"]["workflow_name"] == "damai-web-smoke"
+    assert report["context"]["metadata"]["live"] is True
+    assert report["context"]["metadata"]["session_factory"] == (
+        "tests.runner.fixtures:make_session"
+    )
     assert report["status"] == "succeeded"
-    assert report["run_id"] == "cli-run"
-    assert report["run_state"]["run_id"] == "cli-run"
-    assert report["run_state"]["status"] == "succeeded"
-    assert report["run_state"]["finished_at"] is not None
-    assert report["run_state"]["outcome"] == "succeeded"
-    assert report["live"] is True
-    assert isinstance(report["elapsed_seconds"], float)
-    assert report["elapsed_seconds"] >= 0
+    assert report["success"] is True
+    assert report["failure"] is None
     assert [event["event_type"] for event in report["events"]] == [
-        "task.start",
+        "workflow.start",
+        "step.start",
+        "action.end",
+        "step.end",
+        "step.start",
         "artifact",
-        "task.end",
+        "step.end",
+        "workflow.end",
     ]
-    assert report["events"][0]["task_id"] == "cli-run"
-    assert report["events"][0]["payload"]["task_name"] == "damai-web-smoke"
-    assert report["events"][1]["payload"] == {
-        "task_name": "damai-web-smoke",
-        "task_id": "cli-run",
+    assert report["events"][0]["run_id"] == report["context"]["run_id"]
+    assert report["context"]["run_id"]
+    assert report["events"][0]["payload"]["workflow_name"] == "damai-web-smoke"
+    assert report["events"][2]["payload"] == {"step_name": "open", "success": True}
+    assert report["events"][5]["payload"] == {
         "artifact_type": "screenshot",
         "path": "home.png",
     }
-    assert report["events"][2]["payload"]["outcome"] == "succeeded"
-    assert report["error"] is None
-    assert report["session"] == {
-        "driver_name": "fake-cli",
-        "platform": "web",
-        "identifier": "cli-run",
+    assert report["events"][-1]["payload"]["status"] == "succeeded"
+    assert report["steps"][0]["action_result"] == {
+        "success": True,
+        "message": "open",
+        "data": {"url": "https://example.test/damai"},
     }
-    assert report["actions"] == [
-        {"success": True, "message": "open"},
-    ]
     assert report["artifacts"] == [
         {"artifact_type": "screenshot", "path": "home.png", "metadata": {}},
     ]
-    assert "data" not in report["actions"][0]
+    assert report["providers"] == []
 
 
 def test_cli_can_write_json_report_to_file(tmp_path, capsys):
@@ -1150,33 +1172,26 @@ def test_cli_emits_json_report_when_workflow_fails(tmp_path, capsys):
 
     assert exit_code == 1
     assert report_path.read_text(encoding="utf-8") == captured.out
-    assert report["workflow"] == "damai-web-smoke"
-    assert report["workflow_factory"] is None
-    assert report["session_factory"] == "tests.runner.fixtures:make_failing_session"
-    assert report["success"] is False
+    assert report["context"]["workflow_name"] == "damai-web-smoke"
     assert report["status"] == "failed"
-    assert report["run_id"] == "cli-run"
-    assert report["run_state"]["run_id"] == "cli-run"
-    assert report["run_state"]["status"] == "failed"
-    assert report["run_state"]["finished_at"] is not None
-    assert report["run_state"]["outcome"] == "failed"
-    assert report["live"] is True
-    assert report["error"] is None
+    assert report["success"] is False
+    assert report["failure"]["category"] == "provider"
+    assert report["failure"]["code"] == "action_execution_failed"
+    assert report["failure"]["message"] == "action failed: open"
+    assert report["failure"]["retryable"] is False
+    assert report["failure"]["details"] == {"error_type": "RuntimeError"}
+    assert "driver socket closed" not in captured.out
     assert [event["event_type"] for event in report["events"]] == [
-        "task.start",
-        "task.end",
+        "workflow.start",
+        "step.start",
+        "action.end",
+        "step.end",
+        "workflow.end",
     ]
-    assert report["events"][1]["payload"]["outcome"] == "failed"
-    assert report["actions"] == [
-        {"success": False, "message": "open failed: open failed"}
-    ]
-    assert report["action_batch"] == {
-        "results": [
-            {"success": False, "message": "open failed: open failed"},
-        ],
-        "skipped": [],
-        "success": False,
-    }
+    assert report["events"][2]["payload"]["success"] is False
+    assert report["events"][-1]["payload"]["status"] == "failed"
+    assert report["steps"][0]["status"] == "failed"
+    assert report["steps"][0]["error"]["code"] == "action_execution_failed"
     assert report["artifacts"] == []
     assert fixtures.CREATED_SESSIONS[0].stopped is True
 
@@ -1188,7 +1203,7 @@ def test_cli_emits_json_report_when_workflow_is_cancelled(capsys):
         [
             "run",
             "--workflow-factory",
-            "tests.runner.fixtures:create_cancelled_workflow",
+            "tests.runner.fixtures:create_cancelling_workflow",
             "--json",
         ]
     )
@@ -1197,17 +1212,20 @@ def test_cli_emits_json_report_when_workflow_is_cancelled(capsys):
     report = json.loads(captured.out)
 
     assert exit_code == 130
-    assert report["workflow"] == "tests.runner.fixtures:create_cancelled_workflow"
-    assert report["workflow_factory"] == "tests.runner.fixtures:create_cancelled_workflow"
-    assert report["success"] is False
+    assert report["context"]["workflow_name"] == (
+        "tests.runner.fixtures:create_cancelling_workflow"
+    )
     assert report["status"] == "cancelled"
-    assert report["run_state"]["status"] == "cancelled"
-    assert report["run_state"]["outcome"] == "cancelled"
+    assert report["success"] is False
+    assert report["failure"]["category"] == "cancelled"
+    assert report["steps"][0]["status"] == "cancelled"
     assert [event["event_type"] for event in report["events"]] == [
-        "task.start",
-        "task.end",
+        "workflow.start",
+        "step.start",
+        "step.end",
+        "workflow.end",
     ]
-    assert report["events"][-1]["payload"]["outcome"] == "cancelled"
+    assert report["events"][2]["payload"]["status"] == "cancelled"
 
 
 def test_cli_returns_cancelled_exit_code_without_json(capsys):
@@ -1217,14 +1235,16 @@ def test_cli_returns_cancelled_exit_code_without_json(capsys):
         [
             "run",
             "--workflow-factory",
-            "tests.runner.fixtures:create_cancelled_workflow",
+            "tests.runner.fixtures:create_cancelling_workflow",
         ]
     )
 
     captured = capsys.readouterr()
 
     assert exit_code == 130
-    assert captured.out == "tests.runner.fixtures:create_cancelled_workflow success=False\n"
+    assert captured.out == (
+        "tests.runner.fixtures:create_cancelling_workflow success=False\n"
+    )
     assert captured.err == ""
 
 
@@ -1252,36 +1272,21 @@ def test_cli_emits_json_report_when_session_factory_fails(tmp_path, capsys):
 
     assert exit_code == 1
     assert report_path.read_text(encoding="utf-8") == captured.out
-    assert report["workflow"] == "damai-web-smoke"
-    assert report["success"] is False
+    assert report["context"]["workflow_name"] == "damai-web-smoke"
     assert report["status"] == "failed"
-    assert report["run_id"] == "damai-web-smoke-failed-run"
-    assert report["run_state"]["status"] == "failed"
-    assert report["live"] is True
-    assert report["session"] == {
-        "driver_name": "unavailable",
-        "platform": "unknown",
-        "identifier": "damai-web-smoke-failed-run",
-    }
-    assert report["actions"] == []
-    assert report["artifacts"] == []
-    assert report["error"] == "RuntimeError: session startup failed"
+    assert report["failure"]["category"] == "config"
+    assert report["failure"]["code"] == "session_start_failed"
+    assert report["failure"]["details"] == {"error_type": "RuntimeError"}
+    assert "session startup failed" not in captured.out
     assert [event["event_type"] for event in report["events"]] == [
-        "task.start",
-        "error",
-        "task.end",
+        "workflow.start",
+        "workflow.end",
     ]
-    assert report["events"][0]["task_id"] == "damai-web-smoke-failed-run"
-    assert report["events"][1]["payload"] == {
-        "task_name": "damai-web-smoke",
-        "task_id": "damai-web-smoke-failed-run",
-        "message": "session startup failed",
-        "error_type": "RuntimeError",
-    }
-    assert report["events"][2]["payload"]["outcome"] == "failed"
+    assert report["steps"] == []
+    assert report["artifacts"] == []
 
 
-def test_cli_emits_json_report_when_custom_workflow_factory_fails(capsys):
+def test_cli_emits_error_without_report_when_custom_workflow_factory_fails(capsys):
     fixtures.reset()
 
     exit_code = main(
@@ -1294,25 +1299,29 @@ def test_cli_emits_json_report_when_custom_workflow_factory_fails(capsys):
     )
 
     captured = capsys.readouterr()
-    report = json.loads(captured.out)
 
     assert exit_code == 1
-    assert report["workflow"] == "tests.runner.fixtures:create_raising_workflow"
-    assert report["workflow_factory"] == "tests.runner.fixtures:create_raising_workflow"
-    assert report["success"] is False
-    assert report["run_id"] == "tests.runner.fixtures:create_raising_workflow-failed-run"
-    assert report["error"] == "RuntimeError: workflow construction failed"
-    assert [event["event_type"] for event in report["events"]] == [
-        "task.start",
-        "error",
-        "task.end",
-    ]
-    assert report["events"][1]["payload"] == {
-        "task_name": "tests.runner.fixtures:create_raising_workflow",
-        "task_id": "tests.runner.fixtures:create_raising_workflow-failed-run",
-        "message": "workflow construction failed",
-        "error_type": "RuntimeError",
-    }
+    assert captured.out == ""
+    assert "RuntimeError: workflow construction failed" in captured.err
+
+
+def test_cli_rejects_workflow_result_of_unexpected_type(capsys):
+    fixtures.reset()
+
+    exit_code = main(
+        [
+            "run",
+            "--workflow-factory",
+            "tests.runner.fixtures:create_invalid_result_workflow",
+            "--json",
+        ]
+    )
+
+    captured = capsys.readouterr()
+
+    assert exit_code == 1
+    assert captured.out == ""
+    assert "must return automation_core.execution.WorkflowResult" in captured.err
 
 
 def test_cli_creates_report_file_parent_directories(tmp_path, capsys):

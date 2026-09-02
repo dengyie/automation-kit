@@ -293,6 +293,9 @@ class WorkflowRuntime:
         step_context: ExecutionContext,
         result: StepExecutionResult,
     ) -> None:
+        if result.kind is StepKind.ARTIFACT:
+            # Artifact steps carry their evidence in the artifact event.
+            return
         if result.kind is StepKind.CAPABILITY and result.capability_result is not None:
             payload: Dict[str, Any] = {
                 "step_name": result.step_name,

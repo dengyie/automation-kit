@@ -6,6 +6,7 @@ from automation_core.capabilities.models import CapabilityResult
 from automation_core.drivers import ActionResult, ArtifactHandle
 from automation_core.execution.context import ExecutionContext
 from automation_core.execution.failures import ExecutionFailure
+from automation_core.redaction import redact
 
 
 class StepKind(str, Enum):
@@ -34,13 +35,10 @@ def _required_string(value: str, name: str) -> str:
 
 
 def _serialize_action_result(result: ActionResult) -> Dict[str, Any]:
-    data = result.data
-    if data is not None and not isinstance(data, (bool, int, float, str, list, dict, type(None))):
-        data = f"<{type(data).__name__}>"
     return {
         "success": result.success,
         "message": result.message,
-        "data": data,
+        "data": redact(result.data),
     }
 
 
@@ -48,7 +46,7 @@ def _serialize_artifact(artifact: ArtifactHandle) -> Dict[str, Any]:
     return {
         "artifact_type": artifact.artifact_type,
         "path": str(artifact.path),
-        "metadata": dict(artifact.metadata),
+        "metadata": redact(dict(artifact.metadata)),
     }
 
 

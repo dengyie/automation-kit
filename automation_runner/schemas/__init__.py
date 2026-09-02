@@ -3,7 +3,7 @@ from importlib import resources
 from typing import Dict
 
 
-REPORT_SCHEMA_VERSION = "1"
+REPORT_SCHEMA_VERSION = "2"
 REPORT_SCHEMA_RESOURCE = "report-schema-v1.json"
 
 _SCHEMA_RESOURCES = {

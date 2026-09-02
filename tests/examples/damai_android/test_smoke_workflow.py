@@ -1,10 +1,11 @@
 from pathlib import Path
 
 from automation_core.drivers import ActionResult, ArtifactHandle, SessionInfo
-from examples.damai_android import create_workflow, run_smoke_workflow
+from automation_core.execution import FailureCategory
+from examples.damai_android import build_steps, create_workflow
 
 
-class FakeSession:
+class FakeAppiumSession:
     def __init__(self):
         self.info = SessionInfo(
             driver_name="fake-appium",
@@ -24,92 +25,53 @@ class FakeSession:
 
     def execute_action(self, action_name, **kwargs):
         self.actions.append((action_name, kwargs))
-        return ActionResult(success=True, message=action_name, data=kwargs)
+        return ActionResult(success=True, message=action_name)
 
     def capture_artifact(self, artifact_type, name):
         self.artifacts.append((artifact_type, name))
         return ArtifactHandle(artifact_type=artifact_type, path=Path(name))
 
 
-def test_damai_android_smoke_workflow_starts_app_and_captures_artifacts():
-    session = FakeSession()
+def test_damai_android_steps_declare_app_launch_and_artifacts():
+    steps = build_steps("cn.damai")
 
-    result = run_smoke_workflow(session, app_id="cn.damai")
-
-    assert session.started is True
-    assert session.stopped is True
-    assert result.success is True
-    assert result.session == session.info
-    assert result.actions[0].message == "launch_app"
-    assert result.batch_result is not None
-    assert result.batch_result.results == result.actions
-    assert result.batch_result.skipped == []
-    assert session.actions == [("launch_app", {"app_id": "cn.damai"})]
-    assert session.artifacts == [
-        ("screenshot", "startup.png"),
-        ("page_source", "startup.xml"),
+    assert [(step.kind, step.name) for step in steps] == [
+        ("action", "launch_app"),
+        ("artifact", "screenshot"),
+        ("artifact", "page_source"),
     ]
+    assert steps[0].parameters == {"app_id": "cn.damai"}
 
 
-def test_damai_android_smoke_workflow_factory_returns_runnable_workflow():
-    session = FakeSession()
+def test_damai_android_workflow_runs_against_injected_session():
+    session = FakeAppiumSession()
     workflow = create_workflow(session_factory=lambda: session, app_id="cn.damai")
 
     result = workflow.run()
 
     assert workflow.name == "damai-android-smoke"
-    assert result.success is True
+    assert result.status.value == "succeeded"
+    assert session.started is True
+    assert session.stopped is True
     assert session.actions == [("launch_app", {"app_id": "cn.damai"})]
-    assert result.batch_result is not None
-    assert result.batch_result.success is True
-    assert [event.event_type for event in result.events] == [
-        "task.start",
-        "artifact",
-        "artifact",
-        "task.end",
+    assert session.artifacts == [
+        ("screenshot", "startup.png"),
+        ("page_source", "startup.xml"),
     ]
-    assert result.events[0].payload["task_name"] == "damai-android-smoke"
-    assert result.events[-1].payload["outcome"] == "succeeded"
+    assert list(result.artifacts)[0].artifact_type == "screenshot"
 
 
-def test_damai_android_workflow_factory_returns_failure_result():
-    class FailingSession(FakeSession):
+def test_damai_android_workflow_reports_provider_failure():
+    class FailingSession(FakeAppiumSession):
         def execute_action(self, action_name, **kwargs):
-            raise RuntimeError("activation failed")
+            raise ConnectionError("device offline")
 
     session = FailingSession()
     workflow = create_workflow(session_factory=lambda: session, app_id="cn.damai")
 
     result = workflow.run()
 
-    assert result.success is False
-    assert result.error is None
-    assert [action.message for action in result.actions] == [
-        "launch_app failed: activation failed",
-    ]
-    assert result.artifacts == []
-    assert [event.event_type for event in result.events] == [
-        "task.start",
-        "task.end",
-    ]
-    assert result.events[-1].payload["outcome"] == "failed"
-    assert session.stopped is True
-
-
-def test_damai_android_smoke_workflow_returns_failure_when_action_raises():
-    class FailingSession(FakeSession):
-        def execute_action(self, action_name, **kwargs):
-            raise RuntimeError("activation failed")
-
-    session = FailingSession()
-
-    result = run_smoke_workflow(session, app_id="cn.damai")
-
-    assert result.success is False
-    assert result.error is None
-    assert [action.message for action in result.actions] == [
-        "launch_app failed: activation failed",
-    ]
-    assert result.artifacts == []
-    assert session.started is True
+    assert result.status.value == "failed"
+    assert result.failure.category is FailureCategory.PROVIDER
+    assert result.failure.details == {"error_type": "ConnectionError"}
     assert session.stopped is True
