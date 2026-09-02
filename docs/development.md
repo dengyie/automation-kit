@@ -45,7 +45,7 @@ Android 和图像自动化应用提供底层能力的通用平台。
 
 ### 1.3 架构状态
 
-- 当前 `0.3.x`（2026-09-03 完成 runtime 模型收口）：`ExecutionContext` /
+- 当前 `0.4.0`（runtime 模型收口完成于 2026-09-03，随本版本起 legacy 路径不复存在）：`ExecutionContext` /
   `ExecutionFailure` / step result 模型、Provider V2 单一异步入口、`WorkflowRuntime`、
   runtime-owned `ReportCollector` 和 report schema v2 已是唯一路径；CLI/examples 已完全
   切到 runtime 结果模型，legacy `ManagedWorkflow` / `LegacyWorkflowResult` /
@@ -60,7 +60,7 @@ Android 和图像自动化应用提供底层能力的通用平台。
 
 | 仓库 | 平台角色 | 拥有内容 | 禁止内容 | 当前版本/状态 |
 | --- | --- | --- | --- | --- |
-| `automation-kit` | 执行内核与公共 SDK | 核心模型、能力契约、runner、通用 adapter、报告 | 业务规则、Slidex 或厂商硬依赖 | `0.3.0` |
+| `automation-kit` | 执行内核与公共 SDK | 核心模型、能力契约、runner、通用 adapter、报告 | 业务规则、Slidex 或厂商硬依赖 | `0.4.0` |
 | `slidex` | 可选视觉能力 provider | slider、OCR、图像识别、人工兜底、视觉 telemetry | 点评/大麦流程、反向要求核心依赖 Slidex | `0.5.0` |
 | `automation-app-damai` | Web/业务应用 | 大麦配置、流程、业务验收、workflow step 声明 | 通用执行内核、视觉算法 | `0.3.0` |
 | `automation-app-dianping` | Android/业务应用 | 点评配置、流程、业务验收、workflow step 声明 | 通用执行内核、OCR 实现 | `0.3.0` |
@@ -673,7 +673,7 @@ source、图片、token、cookie、action data 或 skipped action parameters。a
 ## 9. 版本与兼容
 
 - automation-kit 公共契约采用语义化版本。
-- app 的发布元数据声明 `automation-kit>=0.3.0,<0.4.0`；Poetry 仅在开发锁中使用
+- app 的发布元数据声明 `automation-kit>=0.4.0,<0.5.0`；Poetry 仅在开发锁中使用
   sibling path 解析当前源码，wheel 不得包含本机路径。
 - Slidex 的 automation-kit extra 声明兼容范围并运行跨仓契约测试。
 - manifest 的 provider 版本描述 provider 行为版本，不替代 Python 包版本。
@@ -743,7 +743,7 @@ automation-kit 后执行完整测试。Python 3.8/3.11 测试环境统一用 pip
 | wheel 构建与隔离安装 | 四仓 wheel 构建通过；Python 3.8/3.12 隔离安装通过 |
 | 五仓 `git diff --check` | 通过 |
 
-### 10.4 2026-09-03 验证基线
+### 10.4 2026-09-03 验证基线（v0.4.0）
 
 | 范围 | 结果 |
 | --- | --- |
