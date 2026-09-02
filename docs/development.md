@@ -552,7 +552,9 @@ options=...)` 返回 `ComposedWorkflow`（或任何 `run()` 产出
 `automation_core.execution.WorkflowResult` 的对象）；factory 应把 context 中的
 live/factory 信息写入 runtime 的 `metadata`，使 v2 报告带可公开的运行配置摘要。
 CLI 的优先级固定为：显式 CLI > 环境变量 > 配置源 > 代码默认值。`--param KEY=VALUE` 的值保持字符串，由业务 workflow 负责解析；空 key、
-空 factory、空 URL、空 app id 在 factory 加载前拒绝。built-in workflow name 与
+空 factory、空 URL、空 app id 在 factory 加载前拒绝。built-in 的必填选项由
+`WORKFLOW_METADATA` 的 `required_options` 声明并由 CLI 统一校验（单一事实源，
+新增 built-in 登记即自动获得 guard）。built-in workflow name 与
 `--workflow-factory` 不能同时提供。
 
 适配器 action alias 只能位于 adapter 层。Selenium/Appium 的 `open`、`click`、`tap`、
@@ -656,7 +658,9 @@ Artifact 是业务无关的调试证据，路径统一为：
 <artifact-root>/<run-id>/<artifact-type>/<artifact-name>
 ```
 
-默认根目录为 `artifacts`；dry-run 可以返回 deterministic 路径但不写文件。`run_id`、
+默认根目录为 `artifacts`，可通过 `WorkflowRuntime(artifact_root=...)` 显式指定（用于
+runtime 合成的未写入路径——取消或 last-resort 失败的 artifact step——应与 adapter 的
+artifact root 在 composition root 对齐）；dry-run 可以返回 deterministic 路径但不写文件。`run_id`、
 `artifact_type` 和 artifact name 都是单一安全路径组件：拒绝空值、`.`、`..` 和目录穿越，
 空格按既定 store 规则规范化。推荐类型包括 `screenshot`、`page_source`、`ui_tree`、
 `trace` 和 `log`。
@@ -743,10 +747,11 @@ automation-kit 后执行完整测试。Python 3.8/3.11 测试环境统一用 pip
 
 | 范围 | 结果 |
 | --- | --- |
-| automation-kit 全量离线测试 | `297 passed`，coverage `>= 80%`（pytest 门禁） |
+| automation-kit 全量离线测试 | `300 passed`，coverage `91.14%`（门禁 80%） |
 | legacy 结果路径 | `automation-kit` 内已删除；CLI/examples 只产出 report schema v2 |
 | wheel 构建与隔离安装 | 通过（`pip wheel --no-deps`） |
 | `git diff --check` | 通过 |
+| 根因修复（`11f3769`） | 元数据驱动 required-options、synthetic step result 统一、run clock 透传、`artifact_root` 显式化 |
 
 ## 11. 当前状态与差距
 
