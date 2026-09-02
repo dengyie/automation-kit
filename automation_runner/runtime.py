@@ -1,9 +1,17 @@
 import asyncio
 import time
-from typing import Callable, List, Optional, Sequence
+from pathlib import Path
+from typing import Any, Callable, Dict, Optional, Sequence
 from uuid import uuid4
 
+from automation_core.artifacts import ArtifactStore
 from automation_core.capabilities import CapabilityExecutor, CapabilityResult
+from automation_core.capabilities.errors import (
+    CapabilityError,
+    CapabilityNotFoundError,
+    CapabilityOperationNotSupportedError,
+    CapabilityRegistrationError,
+)
 from automation_core.drivers import ActionResult, ArtifactHandle, DriverSession
 from automation_core.execution import (
     ExecutionContext,
@@ -20,6 +28,47 @@ from automation_runner.policies import CapabilityPolicy
 from automation_runner.steps import WorkflowStep
 
 
+class _RunClock:
+    """Deadline arithmetic anchored once per workflow run.
+
+    ``ExecutionContext.deadline`` stays a wall-clock epoch (public contract);
+    elapsed time is measured on the monotonic clock so NTP adjustments during
+    a run can neither extend nor shrink the effective budget.
+    """
+
+    def __init__(self) -> None:
+        self.wall_start = time.time()
+        self.mono_start = time.monotonic()
+
+    def remaining(self, context: ExecutionContext) -> Optional[float]:
+        if context.deadline is None:
+            return None
+        now_wall = self.wall_start + (time.monotonic() - self.mono_start)
+        return context.deadline - now_wall
+
+
+def _capability_error_category(exc: Exception) -> FailureCategory:
+    if isinstance(exc, CapabilityRegistrationError):
+        return FailureCategory.REGISTRATION
+    if isinstance(exc, (CapabilityNotFoundError, CapabilityOperationNotSupportedError)):
+        return FailureCategory.RESOLUTION
+    return FailureCategory.CONFIG
+
+
+def _cancelled_artifact_path(context: ExecutionContext, step: WorkflowStep) -> Path:
+    """Deterministic never-written path for an artifact step cancelled mid-run.
+
+    Goes through ``ArtifactStore`` so the fabricated handle cannot carry path
+    separators or traversal segments into the report.
+    """
+    name = str(step.parameters.get("name") or step.name)
+    return ArtifactStore(Path("artifacts")).build_path(
+        context.run_id,
+        step.name,
+        name,
+    )
+
+
 class WorkflowRuntime:
     def __init__(
         self,
@@ -30,6 +79,7 @@ class WorkflowRuntime:
         run_id: Optional[str] = None,
         correlation_id: Optional[str] = None,
         deadline: Optional[float] = None,
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> None:
         self.session_factory = session_factory
         self.capability_executor = capability_executor
@@ -37,6 +87,7 @@ class WorkflowRuntime:
         self.run_id = run_id
         self.correlation_id = correlation_id
         self.deadline = deadline
+        self.metadata = metadata
 
     def run(self, steps: Sequence[WorkflowStep]) -> WorkflowResult:
         try:
@@ -52,8 +103,10 @@ class WorkflowRuntime:
             workflow_name=self.workflow_name,
             correlation_id=self.correlation_id or uuid4().hex,
             deadline=self.deadline,
+            metadata=dict(self.metadata or {}),
         )
         collector = ReportCollector(context)
+        clock = _RunClock()
         collector.record_event(
             {
                 "event_id": f"{context.run_id}:workflow.start",
@@ -82,6 +135,18 @@ class WorkflowRuntime:
                 status = WorkflowStatus.FAILED
             else:
                 for index, step in enumerate(steps, start=1):
+                    remaining = clock.remaining(context)
+                    if remaining is not None and remaining <= 0:
+                        failure = ExecutionFailure(
+                            category=FailureCategory.TIMEOUT,
+                            code="deadline_exceeded",
+                            message=f"workflow deadline exceeded before step: {step.name}",
+                            retryable=False,
+                            source="runtime",
+                        )
+                        status = WorkflowStatus.FAILED
+                        break
+
                     step_context = context.for_step(f"step-{index}")
                     collector.record_event(
                         {
@@ -92,14 +157,9 @@ class WorkflowRuntime:
                         }
                     )
                     try:
-                        if step.kind == "action":
-                            result = await self._run_action(session, step, step_context)
-                        elif step.kind == "capability":
-                            result = await self._run_capability(step, step_context)
-                        elif step.kind == "artifact":
-                            result = await self._run_artifact(session, step, step_context)
-                        else:
-                            result = self._unsupported_step(step, step_context)
+                        result = await self._execute_step(
+                            session, step, step_context, collector
+                        )
                     except asyncio.CancelledError:
                         failure = ExecutionFailure(
                             category=FailureCategory.CANCELLED,
@@ -109,8 +169,7 @@ class WorkflowRuntime:
                             source="runtime",
                         )
                         status = WorkflowStatus.CANCELLED
-                        cancelled_step = self._cancelled_step(step, step_context)
-                        collector.record_step(cancelled_step)
+                        collector.record_step(self._cancelled_step(step, step_context))
                         collector.record_event(
                             {
                                 "event_id": f"{context.run_id}:{step_context.task_id}:end",
@@ -123,13 +182,36 @@ class WorkflowRuntime:
                             }
                         )
                         break
+                    except Exception as exc:
+                        # Last-resort normalization: no exception may escape a
+                        # workflow run without a step result and a report.
+                        result = self._unhandled_step_failure(step, step_context, exc)
 
                     collector.record_step(result)
+                    if result.status is not StepStatus.CANCELLED:
+                        self._record_terminal_event(collector, context, step_context, result)
+                    artifact_count = 0
                     if result.artifact_result is not None:
                         collector.attach_artifact(result.artifact_result)
+                        artifact_count += 1
+                        self._record_artifact_event(
+                            collector,
+                            context,
+                            step_context,
+                            result.artifact_result,
+                            artifact_count,
+                        )
                     if result.capability_result is not None:
                         for artifact in result.capability_result.artifacts:
                             collector.attach_artifact(artifact)
+                            artifact_count += 1
+                            self._record_artifact_event(
+                                collector,
+                                context,
+                                step_context,
+                                artifact,
+                                artifact_count,
+                            )
                     collector.record_event(
                         {
                             "event_id": f"{context.run_id}:{step_context.task_id}:end",
@@ -198,11 +280,76 @@ class WorkflowRuntime:
         return WorkflowResult(
             context=context,
             status=status,
-            steps=tuple(collector._steps),
-            artifacts=tuple(collector._artifacts),
+            steps=tuple(collector.steps()),
+            artifacts=tuple(collector.artifacts()),
             events=tuple(report["events"]),
             failure=failure,
         )
+
+    @staticmethod
+    def _record_terminal_event(
+        collector: ReportCollector,
+        context: ExecutionContext,
+        step_context: ExecutionContext,
+        result: StepExecutionResult,
+    ) -> None:
+        if result.kind is StepKind.CAPABILITY and result.capability_result is not None:
+            payload: Dict[str, Any] = {
+                "step_name": result.step_name,
+                "provider": result.capability_result.provider,
+                "success": result.capability_result.success,
+                "error_code": result.capability_result.error_code,
+            }
+            event_type = "capability.end"
+        else:
+            payload = {
+                "step_name": result.step_name,
+                "success": result.status is StepStatus.SUCCEEDED,
+            }
+            event_type = "action.end"
+        collector.record_event(
+            {
+                "event_id": f"{context.run_id}:{step_context.task_id}:{event_type}",
+                "event_type": event_type,
+                "task_id": step_context.task_id,
+                "payload": payload,
+            }
+        )
+
+    @staticmethod
+    def _record_artifact_event(
+        collector: ReportCollector,
+        context: ExecutionContext,
+        step_context: ExecutionContext,
+        artifact: ArtifactHandle,
+        index: int,
+    ) -> None:
+        collector.record_event(
+            {
+                "event_id": f"{context.run_id}:{step_context.task_id}:artifact-{index}",
+                "event_type": "artifact",
+                "task_id": step_context.task_id,
+                "payload": {
+                    "artifact_type": artifact.artifact_type,
+                    "path": str(artifact.path),
+                },
+            }
+        )
+
+    async def _execute_step(
+        self,
+        session: DriverSession,
+        step: WorkflowStep,
+        context: ExecutionContext,
+        collector: ReportCollector,
+    ) -> StepExecutionResult:
+        if step.kind == "action":
+            return await self._run_action(session, step, context)
+        if step.kind == "capability":
+            return await self._run_capability(step, context, collector)
+        if step.kind == "artifact":
+            return await self._run_artifact(session, step, context)
+        return self._unsupported_step(step, context)
 
     async def _run_action(
         self,
@@ -211,7 +358,32 @@ class WorkflowRuntime:
         context: ExecutionContext,
     ) -> StepExecutionResult:
         started = time.monotonic()
-        action_result = session.execute_action(step.name, **dict(step.parameters))
+        try:
+            action_result = session.execute_action(step.name, **dict(step.parameters))
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            return StepExecutionResult(
+                step_id=context.task_id or step.name,
+                step_name=step.name,
+                kind=StepKind.ACTION,
+                status=StepStatus.FAILED,
+                attempts=1,
+                duration_ms=int((time.monotonic() - started) * 1000),
+                context=context,
+                action_result=ActionResult(
+                    success=False,
+                    message=f"{step.name} failed",
+                ),
+                error=ExecutionFailure(
+                    category=FailureCategory.PROVIDER,
+                    code="action_execution_failed",
+                    message=f"action failed: {step.name}",
+                    retryable=False,
+                    source="action",
+                    details={"error_type": type(exc).__name__},
+                ),
+            )
         duration_ms = int((time.monotonic() - started) * 1000)
         status = StepStatus.SUCCEEDED if action_result.success else StepStatus.FAILED
         error = None
@@ -245,6 +417,8 @@ class WorkflowRuntime:
         artifact_name = str(step.parameters.get("name") or step.name)
         try:
             artifact = session.capture_artifact(step.name, artifact_name)
+        except asyncio.CancelledError:
+            raise
         except Exception as exc:
             return StepExecutionResult(
                 step_id=context.task_id or step.name,
@@ -283,50 +457,55 @@ class WorkflowRuntime:
         self,
         step: WorkflowStep,
         context: ExecutionContext,
+        collector: ReportCollector,
     ) -> StepExecutionResult:
         if self.capability_executor is None:
-            failure = ExecutionFailure(
-                category=FailureCategory.CONFIG,
-                code="capability_executor_missing",
-                message="capability executor is not configured",
-                retryable=False,
-                source="runtime",
-            )
-            return StepExecutionResult(
-                step_id=context.task_id or step.name,
-                step_name=step.name,
-                kind=StepKind.CAPABILITY,
-                status=StepStatus.FAILED,
-                attempts=0,
-                duration_ms=0,
-                context=context,
-                capability_result=CapabilityResult(
-                    success=False,
-                    provider="runtime",
-                    error_code=failure.code,
-                ),
-                error=failure,
-            )
+            return self._capability_missing_executor_step(step, context)
 
+        assert self.capability_executor is not None
         policy = step.policy or CapabilityPolicy()
-        attempts = 0
         started = time.monotonic()
+        attempts = 0
         last_result: Optional[CapabilityResult] = None
         last_error: Optional[ExecutionFailure] = None
 
+        try:
+            profile = self.capability_executor.execution_profile(step.request)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            return self._capability_wiring_failure(step, context, started, exc)
+
+        clock = _RunClock()
         while attempts < policy.max_attempts:
+            remaining = clock.remaining(context)
+            if remaining is not None and remaining <= 0:
+                last_error = ExecutionFailure(
+                    category=FailureCategory.TIMEOUT,
+                    code="deadline_exceeded",
+                    message=f"workflow deadline exceeded before attempt: {step.name}",
+                    retryable=False,
+                    source="runtime",
+                )
+                last_result = CapabilityResult(
+                    success=False,
+                    provider="runtime",
+                    error_code="deadline_exceeded",
+                )
+                break
+
             attempts += 1
-            timeout = self._effective_timeout(policy, context)
             try:
-                if timeout is None:
+                if profile.cancellation == "cooperative":
+                    last_result = await self._execute_cooperative(
+                        step, context, policy, remaining
+                    )
+                else:
+                    # Unsupported cancellation: no hard timeout may be promised
+                    # to a provider that cannot honor it (development.md §4.4).
                     last_result = await self.capability_executor.execute(
                         step.request,
                         context,
-                    )
-                else:
-                    last_result = await asyncio.wait_for(
-                        self.capability_executor.execute(step.request, context),
-                        timeout=timeout,
                     )
             except asyncio.TimeoutError:
                 last_error = ExecutionFailure(
@@ -376,6 +555,22 @@ class WorkflowRuntime:
                 retryable = last_error.retryable
             if not retryable or attempts >= policy.max_attempts:
                 break
+            collector.record_event(
+                {
+                    "event_id": f"{context.run_id}:{context.task_id}:retry-{attempts}",
+                    "event_type": "retry.attempt",
+                    "task_id": context.task_id,
+                    "payload": {
+                        "step_name": step.name,
+                        "attempt": attempts,
+                        "error_code": (
+                            last_error.code
+                            if last_error is not None
+                            else (last_result.error_code if last_result else None)
+                        ),
+                    },
+                }
+            )
             if policy.backoff:
                 await asyncio.sleep(policy.backoff)
 
@@ -402,6 +597,116 @@ class WorkflowRuntime:
                 error_code=last_error.code,
             ),
             error=last_error,
+        )
+
+    async def _execute_cooperative(
+        self,
+        step: WorkflowStep,
+        context: ExecutionContext,
+        policy: CapabilityPolicy,
+        remaining: Optional[float],
+    ) -> CapabilityResult:
+        assert self.capability_executor is not None
+        execution = self.capability_executor.execute(step.request, context)
+        timeout = self._merge_timeout(policy.timeout, remaining)
+        if timeout is None:
+            return await execution
+        return await asyncio.wait_for(execution, timeout=timeout)
+
+    @staticmethod
+    def _merge_timeout(
+        policy_timeout: Optional[float],
+        remaining: Optional[float],
+    ) -> Optional[float]:
+        if remaining is None:
+            return policy_timeout
+        if policy_timeout is None:
+            return remaining
+        return min(policy_timeout, remaining)
+
+    def _capability_missing_executor_step(
+        self,
+        step: WorkflowStep,
+        context: ExecutionContext,
+    ) -> StepExecutionResult:
+        failure = ExecutionFailure(
+            category=FailureCategory.CONFIG,
+            code="capability_executor_missing",
+            message="capability executor is not configured",
+            retryable=False,
+            source="runtime",
+        )
+        return StepExecutionResult(
+            step_id=context.task_id or step.name,
+            step_name=step.name,
+            kind=StepKind.CAPABILITY,
+            status=StepStatus.FAILED,
+            attempts=0,
+            duration_ms=0,
+            context=context,
+            capability_result=CapabilityResult(
+                success=False,
+                provider="runtime",
+                error_code=failure.code,
+            ),
+            error=failure,
+        )
+
+    def _capability_wiring_failure(
+        self,
+        step: WorkflowStep,
+        context: ExecutionContext,
+        started: float,
+        exc: Exception,
+    ) -> StepExecutionResult:
+        return StepExecutionResult(
+            step_id=context.task_id or step.name,
+            step_name=step.name,
+            kind=StepKind.CAPABILITY,
+            status=StepStatus.FAILED,
+            attempts=0,
+            duration_ms=int((time.monotonic() - started) * 1000),
+            context=context,
+            capability_result=CapabilityResult(
+                success=False,
+                provider="runtime",
+                error_code=type(exc).__name__,
+            ),
+            error=ExecutionFailure(
+                category=_capability_error_category(exc),
+                code=type(exc).__name__,
+                message=f"capability wiring failed: {step.name}",
+                retryable=False,
+                source="runtime",
+            ),
+        )
+
+    def _unhandled_step_failure(
+        self,
+        step: WorkflowStep,
+        context: ExecutionContext,
+        exc: Exception,
+    ) -> StepExecutionResult:
+        return StepExecutionResult(
+            step_id=context.task_id or step.name,
+            step_name=step.name,
+            kind=StepKind.ACTION,
+            status=StepStatus.FAILED,
+            attempts=1,
+            duration_ms=0,
+            context=context,
+            action_result=ActionResult(
+                success=False,
+                message=f"{step.name} failed",
+            ),
+            error=ExecutionFailure(
+                category=FailureCategory.PROVIDER,
+                code="step_execution_failed",
+                message=f"step failed: {step.name}",
+                retryable=False,
+                source="runtime",
+                details={"error_type": type(exc).__name__},
+            ),
         )
 
     @staticmethod
@@ -468,7 +773,7 @@ class WorkflowRuntime:
                 context=context,
                 artifact_result=ArtifactHandle(
                     artifact_type=step.name,
-                    path=str(step.parameters.get("name") or step.name),
+                    path=_cancelled_artifact_path(context, step),
                 ),
                 error=ExecutionFailure(
                     category=FailureCategory.CANCELLED,
@@ -515,18 +820,3 @@ class WorkflowRuntime:
                 details={"error_type": type(exc).__name__},
             )
         return None
-
-    @staticmethod
-    def _effective_timeout(
-        policy: CapabilityPolicy,
-        context: ExecutionContext,
-    ) -> Optional[float]:
-        timeout = policy.timeout
-        if context.deadline is None:
-            return timeout
-        remaining = context.deadline - time.time()
-        if remaining <= 0:
-            return 0.0
-        if timeout is None:
-            return remaining
-        return min(timeout, remaining)

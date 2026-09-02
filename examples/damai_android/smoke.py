@@ -1,31 +1,23 @@
-from typing import Callable
+from typing import Callable, List
 
 from automation_core.drivers import DriverSession
-from automation_runner.workflows import (
-    ManagedWorkflow,
-    WorkflowResult,
-    WorkflowStep,
-    run_workflow_steps,
-)
+from automation_runner.runtime import WorkflowRuntime
+from automation_runner.workflows import ComposedWorkflow, WorkflowStep
+
+SessionFactory = Callable[[], DriverSession]
 
 
-def run_smoke_workflow(session: DriverSession, app_id: str) -> WorkflowResult:
-    return run_workflow_steps(
-        session,
-        [
-            WorkflowStep.action("launch_app", app_id=app_id),
-            WorkflowStep.artifact("screenshot", "startup.png"),
-            WorkflowStep.artifact("page_source", "startup.xml"),
-        ],
-    )
+def build_steps(app_id: str) -> List[WorkflowStep]:
+    return [
+        WorkflowStep.action("launch_app", app_id=app_id),
+        WorkflowStep.artifact("screenshot", "startup.png"),
+        WorkflowStep.artifact("page_source", "startup.xml"),
+    ]
 
 
-def create_workflow(
-    session_factory: Callable[[], DriverSession],
-    app_id: str,
-) -> ManagedWorkflow:
-    return ManagedWorkflow(
-        name="damai-android-smoke",
+def create_workflow(session_factory: SessionFactory, app_id: str) -> ComposedWorkflow:
+    runtime = WorkflowRuntime(
         session_factory=session_factory,
-        run_fn=lambda session: run_smoke_workflow(session, app_id=app_id),
+        workflow_name="damai-android-smoke",
     )
+    return ComposedWorkflow(runtime, build_steps(app_id))

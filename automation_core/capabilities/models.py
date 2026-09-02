@@ -1,52 +1,19 @@
 from dataclasses import dataclass, field
-from pathlib import Path
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
 from automation_core.drivers import ArtifactHandle
-from automation_core.events import EventEnvelope
+from automation_core.redaction import redact
 
 
 _CAPABILITY_NAME = re.compile(r"^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$")
 _OPERATION_NAME = re.compile(r"^[a-z][a-z0-9_]*$")
-_SENSITIVE_TERMS = (
-    "authorization",
-    "cookie",
-    "password",
-    "secret",
-    "token",
-    "x5sec",
-    "x5secdata",
-)
 
 
 def _required_string(value: str, name: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"{name} must be a non-blank string")
     return value.strip()
-
-
-def _safe_value(value: Any) -> Any:
-    if value is None or isinstance(value, (bool, int, float, str)):
-        return value
-    if isinstance(value, Path):
-        return str(value)
-    if isinstance(value, dict):
-        safe = {}
-        for key, nested in value.items():
-            output_key = str(key)
-            lowered = output_key.lower()
-            if any(term in lowered for term in _SENSITIVE_TERMS):
-                safe[output_key] = "[redacted]"
-            else:
-                safe[output_key] = _safe_value(nested)
-        return safe
-    if isinstance(value, (list, tuple)):
-        return [_safe_value(item) for item in value]
-    to_dict = getattr(value, "to_dict", None)
-    if callable(to_dict):
-        return _safe_value(to_dict())
-    return f"<{type(value).__name__}>"
 
 
 @dataclass(frozen=True)
@@ -96,7 +63,7 @@ class CapabilityManifest:
             "operations": list(self.operations),
             "platforms": list(self.platforms),
             "default_cancellation": self.default_cancellation,
-            "metadata": _safe_value(self.metadata),
+            "metadata": redact(self.metadata),
         }
 
 
@@ -141,8 +108,8 @@ class CapabilityRequest:
         return {
             "capability": self.capability,
             "operation": self.operation,
-            "parameters": _safe_value(self.parameters),
-            "metadata": _safe_value(self.metadata),
+            "parameters": redact(self.parameters),
+            "metadata": redact(self.metadata),
         }
 
 
@@ -154,7 +121,7 @@ class CapabilityResult:
     error_code: Optional[str] = None
     retryable: bool = False
     artifacts: List[ArtifactHandle] = field(default_factory=list)
-    events: List[EventEnvelope] = field(default_factory=list)
+    events: List[Dict[str, Any]] = field(default_factory=list)
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -169,17 +136,17 @@ class CapabilityResult:
             {
                 "artifact_type": artifact.artifact_type,
                 "path": str(artifact.path),
-                "metadata": _safe_value(artifact.metadata),
+                "metadata": redact(artifact.metadata),
             }
             for artifact in self.artifacts
         ]
         return {
             "success": self.success,
             "provider": self.provider,
-            "data": _safe_value(self.data),
+            "data": redact(self.data),
             "error_code": self.error_code,
             "retryable": self.retryable,
             "artifacts": artifacts,
-            "events": [_safe_value(event) for event in self.events],
-            "metadata": _safe_value(self.metadata),
+            "events": [redact(event) for event in self.events],
+            "metadata": redact(self.metadata),
         }

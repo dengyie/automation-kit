@@ -33,14 +33,6 @@ class CapabilityRegistry:
             )
         self._providers[manifest.name] = provider
 
-    def unregister(self, name: str) -> object:
-        try:
-            return self._providers.pop(name)
-        except KeyError as exc:
-            raise CapabilityNotFoundError(
-                f"capability is not registered: {name}"
-            ) from exc
-
     def get(self, name: str) -> object:
         try:
             return self._providers[name]

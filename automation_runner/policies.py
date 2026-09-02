@@ -7,7 +7,6 @@ class CapabilityPolicy:
     timeout: Optional[float] = None
     max_attempts: int = 1
     backoff: float = 0.0
-    fallback: Optional[str] = None
 
     def __post_init__(self) -> None:
         if self.timeout is not None and self.timeout <= 0:

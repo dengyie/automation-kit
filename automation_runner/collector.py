@@ -1,51 +1,32 @@
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List
 from uuid import uuid4
 
 from automation_core.drivers import ArtifactHandle
 from automation_core.execution import (
     ExecutionContext,
-    ExecutionFailure,
     StepExecutionResult,
     WorkflowStatus,
 )
-
-
-_SENSITIVE_TERMS = (
-    "authorization",
-    "cookie",
-    "password",
-    "secret",
-    "token",
-    "x5sec",
-    "x5secdata",
-)
-
-
-def _redact(value: Any) -> Any:
-    if isinstance(value, dict):
-        safe = {}
-        for key, nested in value.items():
-            lowered = str(key).lower()
-            if any(term in lowered for term in _SENSITIVE_TERMS):
-                safe[key] = "[redacted]"
-            else:
-                safe[key] = _redact(nested)
-        return safe
-    if isinstance(value, list):
-        return [_redact(item) for item in value]
-    return value
+from automation_core.redaction import redact
 
 
 class ReportCollector:
+    """Append-only, runtime-owned recorder for workflow lifecycle evidence.
+
+    Events are deduplicated by ``event_id`` and receive a monotonic
+    ``sequence`` plus the run identity of the owning context. The collector
+    is the single writer of report events, steps and artifacts.
+    """
+
     def __init__(self, context: ExecutionContext) -> None:
         self.context = context
-        self._events: List[Dict[str, object]] = []
+        self._events: List[Dict[str, Any]] = []
         self._event_ids = set()
         self._steps: List[StepExecutionResult] = []
         self._artifacts: List[ArtifactHandle] = []
         self._sequence = 0
 
-    def record_event(self, event: Dict[str, object]) -> None:
+    def record_event(self, event: Dict[str, Any]) -> None:
         event_id = str(event.get("event_id") or uuid4().hex)
         if event_id in self._event_ids:
             return
@@ -58,7 +39,7 @@ class ReportCollector:
         if "task_id" not in payload:
             payload["task_id"] = self.context.task_id
         if "payload" in payload:
-            payload["payload"] = _redact(payload["payload"])
+            payload["payload"] = redact(payload["payload"])
         self._events.append(payload)
 
     def record_step(self, step: StepExecutionResult) -> None:
@@ -67,12 +48,21 @@ class ReportCollector:
     def attach_artifact(self, artifact: ArtifactHandle) -> None:
         self._artifacts.append(artifact)
 
+    def steps(self) -> List[StepExecutionResult]:
+        return list(self._steps)
+
+    def artifacts(self) -> List[ArtifactHandle]:
+        return list(self._artifacts)
+
+    def events(self) -> List[Dict[str, Any]]:
+        return list(self._events)
+
     def finalize(
         self,
         *,
         status: WorkflowStatus,
         failure: Optional[ExecutionFailure] = None,
-    ) -> Dict[str, object]:
+    ) -> Dict[str, Any]:
         return {
             "schema_version": "2",
             "context": self.context.to_dict(),
@@ -84,7 +74,7 @@ class ReportCollector:
                 {
                     "artifact_type": artifact.artifact_type,
                     "path": str(artifact.path),
-                    "metadata": _redact(dict(artifact.metadata)),
+                    "metadata": redact(dict(artifact.metadata)),
                 }
                 for artifact in self._artifacts
             ],
@@ -92,7 +82,7 @@ class ReportCollector:
             "providers": self._provider_summary(),
         }
 
-    def _provider_summary(self) -> List[Dict[str, object]]:
+    def _provider_summary(self) -> List[Dict[str, Any]]:
         providers = []
         for step in self._steps:
             if step.capability_result is None:

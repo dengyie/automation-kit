@@ -1,7 +1,6 @@
 from automation_core.capabilities.contracts import CapabilityProvider
 from automation_core.capabilities.errors import (
     CapabilityError,
-    CapabilityExecutionModeError,
     CapabilityNotFoundError,
     CapabilityOperationNotSupportedError,
     CapabilityProtocolError,
@@ -20,7 +19,6 @@ from automation_core.capabilities.resolver import CapabilityResolver
 
 __all__ = [
     "CapabilityError",
-    "CapabilityExecutionModeError",
     "CapabilityExecutionProfile",
     "CapabilityExecutor",
     "CapabilityManifest",

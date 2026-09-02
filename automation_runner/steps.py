@@ -5,13 +5,18 @@ from automation_core.capabilities import CapabilityRequest
 from automation_runner.policies import CapabilityPolicy
 
 
-def _validate_name(name: str, label: str) -> str:
+def validate_step_name(name: str, label: str) -> str:
+    """Validate a workflow step name and return its normalized form.
+
+    The name must reduce to a single safe path component; the normalized
+    value (not the raw input) is what callers should store and report.
+    """
     if not isinstance(name, str):
         raise ValueError(f"invalid workflow {label} name")
     cleaned = name.replace("\\", "/").split("/")[-1].strip()
     if cleaned in {"", ".", ".."}:
         raise ValueError(f"invalid workflow {label} name")
-    return name
+    return cleaned
 
 
 @dataclass(frozen=True)
@@ -26,7 +31,7 @@ class WorkflowStep:
     def action(cls, name: str, **parameters: object) -> "WorkflowStep":
         return cls(
             kind="action",
-            name=_validate_name(name, "action"),
+            name=validate_step_name(name, "action"),
             parameters=parameters,
         )
 
@@ -34,8 +39,8 @@ class WorkflowStep:
     def artifact(cls, artifact_type: str, name: str) -> "WorkflowStep":
         return cls(
             kind="artifact",
-            name=artifact_type,
-            parameters={"name": _validate_name(name, "artifact")},
+            name=validate_step_name(artifact_type, "artifact"),
+            parameters={"name": validate_step_name(name, "artifact")},
         )
 
     @classmethod
@@ -50,7 +55,7 @@ class WorkflowStep:
             raise ValueError("capability step requires CapabilityRequest")
         return cls(
             kind="capability",
-            name=_validate_name(name, "capability"),
+            name=validate_step_name(name, "capability"),
             request=request,
             policy=policy or CapabilityPolicy(),
         )

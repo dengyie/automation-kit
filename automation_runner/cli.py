@@ -1,34 +1,39 @@
 import argparse
 from dataclasses import replace
-import inspect
 import importlib
+import inspect
 import json
 import os
 from pathlib import Path
 import sys
-import time
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from automation_core import __version__ as AUTOMATION_KIT_VERSION
 from automation_core.config import ConfigSource, EnvConfigSource
-from automation_core.drivers import SessionInfo
-from automation_core.events import ErrorEvent, TaskEndEvent, TaskStartEvent
-from automation_core.state import RunState
-from automation_core.tasks.lifecycle import TaskState
-from automation_runner.context import WorkflowContext, WorkflowOptions
-from automation_runner import WorkflowRunner
+from automation_core.execution import WorkflowResult as ExecutionWorkflowResult
+from automation_core.execution import WorkflowStatus
 from automation_runner.config import RunnerConfig, load_runner_config
+from automation_runner.context import WorkflowContext, WorkflowOptions
 from automation_runner.dry_run import DryRunSession
-from automation_runner.reports import build_report
+from automation_runner.reports import build_report_v2
+from automation_runner.runtime import WorkflowRuntime
 from automation_runner.schemas import load_report_schema
-from automation_runner.workflows import LegacyWorkflowResult as WorkflowResult
-from examples.damai_android import create_workflow as create_damai_android_workflow
-from examples.damai_web import create_workflow as create_damai_web_workflow
+from automation_runner.workflows import ComposedWorkflow
+from examples.damai_android import build_steps as build_damai_android_steps
+from examples.damai_web import build_steps as build_damai_web_steps
 
 
-WORKFLOWS = {
-    "damai-web-smoke": create_damai_web_workflow,
-    "damai-android-smoke": create_damai_android_workflow,
+def _damai_web_steps(url: Optional[str]) -> list:
+    return build_damai_web_steps(url=url or "")
+
+
+def _damai_android_steps(app_id: Optional[str]) -> list:
+    return build_damai_android_steps(app_id=app_id or "")
+
+
+BUILTIN_WORKFLOWS = {
+    "damai-web-smoke": _damai_web_steps,
+    "damai-android-smoke": _damai_android_steps,
 }
 
 WORKFLOW_METADATA = {
@@ -66,12 +71,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     report_schema.add_argument(
         "--version",
-        default="1",
+        default="2",
         help="runner report schema version",
     )
 
     run = subparsers.add_parser("run", help="run a workflow")
-    run.add_argument("workflow", nargs="?", choices=sorted(WORKFLOWS))
+    run.add_argument("workflow", nargs="?", choices=sorted(BUILTIN_WORKFLOWS))
     run.add_argument("--workflow-factory", help="workflow factory import path")
     run.add_argument("--live", action="store_true", help="allow live execution")
     run.add_argument("--factory", help="session factory import path")
@@ -111,35 +116,6 @@ def _print_run_error(message: str) -> int:
     return 1
 
 
-def _failure_result(workflow_name: str, exc: Exception) -> WorkflowResult:
-    task_id = f"{workflow_name}-failed-run"
-    return WorkflowResult(
-        session=SessionInfo(
-            driver_name="unavailable",
-            platform="unknown",
-            identifier=task_id,
-        ),
-        success=False,
-        actions=[],
-        artifacts=[],
-        error=f"{type(exc).__name__}: {exc}",
-        events=[
-            TaskStartEvent(task_name=workflow_name, task_id=task_id).to_envelope(),
-            ErrorEvent(
-                task_name=workflow_name,
-                task_id=task_id,
-                message=str(exc),
-                error_type=type(exc).__name__,
-            ).to_envelope(),
-            TaskEndEvent(
-                task_name=workflow_name,
-                task_id=task_id,
-                outcome="failed",
-            ).to_envelope(),
-        ],
-    )
-
-
 def _json_report_payload(report) -> str:
     return json.dumps(report.to_dict(), sort_keys=True) + "\n"
 
@@ -158,8 +134,8 @@ def _emit_json_report(report) -> None:
     _emit_json_report_payload(_json_report_payload(report))
 
 
-def _workflow_exit_code(result: WorkflowResult) -> int:
-    if result.state == TaskState.CANCELLED:
+def _workflow_exit_code(result: ExecutionWorkflowResult) -> int:
+    if result.status is WorkflowStatus.CANCELLED:
         return 130
     return 0 if result.success else 1
 
@@ -176,12 +152,12 @@ def _workflow_listing_entry(workflow_name: str) -> Dict[str, object]:
 
 
 def _workflow_listing_entries() -> List[Dict[str, object]]:
-    missing_metadata = sorted(set(WORKFLOWS) - set(WORKFLOW_METADATA))
+    missing_metadata = sorted(set(BUILTIN_WORKFLOWS) - set(WORKFLOW_METADATA))
     if missing_metadata:
         raise ValueError(f"missing workflow metadata: {', '.join(missing_metadata)}")
     return [
         _workflow_listing_entry(workflow_name)
-        for workflow_name in sorted(WORKFLOWS)
+        for workflow_name in sorted(BUILTIN_WORKFLOWS)
     ]
 
 
@@ -233,6 +209,14 @@ def _workflow_context(
     )
 
 
+def _run_metadata(config: RunnerConfig) -> Dict[str, Any]:
+    return {
+        "live": config.live,
+        "session_factory": config.factory if config.live else None,
+        "workflow_factory": config.workflow_factory,
+    }
+
+
 def _workflow_options(config: RunnerConfig, args: argparse.Namespace) -> WorkflowOptions:
     parameters = dict(config.parameters)
     parameters.update(_parse_parameters(args.param))
@@ -275,8 +259,8 @@ def _parse_parameters(values: Optional[List[str]]) -> Dict[str, str]:
 def _call_custom_workflow_factory(
     create_workflow,
     session_factory,
-    context: WorkflowContext,
-    options: WorkflowOptions,
+    context,
+    options,
 ):
     try:
         signature = inspect.signature(create_workflow)
@@ -323,7 +307,7 @@ def main(
             }
             print(json.dumps(payload, sort_keys=True))
             return 0
-        for workflow_name in sorted(WORKFLOWS):
+        for workflow_name in sorted(BUILTIN_WORKFLOWS):
             print(workflow_name)
         if args.dry_run:
             print("dry-run: no live browser, Appium, ADB, or device session started")
@@ -372,76 +356,29 @@ def main(
             except ValueError as exc:
                 return _print_error(str(exc))
         else:
-            session_factory = lambda: DryRunSession(workflow_name)
-        if config.workflow_factory:
-            try:
-                create_workflow = load_object(config.workflow_factory)
-            except ValueError as exc:
-                return _print_error(str(exc))
-            context = _workflow_context(
-                workflow_name=workflow_name,
-                config=config,
-                session_factory_name=config.factory if config.live else None,
+            session_factory = lambda: DryRunSession(workflow_name)  # noqa: E731
+
+        try:
+            workflow = _build_workflow(
+                args, config, options, session_factory, workflow_name
             )
-            runner = WorkflowRunner(
-                session_factory=lambda: _call_custom_workflow_factory(
-                    create_workflow,
-                    session_factory,
-                    context,
-                    options,
-                ),
-                workflow=lambda workflow: workflow.run(),
-            )
-        elif workflow_name == "damai-web-smoke":
-            create_workflow = WORKFLOWS[workflow_name]
-            runner = WorkflowRunner(
-                session_factory=lambda: create_workflow(
-                    session_factory=session_factory,
-                    url=config.url,
-                ),
-                workflow=lambda workflow: workflow.run(),
-            )
-        else:
-            create_workflow = WORKFLOWS[workflow_name]
-            runner = WorkflowRunner(
-                session_factory=lambda: create_workflow(
-                    session_factory=session_factory,
-                    app_id=config.app_id,
-                ),
-                workflow=lambda workflow: workflow.run(),
+        except Exception as exc:
+            return _print_run_error(f"{type(exc).__name__}: {exc}")
+
+        try:
+            result = workflow.run()
+        except Exception as exc:
+            return _print_run_error(f"{type(exc).__name__}: {exc}")
+        if not isinstance(result, ExecutionWorkflowResult):
+            return _print_run_error(
+                "workflow factory must return automation_core.execution.WorkflowResult; "
+                f"got {type(result).__name__}"
             )
 
-        started_at = time.monotonic()
-        wall_started_at = time.time()
-        try:
-            result = runner.run()
-        except Exception as exc:
-            if not config.emit_json:
-                return _print_run_error(f"{type(exc).__name__}: {exc}")
-            result = _failure_result(workflow_name, exc)
-        wall_finished_at = time.time()
-        elapsed_seconds = time.monotonic() - started_at
-        run_state = RunState(run_id=result.session.identifier)
-        run_state.start(started_at=wall_started_at)
-        if result.state == TaskState.CANCELLED:
-            run_state.cancel(finished_at=wall_finished_at)
-        elif result.success:
-            run_state.succeed(finished_at=wall_finished_at)
-        else:
-            run_state.fail(finished_at=wall_finished_at)
         if config.emit_json:
-            report = build_report(
-                workflow_name,
-                result,
-                run_state=run_state,
-                live=config.live,
-                workflow_factory=config.workflow_factory,
-                session_factory=config.factory if config.live else None,
-                workflow_context=context if config.workflow_factory else None,
-                elapsed_seconds=elapsed_seconds,
-            )
+            report = build_report_v2(result)
+            payload = _json_report_payload(report)
             if args.report_file:
-                payload = _json_report_payload(report)
                 try:
                     _write_json_report_file(args.report_file, payload)
                 except OSError as exc:
@@ -451,9 +388,39 @@ def main(
                 _emit_json_report_payload(payload)
             else:
                 _emit_json_report(report)
-            return _workflow_exit_code(result)
         else:
             print(f"{workflow_name} success={result.success}")
         return _workflow_exit_code(result)
 
     return 1
+
+
+def _build_workflow(
+    args: argparse.Namespace,
+    config: RunnerConfig,
+    options,
+    session_factory,
+    workflow_name: str,
+):
+    if config.workflow_factory:
+        create_workflow = load_object(config.workflow_factory)
+        context = _workflow_context(
+            workflow_name=workflow_name,
+            config=config,
+            session_factory_name=config.factory if config.live else None,
+        )
+        return _call_custom_workflow_factory(
+            create_workflow,
+            session_factory,
+            context,
+            options,
+        )
+    steps = BUILTIN_WORKFLOWS[workflow_name](
+        config.url if workflow_name == "damai-web-smoke" else config.app_id
+    )
+    runtime = WorkflowRuntime(
+        session_factory=session_factory,
+        workflow_name=workflow_name,
+        metadata=_run_metadata(config),
+    )
+    return ComposedWorkflow(runtime, steps)

@@ -1,26 +1,16 @@
-"""Minimal runner facade for automation-kit examples."""
+"""Public runner surface: composition, policies, runtime and workflows."""
 
 from automation_runner.context import WorkflowContext, WorkflowOptions
-from automation_runner.runner import WorkflowRunner
 from automation_runner.policies import CapabilityPolicy
 from automation_runner.runtime import WorkflowRuntime
 from automation_runner.steps import WorkflowStep
-from automation_runner.workflows import (
-    ManagedWorkflow,
-    LegacyWorkflowResult,
-    WorkflowResult,
-    run_workflow_steps,
-)
+from automation_runner.workflows import ComposedWorkflow
 
 __all__ = [
-    "WorkflowRunner",
+    "ComposedWorkflow",
+    "CapabilityPolicy",
     "WorkflowContext",
     "WorkflowOptions",
-    "CapabilityPolicy",
     "WorkflowRuntime",
-    "ManagedWorkflow",
-    "LegacyWorkflowResult",
-    "WorkflowResult",
     "WorkflowStep",
-    "run_workflow_steps",
 ]

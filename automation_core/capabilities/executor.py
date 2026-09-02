@@ -16,6 +16,20 @@ class CapabilityExecutor:
     def __init__(self, resolver: CapabilityResolver) -> None:
         self.resolver = resolver
 
+    def execution_profile(
+        self,
+        request: CapabilityRequest,
+        *,
+        platform: Optional[str] = None,
+    ) -> CapabilityExecutionProfile:
+        """Resolve the provider for ``request`` and return its execution profile.
+
+        Resolver and protocol errors propagate unchanged so callers can
+        distinguish platform wiring mistakes from provider runtime failures.
+        """
+        provider = self.resolver.resolve(request, platform=platform)
+        return self._profile(provider, request)
+
     async def execute(
         self,
         request: CapabilityRequest,
@@ -24,7 +38,7 @@ class CapabilityExecutor:
         platform: Optional[str] = None,
     ) -> CapabilityResult:
         provider = self.resolver.resolve(request, platform=platform)
-        profile = self._profile(provider, request)
+        self._profile(provider, request)
         execute = getattr(provider, "execute", None)
         if not callable(execute):
             raise CapabilityProtocolError("provider must define async execute")
@@ -38,10 +52,13 @@ class CapabilityExecutor:
             raise
         except Exception as exc:
             return self._provider_failure(provider, exc)
-        return self._validate_result(result, profile=profile)
+        return self._validate_result(result)
 
     @staticmethod
-    def _profile(provider: object, request: CapabilityRequest) -> CapabilityExecutionProfile:
+    def _profile(
+        provider: object,
+        request: CapabilityRequest,
+    ) -> CapabilityExecutionProfile:
         profile_fn = getattr(provider, "execution_profile", None)
         if not callable(profile_fn):
             raise CapabilityProtocolError("provider must define execution_profile")
@@ -53,17 +70,11 @@ class CapabilityExecutor:
         return profile
 
     @staticmethod
-    def _validate_result(
-        result: object,
-        *,
-        profile: CapabilityExecutionProfile,
-    ) -> CapabilityResult:
+    def _validate_result(result: object) -> CapabilityResult:
         if not isinstance(result, CapabilityResult):
             raise CapabilityProtocolError(
                 "provider must return CapabilityResult"
             )
-        # Profile is currently advisory for runtime policy ownership.
-        _ = profile
         return result
 
     @staticmethod

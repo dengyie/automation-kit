@@ -1,11 +1,9 @@
 from dataclasses import dataclass, field
 from enum import Enum
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, Optional, Sequence, Tuple, Union
 
 from automation_core.capabilities.models import CapabilityResult
 from automation_core.drivers import ActionResult, ArtifactHandle
-from automation_core.events import EventEnvelope
 from automation_core.execution.context import ExecutionContext
 from automation_core.execution.failures import ExecutionFailure
 
