@@ -762,6 +762,9 @@ automation-kit 后执行完整测试。Python 3.8/3.11 测试环境统一用 pip
   provider 协议与 executor。
 - runner 已有 workflow、CLI、配置、dry-run、报告和 schema v1。
 - Selenium/Appium adapter 已实现通用 `DriverSession`。
+- Appium adapter 平台感知：session platform 从 driver W3C capabilities 的
+  `platformName` 派生；坐标 tap 按 Android（`mobile: clickGesture`）/ iOS
+  （`mobile: tap`）分派，XCUITest 真机链路在 adapter 层已打通。
 - Slidex 已有统一视觉 request/result、OCR、slider、provider manifest、人工兜底和
   automation-kit capability result/event/artifact 映射。
 - Slidex 已通过 `SlidexVisualCapability` 实现通用视觉能力 provider。

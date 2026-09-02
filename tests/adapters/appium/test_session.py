@@ -510,3 +510,35 @@ def test_appium_session_factory_wraps_driver_startup_failure(tmp_path):
 
     with pytest.raises(AdapterStartupError, match="failed to create appium driver"):
         factory.create()
+
+
+class FakeIosDriver(FakeMobileDriver):
+    capabilities = {"platformName": "iOS"}
+
+
+def test_appium_session_derives_platform_from_driver_capabilities():
+    ios_session = AppiumSession(driver=FakeIosDriver())
+    android_session = AppiumSession(driver=FakeMobileDriver())
+
+    assert ios_session.info.platform == "ios"
+    assert android_session.info.platform == "android"
+
+
+def test_appium_session_coordinate_tap_uses_xcuitest_gesture_on_ios():
+    driver = FakeIosDriver()
+    session = AppiumSession(driver=driver)
+
+    result = session.execute_action("tap", x=1, y=2)
+
+    assert result.success is True
+    assert result.message == "tap"
+    assert driver.scripts == [("mobile: tap", {"x": 1, "y": 2})]
+
+
+def test_appium_session_coordinate_tap_defaults_to_android_gesture():
+    driver = FakeMobileDriver()
+    session = AppiumSession(driver=driver)
+
+    result = session.execute_action("tap", x=1, y=2)
+
+    assert driver.scripts == [("mobile: clickGesture", {"x": 1, "y": 2})]

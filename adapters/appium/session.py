@@ -10,6 +10,21 @@ from automation_core.retries import RetryPolicy, retry_until
 DriverFactory = Callable[[], Any]
 
 
+def _driver_platform(driver: Any) -> str:
+    """Derive the session platform from the driver's W3C capabilities.
+
+    Appium reports ``platformName`` (e.g. ``Android`` / ``iOS``); a driver
+    without capabilities falls back to ``android`` so legacy fakes keep
+    working.
+    """
+    capabilities = getattr(driver, "capabilities", None)
+    if isinstance(capabilities, dict):
+        name = capabilities.get("platformName")
+        if isinstance(name, str) and name.strip():
+            return name.strip().lower()
+    return "android"
+
+
 class AppiumSession:
     """DriverSession implementation for Appium-like mobile drivers."""
 
@@ -22,7 +37,7 @@ class AppiumSession:
         self.driver = driver
         self.info = SessionInfo(
             driver_name="appium",
-            platform="android",
+            platform=_driver_platform(driver),
             identifier=identifier,
         )
         self.artifact_store = ArtifactStore(artifact_root or Path("artifacts"))
@@ -96,9 +111,10 @@ class AppiumSession:
                 success=False,
                 message="driver does not support mobile script execution",
             )
+        script = "mobile: tap" if self.info.platform == "ios" else "mobile: clickGesture"
         return self._run_action(
             "tap",
-            lambda: execute_script("mobile: clickGesture", {"x": x, "y": y}),
+            lambda: execute_script(script, {"x": x, "y": y}),
         )
 
     def _type_text(self, **kwargs: Any) -> ActionResult:
