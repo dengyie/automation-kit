@@ -1,5 +1,6 @@
 import asyncio
 import time
+from pathlib import Path
 
 import pytest
 
@@ -13,7 +14,8 @@ from automation_core.capabilities import (
     CapabilityResult,
 )
 from automation_core.drivers import ActionResult, SessionInfo
-from automation_core.execution import FailureCategory, WorkflowStatus
+from automation_core.execution import ExecutionContext, FailureCategory, WorkflowStatus
+from automation_runner.collector import ReportCollector
 from automation_runner.policies import CapabilityPolicy
 from automation_runner.runtime import _RunClock, WorkflowRuntime
 from automation_runner.steps import WorkflowStep
@@ -156,6 +158,11 @@ def test_artifact_exception_becomes_failed_step_and_report():
     assert result.status is WorkflowStatus.FAILED
     assert result.failure.code == "artifact_capture_failed"
     assert result.failure.category is FailureCategory.PROVIDER
+    handle = result.steps[0].artifact_result
+    assert isinstance(handle.path, Path)
+    assert handle.path.parts[-3:] == (result.context.run_id, "screenshot", "x.png")
+    assert not handle.path.exists()
+    assert list(result.artifacts) == []
     assert session.stopped == 1
 
 
@@ -238,10 +245,6 @@ def test_unsupported_cancellation_is_not_hard_timeout():
 
 
 def test_deadline_exceeded_before_attempt_is_reported():
-    from automation_core.execution import ExecutionContext
-
-    from automation_runner.collector import ReportCollector
-
     runtime = WorkflowRuntime(
         session_factory=lambda: RecordingSession(),
         capability_executor=_executor(FlakyProvider()),
@@ -315,7 +318,139 @@ def test_retry_attempts_are_visible_as_events():
     }
 
 
-def test_run_metadata_reaches_report_context():
+def test_retry_backoff_is_clamped_to_remaining_deadline():
+    provider = FlakyProvider()
+    runtime = WorkflowRuntime(
+        session_factory=lambda: RecordingSession(),
+        capability_executor=_executor(provider),
+        workflow_name="backoff-clamp",
+    )
+    root = ExecutionContext(
+        run_id="run-backoff",
+        task_id=None,
+        workflow_name="backoff-clamp",
+        deadline=time.time() + 0.1,
+    )
+    step_context = root.for_step("step-1")
+    collector = ReportCollector(root)
+    step = WorkflowStep.capability(
+        "solve",
+        request=_request(),
+        policy=CapabilityPolicy(timeout=5.0, max_attempts=3, backoff=10.0),
+    )
+
+    started = time.monotonic()
+    result = asyncio.run(
+        runtime._run_capability(step, step_context, collector, _RunClock())
+    )
+    elapsed = time.monotonic() - started
+
+    assert result.status.value == "failed"
+    assert provider.calls == 1
+    assert result.attempts == 1
+    assert elapsed < 5
+    assert result.error is not None
+    assert result.error.category is FailureCategory.TIMEOUT
+    assert result.error.code == "deadline_exceeded"
+
+
+def test_backoff_after_deadline_expiry_skips_next_attempt():
+    provider = FlakyProvider()
+    runtime = WorkflowRuntime(
+        session_factory=lambda: RecordingSession(),
+        capability_executor=_executor(provider),
+        workflow_name="backoff-expired",
+    )
+    root = ExecutionContext(
+        run_id="run-backoff-expired",
+        task_id=None,
+        workflow_name="backoff-expired",
+        deadline=time.time() - 1,
+    )
+    step_context = root.for_step("step-1")
+    collector = ReportCollector(root)
+    step = WorkflowStep.capability(
+        "solve",
+        request=_request(),
+        policy=CapabilityPolicy(timeout=5.0, max_attempts=3, backoff=0.0),
+    )
+
+    result = asyncio.run(
+        runtime._run_capability(step, step_context, collector, _RunClock())
+    )
+
+    assert provider.calls == 0
+    assert result.attempts == 0
+    assert result.error is not None
+    assert result.error.category is FailureCategory.TIMEOUT
+    assert result.error.code == "deadline_exceeded"
+
+
+def test_backoff_after_failed_attempt_does_not_run_provider_again_when_deadline_passed():
+    class ImmediateFailureProvider:
+        manifest = CapabilityManifest(
+            name="visual.challenge",
+            version="1.0.0",
+            operations=("solve",),
+            default_cancellation="cooperative",
+        )
+
+        def __init__(self):
+            self.calls = 0
+
+        def execution_profile(self, request):
+            return CapabilityExecutionProfile(cancellation="cooperative")
+
+        async def execute(self, request, context):
+            self.calls += 1
+            return CapabilityResult(
+                success=False,
+                provider="immediate-failure",
+                error_code="temporary",
+                retryable=True,
+            )
+
+    provider = ImmediateFailureProvider()
+    runtime = WorkflowRuntime(
+        session_factory=lambda: RecordingSession(),
+        capability_executor=_executor(provider),
+        workflow_name="backoff-expired-mid-retry",
+    )
+    step_context = ExecutionContext(
+        run_id="run-mid",
+        task_id=None,
+        workflow_name="backoff-expired-mid-retry",
+        deadline=time.time() + 30,
+    ).for_step("step-1")
+    collector = ReportCollector(step_context)
+    step = WorkflowStep.capability(
+        "solve",
+        request=_request(),
+        policy=CapabilityPolicy(timeout=5.0, max_attempts=2, backoff=0.05),
+    )
+    clock = _RunClock()
+
+    async def scenario():
+        first = await runtime._run_capability(step, step_context, collector, clock)
+        assert first.error is not None
+        assert first.attempts == 2
+        assert provider.calls == 2
+        # Simulate the workflow deadline expiring between retry attempts.
+        expired = ExecutionContext(
+            run_id=step_context.run_id,
+            task_id=step_context.task_id,
+            workflow_name=step_context.workflow_name,
+            deadline=time.time() - 1,
+        )
+        return await runtime._run_capability(step, expired, collector, clock)
+
+    result = asyncio.run(scenario())
+
+    assert provider.calls == 2
+    assert result.attempts == 0
+    assert result.error is not None
+    assert result.error.category is FailureCategory.TIMEOUT
+    assert result.error.code == "deadline_exceeded"
     runtime = WorkflowRuntime(
         session_factory=lambda: RecordingSession(),
         workflow_name="meta",

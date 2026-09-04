@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Any, Callable, Optional, Tuple
 
-from adapters.errors import AdapterStartupError
+from adapters.errors import AdapterArtifactError, AdapterStartupError
 from automation_core.artifacts import ArtifactStore
 from automation_core.drivers import ActionResult, ArtifactHandle, SessionInfo
 from automation_core.retries import RetryPolicy, retry_until
@@ -27,6 +27,8 @@ def _driver_platform(driver: Any) -> str:
 
 class AppiumSession:
     """DriverSession implementation for Appium-like mobile drivers."""
+
+    SUPPORTED_ARTIFACT_TYPES = frozenset({"screenshot", "page_source", "ui_tree"})
 
     def __init__(
         self,
@@ -207,6 +209,10 @@ class AppiumSession:
         return ActionResult(success=True, message=action_name, data=result)
 
     def capture_artifact(self, artifact_type: str, name: str) -> ArtifactHandle:
+        if artifact_type not in self.SUPPORTED_ARTIFACT_TYPES:
+            raise AdapterArtifactError(
+                f"unsupported appium artifact type: {artifact_type}"
+            )
         record = self.artifact_store.record(
             run_id=self.info.identifier,
             artifact_type=artifact_type,
@@ -214,14 +220,25 @@ class AppiumSession:
         )
         if artifact_type == "screenshot":
             screenshot = getattr(self.driver, "save_screenshot", None)
-            if callable(screenshot):
-                record.path.parent.mkdir(parents=True, exist_ok=True)
-                screenshot(str(record.path))
+            if not callable(screenshot):
+                raise AdapterArtifactError(
+                    "driver does not support screenshot capture"
+                )
+            record.path.parent.mkdir(parents=True, exist_ok=True)
+            if screenshot(str(record.path)) is False:
+                raise AdapterArtifactError("driver reported screenshot capture failed")
         elif artifact_type in {"page_source", "ui_tree"}:
             page_source = getattr(self.driver, "page_source", None)
-            if isinstance(page_source, str):
-                record.path.parent.mkdir(parents=True, exist_ok=True)
-                record.path.write_text(page_source, encoding="utf-8")
+            if not isinstance(page_source, str):
+                raise AdapterArtifactError(
+                    "driver does not provide a page source"
+                )
+            record.path.parent.mkdir(parents=True, exist_ok=True)
+            record.path.write_text(page_source, encoding="utf-8")
+        if not record.path.is_file():
+            raise AdapterArtifactError(
+                f"artifact was not written: {record.path}"
+            )
         return ArtifactHandle(
             artifact_type=artifact_type,
             path=record.path,

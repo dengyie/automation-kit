@@ -384,6 +384,9 @@ CapabilityPolicy(
 - runtime 是 timeout、retry、backoff、fallback 和最终失败判定的唯一权威。
 - 每次 retry 保持同一个 `task_id`，增加 attempt 记录和 attempt event。
 - timeout 只有一个来源；provider 不得再套一层无法协调的 platform timeout。
+- backoff 属于 runtime 预算的一部分：进入 backoff 前按剩余 deadline 截断等待
+  （`min(backoff, remaining)`）；deadline 已耗尽时不再发起下一次 provider 调用，直接以
+  `deadline_exceeded` timeout failure 结束该 step。
 
 目标 V2 平台错误分类：
 
@@ -669,6 +672,13 @@ JSON report 只允许写 artifact type、path 和脱敏 metadata；不得嵌入 
 source、图片、token、cookie、action data 或 skipped action parameters。adapter 负责捕获
 具体证据，`ArtifactStore` 负责路径和记录，runner 负责 report attachment；三层不能互相
 复制实现。
+
+Artifact 成功语义是「证据确实产生」，不是「路径已构造」。adapter 的 `capture_artifact`
+必须显式校验：未知 artifact 类型直接失败（`AdapterArtifactError`），驱动缺少捕获能力、
+驱动显式返回失败（例如 `save_screenshot` 返回 `False`）或写入后目标文件不存在，都必须
+失败而不能返回成功 handle。runner 只把 `SUCCEEDED` 的 artifact step 计入 report 的
+artifacts 与 artifact 事件；失败或取消的 artifact step 仅携带 namespaced 未写入 `Path`
+供诊断，不得作为已产出证据出现在报告里。
 
 ## 9. 版本与兼容
 

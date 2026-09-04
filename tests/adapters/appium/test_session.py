@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from adapters import AdapterStartupError
+from adapters import AdapterArtifactError, AdapterStartupError
 from adapters.appium import AppiumSession, AppiumSessionFactory
 from automation_core.drivers import DriverSession
 
@@ -473,6 +473,84 @@ def test_appium_session_rejects_invalid_artifact_name(tmp_path):
 
     with pytest.raises(ValueError, match="invalid artifact name"):
         session.capture_artifact("screenshot", "..")
+
+
+def test_appium_session_rejects_unsupported_artifact_type(tmp_path):
+    session = AppiumSession(
+        driver=FakeMobileDriver(),
+        identifier="device-1",
+        artifact_root=tmp_path,
+    )
+
+    with pytest.raises(AdapterArtifactError, match="unsupported appium artifact type"):
+        session.capture_artifact("video", "clip.mp4")
+
+
+def test_appium_session_screenshot_failure_return_value_is_error(tmp_path):
+    class FalseScreenshotDriver(FakeMobileDriver):
+        def save_screenshot(self, path):
+            self.screenshots.append(path)
+            return False
+
+    driver = FalseScreenshotDriver()
+    session = AppiumSession(
+        driver=driver,
+        identifier="device-1",
+        artifact_root=tmp_path,
+    )
+
+    with pytest.raises(AdapterArtifactError, match="screenshot capture failed"):
+        session.capture_artifact("screenshot", "screen.png")
+
+
+def test_appium_session_screenshot_requires_driver_support(tmp_path):
+    class NoScreenshotDriver:
+        pass
+
+    session = AppiumSession(
+        driver=NoScreenshotDriver(),
+        identifier="device-1",
+        artifact_root=tmp_path,
+    )
+
+    with pytest.raises(
+        AdapterArtifactError, match="driver does not support screenshot capture"
+    ):
+        session.capture_artifact("screenshot", "screen.png")
+
+
+def test_appium_session_screenshot_missing_file_is_error(tmp_path):
+    class NoOpScreenshotDriver(FakeMobileDriver):
+        def save_screenshot(self, path):
+            self.screenshots.append(path)
+            return True
+
+    session = AppiumSession(
+        driver=NoOpScreenshotDriver(),
+        identifier="device-1",
+        artifact_root=tmp_path,
+    )
+
+    with pytest.raises(AdapterArtifactError, match="artifact was not written"):
+        session.capture_artifact("screenshot", "screen.png")
+
+
+def test_appium_session_page_source_requires_string(tmp_path):
+    class NoPageSourceDriver(FakeMobileDriver):
+        pass
+
+    driver = NoPageSourceDriver()
+    driver.page_source = None
+    session = AppiumSession(
+        driver=driver,
+        identifier="device-1",
+        artifact_root=tmp_path,
+    )
+
+    with pytest.raises(
+        AdapterArtifactError, match="driver does not provide a page source"
+    ):
+        session.capture_artifact("page_source", "tree.xml")
 
 
 def test_appium_session_stops_driver():

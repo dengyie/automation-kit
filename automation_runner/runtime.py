@@ -181,7 +181,12 @@ class WorkflowRuntime:
                     if result.status is not StepStatus.CANCELLED:
                         self._record_terminal_event(collector, context, step_context, result)
                     artifact_count = 0
-                    if result.artifact_result is not None:
+                    if (
+                        result.artifact_result is not None
+                        and result.status is StepStatus.SUCCEEDED
+                    ):
+                        # A failed artifact step carries a never-written handle for
+                        # diagnostics only; it must not surface as produced evidence.
                         collector.attach_artifact(result.artifact_result)
                         artifact_count += 1
                         self._record_artifact_event(
@@ -424,7 +429,7 @@ class WorkflowRuntime:
                 context=context,
                 artifact_result=ArtifactHandle(
                     artifact_type=step.name,
-                    path=artifact_name,
+                    path=self._unwritten_artifact_path(context, step),
                     metadata={"error": "capture_failed"},
                 ),
                 error=ExecutionFailure(
@@ -566,7 +571,20 @@ class WorkflowRuntime:
                 }
             )
             if policy.backoff:
-                await asyncio.sleep(policy.backoff)
+                backoff_remaining = clock.remaining(context)
+                if backoff_remaining is not None and backoff_remaining <= 0:
+                    last_error = ExecutionFailure(
+                        category=FailureCategory.TIMEOUT,
+                        code="deadline_exceeded",
+                        message=f"workflow deadline exceeded during retry backoff: {step.name}",
+                        retryable=False,
+                        source="runtime",
+                    )
+                    break
+                delay = policy.backoff
+                if backoff_remaining is not None:
+                    delay = min(delay, backoff_remaining)
+                await asyncio.sleep(delay)
 
         if last_error is None:
             last_error = ExecutionFailure(
