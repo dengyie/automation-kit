@@ -19,6 +19,7 @@ from automation_runner.reports import build_report_v2
 from automation_runner.runtime import WorkflowRuntime
 from automation_runner.schemas import load_report_schema
 from automation_runner.workflows import ComposedWorkflow
+from automation_runner.yaml_loader import load_flow
 from examples.damai_android import build_steps as build_damai_android_steps
 from examples.damai_web import build_steps as build_damai_web_steps
 
@@ -105,7 +106,32 @@ def build_parser() -> argparse.ArgumentParser:
     )
     run.add_argument("--json", action="store_true", help="emit JSON report")
     run.add_argument("--report-file", help="write JSON report to file")
+
+    build_run_yaml_parser(subparsers)
     return parser
+
+
+def build_run_yaml_parser(subparsers):
+    run_yaml = subparsers.add_parser(
+        "run-yaml",
+        help="run a declarative YAML flow (schema v1)",
+    )
+    run_yaml.add_argument("flow", help="path to the flow YAML file")
+    run_yaml.add_argument(
+        "--param",
+        action="append",
+        help="flow parameter as KEY=VALUE; may be repeated",
+    )
+    run_yaml.add_argument(
+        "--capability-builders",
+        default=None,
+        help="module:attr exporting a mapping of capability builder callables",
+    )
+    run_yaml.add_argument("--factory", help="session factory import path")
+    run_yaml.add_argument("--live", action="store_true", help="allow live execution")
+    run_yaml.add_argument("--json", action="store_true", help="emit JSON report")
+    run_yaml.add_argument("--report-file", help="write JSON report to file")
+    return run_yaml
 
 
 def load_object(import_path: str):
@@ -327,6 +353,46 @@ def _call_custom_workflow_factory(
     )
 
 
+def _load_capability_builders(import_path: Optional[str]):
+    if not import_path:
+        return {}
+    target = load_object(import_path)
+    builders = target() if callable(target) else target
+    if not isinstance(builders, dict):
+        raise ValueError(
+            "--capability-builders must resolve to a mapping of builder callables"
+        )
+    return builders
+
+
+def _execute_and_report(workflow, workflow_name, emit_json, report_file) -> int:
+    try:
+        result = workflow.run()
+    except Exception as exc:
+        return _print_run_error(f"{type(exc).__name__}: {exc}")
+    if not isinstance(result, ExecutionWorkflowResult):
+        return _print_run_error(
+            "workflow factory must return automation_core.execution.WorkflowResult; "
+            f"got {type(result).__name__}"
+        )
+    if emit_json:
+        report = build_report_v2(result)
+        payload = _json_report_payload(report)
+        if report_file:
+            try:
+                _write_json_report_file(report_file, payload)
+            except OSError as exc:
+                return _print_error(
+                    f"could not write report file {report_file}: {exc}"
+                )
+            _emit_json_report_payload(payload)
+        else:
+            _emit_json_report(report)
+    else:
+        print(f"{workflow_name} success={result.success}")
+    return _workflow_exit_code(result)
+
+
 def main(
     argv: Optional[List[str]] = None,
     config_source: Optional[ConfigSource] = None,
@@ -434,32 +500,54 @@ def main(
         except Exception as exc:
             return _print_run_error(f"{type(exc).__name__}: {exc}")
 
-        try:
-            result = workflow.run()
-        except Exception as exc:
-            return _print_run_error(f"{type(exc).__name__}: {exc}")
-        if not isinstance(result, ExecutionWorkflowResult):
-            return _print_run_error(
-                "workflow factory must return automation_core.execution.WorkflowResult; "
-                f"got {type(result).__name__}"
-            )
+        return _execute_and_report(workflow, workflow_name, config.emit_json, args.report_file)
 
-        if config.emit_json:
-            report = build_report_v2(result)
-            payload = _json_report_payload(report)
-            if args.report_file:
-                try:
-                    _write_json_report_file(args.report_file, payload)
-                except OSError as exc:
-                    return _print_error(
-                        f"could not write report file {args.report_file}: {exc}"
-                    )
-                _emit_json_report_payload(payload)
-            else:
-                _emit_json_report(report)
-        else:
-            print(f"{workflow_name} success={result.success}")
-        return _workflow_exit_code(result)
+    if args.command == "run-yaml":
+        source = config_source or EnvConfigSource(os.environ, prefix="AUTOMATION_RUNNER_")
+        try:
+            config = load_runner_config(source)
+        except ValueError as exc:
+            return _print_error(str(exc))
+        live = args.live or config.live
+        emit_json = args.json or config.emit_json
+        factory_name = (
+            args.factory if args.factory is not None else config.factory
+        )
+        if args.report_file and not emit_json:
+            return _print_error("--report-file requires --json")
+        try:
+            parameters = dict(config.parameters)
+            parameters.update(_parse_parameters(args.param))
+        except ValueError as exc:
+            return _print_error(str(exc))
+        if live and not factory_name:
+            return _print_error("--factory is required for live workflows")
+        try:
+            session_factory = (
+                load_object(factory_name)
+                if live
+                else lambda: DryRunSession("yaml-flow")  # noqa: E731
+            )
+            builders = _load_capability_builders(args.capability_builders)
+            flow = load_flow(
+                args.flow,
+                parameters=parameters,
+                capability_builders=builders,
+            )
+        except ValueError as exc:
+            return _print_error(str(exc))
+        runtime = WorkflowRuntime(
+            session_factory=session_factory,
+            workflow_name=flow.workflow_name,
+            metadata={
+                "live": live,
+                "session_factory": factory_name if live else None,
+                "flow": args.flow,
+                "flow_schema_version": flow.schema_version,
+            },
+        )
+        workflow = ComposedWorkflow(runtime, flow.steps)
+        return _execute_and_report(workflow, flow.workflow_name, emit_json, args.report_file)
 
     return 1
 
