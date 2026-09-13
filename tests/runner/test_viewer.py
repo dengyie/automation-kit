@@ -112,6 +112,26 @@ def test_render_marks_paths_outside_artifact_root_external(tmp_path):
         outside.unlink()
 
 
+def test_artifact_root_candidate_beats_cwd_shadow(tmp_path, monkeypatch):
+    """A same-named file in CWD must not shadow the artifact root copy."""
+    cwd = tmp_path / "cwd"
+    cwd.mkdir()
+    (cwd / "shot.png").write_bytes(b"shadowed-from-cwd")
+    root = tmp_path / "artifacts"
+    root.mkdir()
+    (root / "shot.png").write_bytes(PNG_BYTES)
+    monkeypatch.chdir(cwd)
+    try:
+        report = make_report(tmp_path, artifact_path="shot.png")
+        prepared = prepare_report(report, artifact_root=root)
+        assert prepared["artifacts"][0]["state"] == "embedded"
+        assert "data:image/png;base64," in render_report_html(
+            report, artifact_root=root
+        )
+    finally:
+        monkeypatch.chdir(tmp_path)
+
+
 def test_render_escapes_script_breakout(tmp_path):
     report = make_report(tmp_path)
     report["steps"][0]["step_name"] = "</script><script>alert(1)</script>"

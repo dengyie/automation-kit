@@ -38,9 +38,12 @@ def load_report(report_path: str) -> Dict[str, Any]:
 
 
 def _resolve_artifact_path(raw: str, artifact_root: Optional[Path]) -> Optional[Path]:
-    candidates = [Path(raw)]
+    # The artifact root candidate comes first so a same-named file in the
+    # current working directory can never shadow the run's own artifacts.
+    candidates = []
     if artifact_root is not None:
         candidates.append(artifact_root / raw)
+    candidates.append(Path(raw))
     for candidate in candidates:
         try:
             resolved = candidate.resolve()
@@ -48,13 +51,6 @@ def _resolve_artifact_path(raw: str, artifact_root: Optional[Path]) -> Optional[
             continue
         if resolved.is_file():
             return resolved
-        if artifact_root is not None:
-            try:
-                rooted = (artifact_root / candidate).resolve()
-            except OSError:
-                continue
-            if rooted.is_file():
-                return rooted
     return None
 
 
