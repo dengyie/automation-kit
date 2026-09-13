@@ -12,13 +12,16 @@ DriverFactory = Callable[[], Any]
 
 # Locator vocabulary mapped onto uiautomator2 selector kwargs. ``by=None``
 # defaults to ``text`` (the most common uiautomator2 shorthand); ``xpath``
-# is dispatched through ``Device.xpath``.
+# is dispatched through ``Device.xpath``. Contains variants mirror the
+# native ``textContains``/``descriptionContains`` uiautomator2 kwargs.
 SUPPORTED_BY: Dict[str, str] = {
     "id": "resourceId",
     "text": "text",
     "description": "description",
     "class": "className",
     "xpath": "xpath",
+    "text-contains": "textContains",
+    "description-contains": "descriptionContains",
 }
 
 

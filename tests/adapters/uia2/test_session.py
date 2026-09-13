@@ -229,6 +229,22 @@ def test_xpath_lookup_dispatches_to_device_xpath():
     assert device.calls[0] == ("xpath", "//node")
 
 
+def test_contains_locators_map_to_native_kwargs():
+    session, device = make_session()
+
+    contains = session.execute_action(
+        "tap", selector="搜索", by="text-contains"
+    )
+    description = session.execute_action(
+        "tap", selector="搜索", by="description-contains"
+    )
+
+    assert contains.success is True
+    assert description.success is True
+    assert ("selector", {"textContains": "搜索"}) in device.calls
+    assert ("selector", {"descriptionContains": "搜索"}) in device.calls
+
+
 def test_capture_artifact_screenshot_from_pil_image(tmp_path):
     session, device = make_isolated_session(tmp_path)
     image = FakePilImage()
