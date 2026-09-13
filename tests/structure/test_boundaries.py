@@ -61,13 +61,30 @@ def test_adapter_and_example_shells_import():
         "adapters",
         "adapters.selenium",
         "adapters.appium",
+        "adapters.uia2",
         "examples",
         "examples.damai_web",
         "examples.damai_android",
+        "examples.damai_android.live",
     ]
 
     for module in modules:
         assert importlib.import_module(module)
+
+
+def test_uia2_adapter_does_not_import_uiautomator2():
+    uia2_text = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in (ROOT / "adapters" / "uia2").rglob("*.py")
+    ).lower()
+
+    assert "import uiautomator2" not in uia2_text
+    assert "from uiautomator2" not in uia2_text
+    # The example factory is the only allowed lazy import site.
+    live_text = (
+        (EXAMPLES_ROOT / "damai_android" / "live.py").read_text(encoding="utf-8")
+    )
+    assert "import uiautomator2" in live_text
 
 
 def test_retry_core_does_not_import_events():
