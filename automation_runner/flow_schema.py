@@ -9,7 +9,7 @@ schema file is documentation-grade, this validator is authoritative.
 
 import json
 from importlib import resources
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 
 FLOW_SCHEMA_VERSION = "1"
 FLOW_SCHEMA_RESOURCE = "flow-schema-v1.json"
@@ -34,6 +34,14 @@ def _require_mapping(value: Any, label: str) -> Dict[str, Any]:
     if not isinstance(value, dict):
         raise FlowError(f"{label} must be a mapping")
     return value
+
+
+def _reject_unknown_fields(
+    body: Dict[str, Any], allowed: Any, label: str
+) -> None:
+    unknown = sorted(set(body) - set(allowed))
+    if unknown:
+        raise FlowError(f"{label} has unknown field(s): {', '.join(unknown)}")
 
 
 def validate_flow_document(document: Any) -> None:
@@ -85,6 +93,9 @@ def _validate_step(step: Any, index: int) -> None:
     body = _require_mapping(body, f"{label} '{marker}'")
 
     if marker == "artifact":
+        _reject_unknown_fields(
+            body, ("type", "name", "capture_on"), f"{label} 'artifact'"
+        )
         for field in ("type", "name"):
             value = body.get(field)
             if not isinstance(value, str) or not value.strip():
@@ -97,6 +108,9 @@ def _validate_step(step: Any, index: int) -> None:
         return
 
     if marker == "capability":
+        _reject_unknown_fields(
+            body, ("builder", "name", "params", "policy"), f"{label} 'capability'"
+        )
         builder = body.get("builder")
         if not isinstance(builder, str) or not builder.strip():
             raise FlowError(f"{label} 'capability' requires a non-blank 'builder'")
@@ -105,6 +119,11 @@ def _validate_step(step: Any, index: int) -> None:
         policy = body.get("policy")
         if policy is not None:
             policy = _require_mapping(policy, f"{label} 'capability' policy")
+            _reject_unknown_fields(
+                policy,
+                ("timeout", "max_attempts", "backoff"),
+                f"{label} capability policy",
+            )
             for field in ("timeout", "max_attempts", "backoff"):
                 value = policy.get(field)
                 if value is None:
@@ -134,11 +153,3 @@ def _validate_step(step: Any, index: int) -> None:
         raise FlowError(
             f"{label} 'assert.element_present' requires a non-blank 'selector'"
         )
-
-
-def unknown_marker_keys(
-    step: Dict[str, Any], marker: str, allowed: Optional[List[str]] = None
-) -> List[str]:
-    """Return keys on a step mapping that are not the marker or allowed fields."""
-    reserved = {marker} | set(allowed or ())
-    return [key for key in step if key not in reserved]
