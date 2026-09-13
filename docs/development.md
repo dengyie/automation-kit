@@ -1207,7 +1207,9 @@ Patchright / stf）。原则：外部 SDK 一律依赖注入，不进 `automatio
   默认值省略键，历史 parameter 形状不变。`failure` 捕获在失败分支执行（声明顺序、
   会话存活时），happy path 记 SKIPPED（可见但无证据），runtime 循环中断条件由
   「非 SUCCEEDED」收紧为 FAILED/CANCELLED。捕获失败只记自身 failed step（未写入
-  path），不掩盖原始失败；取消路径不触发捕获。
+  path），不掩盖原始失败；取消路径不触发捕获。**取消打断捕获**：中断的捕获记
+  cancelled step 后重抛，主失败保留为 `failure`、status 置 CANCELLED（§8.3 要求
+  主失败与取消同报告保留）。
 - **viewer**：`automation-runner report-view <report.json> [--artifact-root]
   [--output]` 渲染单文件离线 HTML（steps 时间线、failure 详情、截图内嵌 ≤5MB、
   事件/provider 列表）。`--artifact-root` 之外的路径不内嵌；数据岛转义 `</` 防止

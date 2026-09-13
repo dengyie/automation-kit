@@ -242,13 +242,19 @@ class WorkflowRuntime:
                             )
                         break
         except asyncio.CancelledError:
-            failure = ExecutionFailure(
-                category=FailureCategory.CANCELLED,
-                code="cancelled",
-                message="workflow cancelled",
-                retryable=False,
-                source="runtime",
-            )
+            if failure is None:
+                failure = ExecutionFailure(
+                    category=FailureCategory.CANCELLED,
+                    code="cancelled",
+                    message="workflow cancelled",
+                    retryable=False,
+                    source="runtime",
+                )
+            # Cancellation arriving after a primary failure (e.g. while
+            # running declared failure captures) must not overwrite it:
+            # development.md §8.3 requires primary failure and cancellation
+            # to both survive into the same report. The interrupted capture
+            # step is recorded by _run_failure_captures before re-raising.
             status = WorkflowStatus.CANCELLED
         finally:
             cleanup_error = self._close_session(session)
@@ -504,7 +510,24 @@ class WorkflowRuntime:
                     },
                 }
             )
-            f_result = await self._run_artifact(session, f_step, f_context)
+            f_result: Optional[StepExecutionResult]
+            try:
+                f_result = await self._run_artifact(session, f_step, f_context)
+            except asyncio.CancelledError:
+                collector.record_step(self._cancelled_step(f_step, f_context))
+                collector.record_event(
+                    {
+                        "event_id": f"{context.run_id}:{f_task_id}:end",
+                        "event_type": "step.end",
+                        "task_id": f_task_id,
+                        "payload": {
+                            "step_name": f_step.name,
+                            "status": StepStatus.CANCELLED.value,
+                            "capture_on": "failure",
+                        },
+                    }
+                )
+                raise
             collector.record_step(f_result)
             if (
                 f_result.artifact_result is not None

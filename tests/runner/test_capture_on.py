@@ -138,9 +138,6 @@ def test_failed_capture_does_not_mask_original_failure():
 
 
 def test_capability_failure_also_triggers_captures():
-    class NoExecutorRuntime(WorkflowRuntime):
-        pass
-
     session = FakeSession()
     runtime = WorkflowRuntime(
         session_factory=lambda: session,
@@ -156,6 +153,44 @@ def test_capability_failure_also_triggers_captures():
 
     assert result.status.value == "failed"
     assert session.captures == [("screenshot", "fail.png")]
+
+
+def test_cancel_during_failure_capture_preserves_primary_failure():
+    import asyncio
+
+    class CancelDuringCaptureSession(FakeSession):
+        def capture_artifact(self, artifact_type, name):
+            self.captures.append((artifact_type, name))
+            raise asyncio.CancelledError()
+
+    session = CancelDuringCaptureSession()
+    session.fail_on.add("open")
+    runtime = WorkflowRuntime(session_factory=lambda: session)
+    steps = [
+        WorkflowStep.action("open", url="https://example.test"),
+        WorkflowStep.artifact("screenshot", "fail.png", capture_on="failure"),
+    ]
+
+    result = runtime.run(steps)
+
+    # The run is cancelled, but the primary failure is preserved (§8.3).
+    assert result.status.value == "cancelled"
+    assert result.failure is not None
+    assert result.failure.code == "action_failed"
+    cancelled_capture = [
+        step for step in result.steps if "-onfailure-" in step.step_id
+    ]
+    assert len(cancelled_capture) == 1
+    assert cancelled_capture[0].status.value == "cancelled"
+    # No dangling step.start: the interrupted capture has a step.end event.
+    ends = [
+        event
+        for event in result.events
+        if isinstance(event, dict)
+        and event.get("task_id") == "step-1-onfailure-1"
+        and event.get("event_type") == "step.end"
+    ]
+    assert len(ends) == 1
 
 
 def _fake_capability_request():
