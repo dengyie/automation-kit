@@ -218,7 +218,7 @@ class WorkflowRuntime:
                             },
                         }
                     )
-                    if result.status is not StepStatus.SUCCEEDED:
+                    if result.status in (StepStatus.FAILED, StepStatus.CANCELLED):
                         failure = result.error or ExecutionFailure(
                             category=FailureCategory.BUSINESS,
                             code="step_failed",
@@ -231,6 +231,15 @@ class WorkflowRuntime:
                             if result.status is StepStatus.CANCELLED
                             else WorkflowStatus.FAILED
                         )
+                        if status is not WorkflowStatus.CANCELLED:
+                            await self._run_failure_captures(
+                                session=session,
+                                steps=steps,
+                                failed_step=step,
+                                failed_task_id=step_context.task_id,
+                                context=context,
+                                collector=collector,
+                            )
                         break
         except asyncio.CancelledError:
             failure = ExecutionFailure(
@@ -347,6 +356,8 @@ class WorkflowRuntime:
         if step.kind == "capability":
             return await self._run_capability(step, context, collector, clock)
         if step.kind == "artifact":
+            if step.parameters.get("capture_on") == "failure":
+                return self._skipped_failure_capture_step(step, context)
             return await self._run_artifact(session, step, context)
         return self._unsupported_step(step, context)
 
@@ -450,6 +461,100 @@ class WorkflowRuntime:
             duration_ms=int((time.monotonic() - started) * 1000),
             context=context,
             artifact_result=artifact,
+        )
+
+    async def _run_failure_captures(
+        self,
+        *,
+        session: DriverSession,
+        steps: Sequence[WorkflowStep],
+        failed_step: WorkflowStep,
+        failed_task_id: str,
+        context: ExecutionContext,
+        collector: ReportCollector,
+    ) -> None:
+        """Execute declared failure-capture artifact steps after a failure.
+
+        Captures are workflow-declared (``WorkflowStep.artifact(
+        capture_on="failure")``) and run here, in declaration order, while
+        the session is still alive. Results never override the original
+        failure: a failed capture records its own failed step with an
+        unwritten path only (cleanup-failure semantics, development.md §4.6).
+        Cancelled runs do not reach this branch.
+        """
+        captures = [
+            f_step
+            for f_step in steps
+            if f_step.kind == "artifact"
+            and f_step.parameters.get("capture_on") == "failure"
+            and f_step is not failed_step
+        ]
+        for offset, f_step in enumerate(captures, start=1):
+            f_task_id = "%s-onfailure-%d" % (failed_task_id, offset)
+            f_context = context.for_step(f_task_id)
+            collector.record_event(
+                {
+                    "event_id": f"{context.run_id}:{f_task_id}:start",
+                    "event_type": "step.start",
+                    "task_id": f_task_id,
+                    "payload": {
+                        "step_name": f_step.name,
+                        "kind": "artifact",
+                        "capture_on": "failure",
+                    },
+                }
+            )
+            f_result = await self._run_artifact(session, f_step, f_context)
+            collector.record_step(f_result)
+            if (
+                f_result.artifact_result is not None
+                and f_result.status is StepStatus.SUCCEEDED
+            ):
+                collector.attach_artifact(f_result.artifact_result)
+                self._record_artifact_event(
+                    collector,
+                    context,
+                    f_context,
+                    f_result.artifact_result,
+                    1,
+                )
+            collector.record_event(
+                {
+                    "event_id": f"{context.run_id}:{f_task_id}:end",
+                    "event_type": "step.end",
+                    "task_id": f_task_id,
+                    "payload": {
+                        "step_name": f_step.name,
+                        "status": f_result.status.value,
+                        "capture_on": "failure",
+                    },
+                }
+            )
+
+    def _skipped_failure_capture_step(
+        self,
+        step: WorkflowStep,
+        context: ExecutionContext,
+    ) -> StepExecutionResult:
+        """Skipped placeholder for a failure-capture artifact on the happy path.
+
+        The step stays visible in the report (declared vs executed must be
+        distinguishable) but produces no evidence; the real capture happens
+        in the failure branch (``_run_failure_captures``).
+        """
+        return StepExecutionResult(
+            step_id=context.task_id or step.name,
+            step_name=step.name,
+            kind=StepKind.ARTIFACT,
+            status=StepStatus.SKIPPED,
+            attempts=0,
+            duration_ms=0,
+            context=context,
+            artifact_result=ArtifactHandle(
+                artifact_type=step.name,
+                path=self._unwritten_artifact_path(context, step),
+                metadata={"capture_on": "failure", "state": "skipped"},
+            ),
         )
 
     async def _run_capability(

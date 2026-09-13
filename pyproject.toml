@@ -13,6 +13,7 @@ packages = [
 include = [
     { path = "automation_runner/schemas/report-schema-v1.json", format = ["sdist", "wheel"] },
     { path = "automation_runner/schemas/report-schema-v2.json", format = ["sdist", "wheel"] },
+    { path = "automation_runner/viewer-template.html", format = ["sdist", "wheel"] },
 ]
 
 [tool.poetry.dependencies]

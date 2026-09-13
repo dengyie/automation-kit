@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>automation-kit run report</title>
+<style>
+  :root { color-scheme: light; }
+  body { font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+         margin: 0; background: #f5f6f8; color: #1c2430; }
+  header { padding: 18px 24px; background: #ffffff; border-bottom: 1px solid #e3e6ea; }
+  header h1 { font-size: 18px; margin: 0 0 6px; }
+  header .meta { font-size: 12px; color: #5b6673; line-height: 1.6; }
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 10px; font-size: 12px; font-weight: 600; }
+  .badge.succeeded { background: #d9f2e3; color: #14713a; }
+  .badge.failed { background: #fbdfdf; color: #a12b2b; }
+  .badge.cancelled { background: #eee3fb; color: #5d3a9e; }
+  .badge.succeeded-step { background: #eef7f1; color: #2c7a4b; }
+  .badge.failed-step { background: #fceeee; color: #a12b2b; }
+  .badge.cancelled-step { background: #f1eafb; color: #5d3a9e; }
+  main { padding: 18px 24px 40px; max-width: 980px; margin: 0 auto; }
+  section { background: #ffffff; border: 1px solid #e3e6ea; border-radius: 10px;
+            padding: 16px 18px; margin-bottom: 16px; }
+  h2 { font-size: 14px; text-transform: uppercase; letter-spacing: .04em;
+       color: #6b7684; margin: 0 0 12px; }
+  .step { border: 1px solid #e8ebef; border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; }
+  .step-head { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+  .step-name { font-weight: 600; }
+  .step-kind { font-size: 11px; color: #8a94a1; border: 1px solid #e3e6ea; border-radius: 6px; padding: 1px 6px; }
+  .step-error { color: #a12b2b; font-size: 12px; margin-top: 6px; }
+  .step-artifacts { margin-top: 8px; }
+  .step-artifacts img { max-width: 100%; border: 1px solid #e3e6ea; border-radius: 6px; margin-top: 6px; }
+  .artifact-state { font-size: 11px; color: #6b7684; }
+  pre.failure { background: #fbf3f3; border: 1px solid #f0d8d8; border-radius: 8px;
+                padding: 10px 12px; font-size: 12px; white-space: pre-wrap; }
+  details { margin-top: 6px; }
+  summary { cursor: pointer; font-size: 12px; color: #5b6673; }
+  pre.events { font-size: 11px; background: #f7f8fa; border: 1px solid #e8ebef;
+               border-radius: 8px; padding: 10px; max-height: 320px; overflow: auto; }
+  .empty { color: #8a94a1; font-size: 13px; }
+</style>
+</head>
+<body>
+<header>
+  <h1><span id="wf-name" class="step-name"></span>
+      <span id="wf-status" class="badge"></span></h1>
+  <div class="meta">
+    run_id: <span id="run-id"></span><br>
+    correlation_id: <span id="correlation-id"></span> ·
+    schema: <span id="schema-version"></span> ·
+    steps: <span id="step-count"></span> ·
+    artifacts: <span id="artifact-count"></span>
+  </div>
+</header>
+<main>
+  <section id="failure-section" style="display:none">
+    <h2>Failure</h2>
+    <pre class="failure" id="failure-detail"></pre>
+  </section>
+
+  <section>
+    <h2>Steps</h2>
+    <div id="steps"></div>
+  </section>
+
+  <section>
+    <h2>Artifacts</h2>
+    <div id="artifacts"></div>
+  </section>
+
+  <section>
+    <h2>Providers</h2>
+    <div id="providers"></div>
+  </section>
+
+  <section>
+    <h2>Events</h2>
+    <details open>
+      <pre class="events" id="events"></pre>
+    </details>
+  </section>
+</main>
+<script id="report-data" type="application/json">__REPORT_DATA__</script>
+<script>
+(function () {
+  var data = JSON.parse(document.getElementById("report-data").textContent);
+  document.getElementById("wf-name").textContent = data.workflow_name || "(unnamed workflow)";
+  var statusEl = document.getElementById("wf-status");
+  statusEl.textContent = data.status || "unknown";
+  statusEl.classList.add("badge");
+  statusEl.classList.add(data.status === "succeeded" ? "succeeded"
+    : data.status === "cancelled" ? "cancelled" : "failed");
+  document.getElementById("run-id").textContent = data.run_id || "-";
+  document.getElementById("correlation-id").textContent = data.correlation_id || "-";
+  document.getElementById("schema-version").textContent = data.schema_version || "-";
+  document.getElementById("step-count").textContent = (data.steps || []).length;
+  document.getElementById("artifact-count").textContent = (data.artifacts || []).length;
+
+  var failure = data.failure;
+  if (failure) {
+    document.getElementById("failure-section").style.display = "";
+    document.getElementById("failure-detail").textContent = JSON.stringify(failure, null, 2);
+  }
+
+  function esc(value) {
+    var div = document.createElement("div");
+    div.textContent = value == null ? "" : String(value);
+    return div.innerHTML;
+  }
+
+  var stepsHost = document.getElementById("steps");
+  if (!(data.steps || []).length) {
+    stepsHost.innerHTML = '<div class="empty">no steps recorded</div>';
+  }
+  (data.steps || []).forEach(function (step) {
+    var div = document.createElement("div");
+    div.className = "step";
+    var head = '<div class="step-head">' +
+      '<span class="step-name">' + esc(step.step_name) + '</span>' +
+      '<span class="step-kind">' + esc(step.kind) + '</span>' +
+      '<span class="badge ' + esc(step.status) + '-step">' + esc(step.status) + '</span>' +
+      '<span class="artifact-state">attempts=' + esc(step.attempts) +
+      ' · ' + esc(step.duration_ms) + 'ms</span></div>';
+    var html = head;
+    if (step.error_code) {
+      html += '<div class="step-error">' + esc(step.error_code) + ': ' + esc(step.error_message) + '</div>';
+    }
+    (step.artifacts || []).forEach(function (artifact) {
+      html += '<div class="step-artifacts"><span class="artifact-state">' +
+        esc(artifact.artifact_type) + ' · ' + esc(artifact.state) +
+        (artifact.size_bytes != null ? ' · ' + artifact.size_bytes + 'B' : '') +
+        ' · ' + esc(artifact.path) + '</span>';
+      if (artifact.embedded && artifact.data_uri) {
+        html += '<img alt="' + esc(artifact.artifact_type) + '" src="' + artifact.data_uri + '">';
+      }
+      html += '</div>';
+    });
+    div.innerHTML = html;
+    stepsHost.appendChild(div);
+  });
+
+  var artifactsHost = document.getElementById("artifacts");
+  if (!(data.artifacts || []).length) {
+    artifactsHost.innerHTML = '<div class="empty">no artifacts produced</div>';
+  } else {
+    var list = document.createElement("div");
+    (data.artifacts || []).forEach(function (artifact) {
+      var row = document.createElement("div");
+      row.className = "artifact-state";
+      row.textContent = artifact.artifact_type + " · " + artifact.state +
+        (artifact.size_bytes != null ? " · " + artifact.size_bytes + "B" : "") +
+        " · " + artifact.path;
+      if (artifact.embedded && artifact.data_uri) {
+        var img = document.createElement("img");
+        img.src = artifact.data_uri;
+        img.style.maxWidth = "100%";
+        row.appendChild(document.createElement("br"));
+        row.appendChild(img);
+      }
+      list.appendChild(row);
+    });
+    artifactsHost.appendChild(list);
+  }
+
+  var providersHost = document.getElementById("providers");
+  if (!(data.providers || []).length) {
+    providersHost.innerHTML = '<div class="empty">no capability providers used</div>';
+  } else {
+    (data.providers || []).forEach(function (provider) {
+      var row = document.createElement("div");
+      row.className = "artifact-state";
+      row.textContent = provider.provider + " · step=" + provider.step_id +
+        " · success=" + provider.success;
+      providersHost.appendChild(row);
+    });
+  }
+
+  document.getElementById("events").textContent =
+    JSON.stringify(data.events || [], null, 2);
+})();
+</script>
+</body>
+</html>

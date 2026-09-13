@@ -75,6 +75,22 @@ def build_parser() -> argparse.ArgumentParser:
         help="runner report schema version",
     )
 
+    report_view = subparsers.add_parser(
+        "report-view",
+        help="render an offline single-file HTML viewer for a v2 report",
+    )
+    report_view.add_argument("report", help="path to a report schema v2 JSON file")
+    report_view.add_argument(
+        "--artifact-root",
+        default=None,
+        help="root used to resolve relative artifact paths",
+    )
+    report_view.add_argument(
+        "--output",
+        default=None,
+        help="output HTML path (default: <report-stem>.viewer.html)",
+    )
+
     run = subparsers.add_parser("run", help="run a workflow")
     run.add_argument("workflow", nargs="?", choices=sorted(BUILTIN_WORKFLOWS))
     run.add_argument("--workflow-factory", help="workflow factory import path")
@@ -344,6 +360,35 @@ def main(
         except ValueError as exc:
             return _print_error(str(exc))
         print(json.dumps(schema, sort_keys=True))
+        return 0
+
+    if args.command == "report-view":
+        from automation_runner.viewer import (
+            default_output_path,
+            load_report,
+            render_report_html,
+        )
+
+        try:
+            report = load_report(args.report)
+        except ValueError as exc:
+            return _print_error(str(exc))
+        artifact_root = (
+            Path(args.artifact_root) if args.artifact_root else None
+        )
+        try:
+            rendered = render_report_html(report, artifact_root=artifact_root)
+        except ValueError as exc:
+            return _print_error(str(exc))
+        output = Path(args.output) if args.output else default_output_path(args.report)
+        try:
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_text(rendered, encoding="utf-8")
+        except OSError as exc:
+            return _print_run_error(
+                f"could not write viewer output {output}: {exc}"
+            )
+        print(str(output))
         return 0
 
     if args.command == "run":

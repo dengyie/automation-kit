@@ -36,11 +36,31 @@ class WorkflowStep:
         )
 
     @classmethod
-    def artifact(cls, artifact_type: str, name: str) -> "WorkflowStep":
+    def artifact(
+        cls,
+        artifact_type: str,
+        name: str,
+        *,
+        capture_on: str = "always",
+    ) -> "WorkflowStep":
+        """Declare an artifact capture step.
+
+        ``capture_on="always"`` (default) preserves the historical shape and
+        timing exactly; ``capture_on="failure"`` defers the capture until a
+        preceding step fails - the runtime executes it during the failure
+        branch while the session is still alive. The key is omitted for the
+        default so existing step-parameter assertions stay stable.
+        """
+        normalized = str(capture_on or "").strip().lower()
+        if normalized not in ("always", "failure"):
+            raise ValueError("artifact capture_on must be 'always' or 'failure'")
+        parameters = {"name": validate_step_name(name, "artifact")}
+        if normalized != "always":
+            parameters["capture_on"] = normalized
         return cls(
             kind="artifact",
             name=validate_step_name(artifact_type, "artifact"),
-            parameters={"name": validate_step_name(name, "artifact")},
+            parameters=parameters,
         )
 
     @classmethod
