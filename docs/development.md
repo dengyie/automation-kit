@@ -53,6 +53,13 @@ Android 和图像自动化应用提供底层能力的通用平台。
   task event 模型已删除。
 - CLI 只产出 report schema v2；`report-schema-v1.json` 保持冻结，仅作为已发布的历史
   schema 资源继续可查询（`automation-runner report-schema --version 1`）。
+- 2026-09 演进波（开源框架借鉴，Task 9-12）：`adapters/uia2`（uiautomator2 轻量
+  Android adapter）、`automation-runner run-yaml`（YAML 流描述层，flow schema v1）、
+  `automation-runner report-view`（离线 HTML viewer）、
+  `WorkflowStep.artifact(capture_on="failure")`（声明式失败截图）已在
+  `feat/evolution-m1-m2` 分支交付，随 `0.5.0` 发布合并；两个 app 仓依赖范围随发布
+  同步 bump 至 `>=0.5.0,<0.6.0`（dianping 已先行提交）。发布前必须重新生成
+  `poetry.lock`（pyproject 新增 optional pyyaml 与 dev group pyyaml）。
 - 目标 `1.0.x`：冻结 workflow、capability、错误和 report v2 公共契约；在此之前目标
   设计允许破坏性调整，不添加没有外部需求支撑的兼容包装。
 
@@ -691,6 +698,9 @@ artifacts 与 artifact 事件；失败或取消的 artifact step 仅携带 names
 - `report-schema-v1.json` 冻结后只做兼容扩展；破坏性变化创建新 schema 文件。
 - `0.3.x` 引入 Provider V2 和 workflow capability step；`0.2.x` 的双入口 provider
   协议只作为迁移基线，不再扩展。
+- `0.5.x` 演进波：`adapters/uia2`、YAML 流层（optional PyYAML extra）、
+  `WorkflowStep.artifact(capture_on=...)`、CLI `run-yaml`/`report-view`；均为
+  additive 变更，app 依赖范围随发布同步 bump（>=0.5.0,<0.6.0）。
 - `1.0.x` 冻结 V2 workflow、capability、failure 和 report 契约。
 - 跨仓发布顺序固定为 automation-kit -> Slidex -> app；下游依赖范围必须与已发布版本
   一致，不能依赖临时 sibling path 作为发布元数据。
@@ -787,6 +797,14 @@ automation-kit 后执行完整测试。Python 3.8/3.11 测试环境统一用 pip
   分类，`execution_profile` 的取消能力由 runtime 消费（unsupported 不承诺硬超时），
   `retry.attempt` / `action.end` / `capability.end` / `artifact` 事件进入报告流，
   deadline 在单调钟上执行。
+- 演进波 Task 9-12（2026-09）：uiautomator2 adapter（`adapters/uia2`，duck-typing
+  注入不引依赖、`by` 词表含 contains 变体、严格 artifact 成功语义）；examples
+  damai-android live factory（driver 选型在 factory 层，CLI 契约零改动）；YAML 流
+  loader（`run-yaml`、flow schema v1、capability builder 引用制、PyYAML 走 optional
+  extra，dev group 安装供 CI 实测）；report viewer（`report-view` 单文件 HTML、
+  截图嵌入上限、`--artifact-root` 根约束、`</` 转义防注入）；声明式失败捕获
+  （`capture_on="failure"`：happy path 记 SKIPPED，失败分支在会话存活时按声明顺序
+  执行，捕获失败只记自身 failed step，不掩盖原始失败）。
 
 ### 11.2 本轮已完成交付
 
@@ -834,6 +852,16 @@ provider 后开启，不得在当前阶段预建空壳。
 和 artifact。验收：在授权测试环境中证明业务成功条件，并确认失败不会泄露凭据或
 残留浏览器/设备会话。
 对应详细任务：Task 7、Task 8 中 app 侧 live 配置和证据门禁。
+2026-09 进展：damai live web session factory（`live_factory.py`，Task 10A）与
+patchright 引擎开关（Task 10B）已交付；dianping uia2 driver 路径（Task 9）已交付，
+publish 流程的 uia2 对等性（UiSelector 多方法翻译）仍为后续。
+
+### 演进波（2026-09，开源框架借鉴）
+
+Task 9-14 的完整方案与开放决策见分支 `feat/evolution-m1-m2` 的本文 §12.12-12.14；
+选型依据来自 2026-09-13 框架调研（uiautomator2 / Maestro / Midscene / DrissionPage /
+Patchright / stf）。原则：外部 SDK 一律依赖注入，不进 `automation_core`；默认离线
+测试不破坏；live opt-in；kit → slidex → app 发布顺序。
 
 ## 12. 详细开发方案
 
@@ -851,6 +879,7 @@ provider 后开启，不得在当前阶段预建空壳。
 | 阶段 3 | Task 0、Task 6 发布、Task 8 发布门禁 | 版本、wheel、正式包源矩阵 |
 | 阶段 4 | Task 2 resolver 基线 | 多 provider 治理仅在真实需求出现后扩展 |
 | 阶段 5 | Task 7-8 | 业务 app 迁移与真实闭环证据 |
+| 演进波 | Task 9-10（已实现）、Task 11-12（已实现）、Task 13-14（规划） | 开源框架借鉴：uia2 adapter / live factory+patchright / YAML 层 / viewer+capture_on / HAR 工具 / 设备农场 |
 
 ### 12.1 分层实施原则
 
@@ -1127,6 +1156,87 @@ provider 后开启，不得在当前阶段预建空壳。
 
 任何任务如果需要修改本节未列出的公共路径，必须先更新总纲并经过管理者 Review；不得
 在实现分支里临时扩大职责边界。
+### 12.12 演进波 Task 9-12（已实现，2026-09）
+
+#### Task 9：uiautomator2 Android adapter
+
+- **所属层和仓库**：L3，`adapters/uia2/`；`examples/damai_android/live.py`；dianping app。
+- **接口**：`Uia2Session`（duck-typing 注入 `uiautomator2.Device`，镜像 AppiumSession
+  语义）+ `Uia2Element`（click/input_text/text）+ `Uia2SessionFactory`。`by` 词表：
+  `None→text`、`id/text/description/class/xpath/text-contains/description-contains`；
+  未知 `by` typed 拒绝。artifact：`screenshot`（PIL/bytes）、`page_source`/`ui_tree`
+  （dump_hierarchy）。`stop()` 幂等，仅调用注入对象的一个 close 钩子
+  （disconnect 优先于 quit）。
+- **边界**：本包禁止 import `uiautomator2`（boundary 测试钉住）；连接与 SDK 导入
+  只发生在 app/examples 的 lazy factory（`_connect_uia2` → `u2.connect`）。
+- **app 侧**：dianping `DianpingUia2Session`（组合 kit session，模块导入不依赖 kit
+  adapter）+ `translate_uiautomator_selector`（id:/~/xpath:/单方法 UiSelector 链 →
+  kit `by` 词表；instance/childSelector 候选跳过不致命）+ `build_session_factory`
+  按 `DIANPING_DRIVER`/`--driver` 分派；publish 流程 uia2 对等性为后续任务。
+- **验收**：离线 fake 全路径 + boundary；kit examples smoke 双通道对拍；真机
+  smoke（OnePlus 7T）与 appium 通道对拍为 live gate。
+
+#### Task 10：damai live factory 与浏览器隐身引擎
+
+- **10A**：`automation_app_damai/live_factory.py` 的 `PlaywrightSession`（open/click/
+  type_text/wait_for_element + 严格 artifact 语义）与 `create_live_session_factory`；
+  同步 API 是刻意选择（DriverSession 同步 + runtime.run() 同步外观，§3.3）。
+- **10B**：`DamaiAppConfig.browser_engine`（默认 `playwright`，`patchright` 授权
+  live opt-in）；引擎经 `_import_sync_playwright` 懒加载，缺 SDK 保留可操作的
+  ImportError，启动失败归一 `AdapterStartupError`。
+- **合规**：隐身引擎仅用于授权环境的稳定性与调试，不承诺绕过目标平台安全规则。
+
+#### Task 11：YAML 声明式流（v1）
+
+- **接口**：`automation-runner run-yaml <flow> [--param K=V] [--capability-builders
+  module:attr] [--factory] [--live]`；`load_flow()` → `LoadedFlow`（workflow_name +
+  steps）。
+- **词汇表 v1**：`action`（adapter 别名 + 插值参数）、`artifact`（含 capture_on）、
+  `capability`（builder 引用制——YAML 无法持有活对象；builder 注册表由 composition
+  root 注入）、`assert.element_present`（映射 wait_for_element；text_visible 因
+  selenium/uia2 文本定位语义分叉而推迟）。
+- **实现边界**：纯描述层，执行语义 100% WorkflowRuntime；`${param.*}`/`${env.*}`
+  插值（未知键 = 装配错误）；PyYAML 为 optional extra（`automation-kit[yaml]`），
+  dev group 安装供 CI 实测；schema 校验失败 = 装配错误（stderr + 退出码 2）；
+  `flow-schema-v1.json` 为已发布资源，`flow_schema.py` 校验器为权威。
+- **红线**：含敏感信息的 env 插值必须使用 redact 七词表键名或仅运行时注入。
+
+#### Task 12：声明式失败捕获与离线报告 viewer
+
+- **capture_on**：`WorkflowStep.artifact(type, name, capture_on="always"|"failure")`；
+  默认值省略键，历史 parameter 形状不变。`failure` 捕获在失败分支执行（声明顺序、
+  会话存活时），happy path 记 SKIPPED（可见但无证据），runtime 循环中断条件由
+  「非 SUCCEEDED」收紧为 FAILED/CANCELLED。捕获失败只记自身 failed step（未写入
+  path），不掩盖原始失败；取消路径不触发捕获。
+- **viewer**：`automation-runner report-view <report.json> [--artifact-root]
+  [--output]` 渲染单文件离线 HTML（steps 时间线、failure 详情、截图内嵌 ≤5MB、
+  事件/provider 列表）。`--artifact-root` 之外的路径不内嵌；数据岛转义 `</` 防止
+  script breakout；report schema v2 无任何变更。
+- **公共 API 变更清单（0.5.0）**：`adapters.uia2.*` 新增；`WorkflowStep.artifact`
+  新增可选 `capture_on` 参数；`WorkflowStatus/StepStatus` 无变化；CLI 新增
+  `run-yaml`/`report-view` 子命令；`pyproject` 新增 optional `pyyaml` 与
+  `[tool.poetry.extras] yaml`。
+
+### 12.13 演进波 Task 13-14（已规划，未实现）
+
+#### Task 13：HAR 抓包工具（damai `tools/inspect_network.py`）
+
+Playwright 内建 HAR 录制（`new_context(record_har_path=..., record_har_mode="full")`
+）→ redact 清洗 → artifact。原始 HAR 仅落本地临时目录；清洗后的 artifact 才可保留；
+不做成 capability/provider（单一需求不预建抽象）；生产 workflow 不依赖。
+
+#### Task 14：设备农场（触发条件制）
+
+触发条件：≥2 台真机并行 live E2E，或需远程操控 pxed 之外设备。触发后先评估
+openatx `atxserver2`（与 uia2 生态同源）vs `DeviceFarmer/stf`。Camoufox（Firefox
+源码级反指纹）为页面级风控升级的最后预案，成本是放弃 Chromium 生态。
+
+### 12.14 演进波执行检查表补充
+
+- 外部 SDK（uiautomator2/patchright/playwright）只能出现在 lazy factory；boundary
+  测试与 `Requires-Dist` 双重验证。
+- kit minor 发布（0.5.0/0.6.0）必须同步：两 app 依赖范围 bump、`poetry.lock`
+  再生成、跨仓契约 CI、本文 §11 状态与「公共 API 变更清单」。
 
 ## 13. 本轮已实现文件
 
@@ -1189,6 +1299,8 @@ provider 后开启，不得在当前阶段预建空壳。
   不是第二份 prose 开发文档。
 - `automation_runner/schemas/report-schema-v1.json`：随 wheel 发布的 v1 schema 副本，
   由测试保证与上一个文件一致。
+- `automation_runner/schemas/report-schema-v2.json` / `flow-schema-v1.json`：随 wheel
+  发布的 v2 报告与 v1 流 schema；flow 的权威校验器是 `automation_runner/flow_schema.py`。
 - 各仓库 `README.md` / `README_EN.md`：安装、最小用法和指向本文的入口。
 - 各仓库 `CHANGELOG.md`：已发布版本历史，不承担当前架构规范。
 - 业务仓库确有必要的环境前置说明时，只维护可执行安装前置；开发边界、workflow 和
