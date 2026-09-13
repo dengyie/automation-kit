@@ -203,11 +203,19 @@ steps:
         ),
         (
             "workflow: x\nsteps:\n  - capability: {operation: solve}\n",
-            "requires a non-blank 'builder'",
+            "unknown field",
         ),
         (
-            "workflow: x\nsteps:\n  - capability:\n      builder: b\n      policy: {timeout: -1}\n",
-            "policy 'timeout' must be a number >= 0",
+            "workflow: x\nsteps:\n  - artifact: {type: screenshot, name: a.png, captureonn: failure}\n",
+            "has unknown field",
+        ),
+        (
+            "workflow: x\nsteps:\n  - capability:\n      builder: b\n      operatio: solve\n",
+            "has unknown field",
+        ),
+        (
+            "workflow: x\nsteps:\n  - capability:\n      builder: b\n      policy: {timeout: 1, maxattempt: 2}\n",
+            "policy has unknown field",
         ),
     ],
 )
@@ -297,3 +305,81 @@ def test_cli_run_yaml_requires_factory_for_live(tmp_path, capsys):
 
     assert exit_code == 2
     assert "--factory is required" in capsys.readouterr().err
+
+
+CAPABILITY_FLOW = """
+workflow: cap-cli-flow
+steps:
+  - capability:
+      builder: fake_slider
+      params:
+        provider: slidex
+"""
+
+
+def test_cli_run_yaml_capability_builders_mapping(tmp_path, capsys):
+    flow_file = tmp_path / "flow.yaml"
+    flow_file.write_text(CAPABILITY_FLOW, encoding="utf-8")
+
+    exit_code = cli.main(
+        [
+            "run-yaml",
+            str(flow_file),
+            "--capability-builders",
+            "tests.runner._flow_builders:BUILDERS",
+        ]
+    )
+
+    # The builder resolved (loader passed); the dry-run runtime then fails at
+    # the capability step because no capability executor is wired in dry-run.
+    assert exit_code == 1
+
+
+def test_cli_run_yaml_capability_builders_callable(tmp_path):
+    flow_file = tmp_path / "flow.yaml"
+    flow_file.write_text(CAPABILITY_FLOW, encoding="utf-8")
+    report_file = tmp_path / "report.json"
+
+    exit_code = cli.main(
+        [
+            "run-yaml",
+            str(flow_file),
+            "--capability-builders",
+            "tests.runner._flow_builders:get_builders",
+            "--json",
+            "--report-file",
+            str(report_file),
+        ]
+    )
+
+    assert exit_code == 1
+    report = json.loads(report_file.read_text(encoding="utf-8"))
+    failed = [step for step in report["steps"] if step["status"] == "failed"]
+    assert failed and failed[0]["step_name"] == "fake_slider"
+
+
+def test_cli_run_yaml_capability_builders_non_mapping_rejected(tmp_path, capsys):
+    flow_file = tmp_path / "flow.yaml"
+    flow_file.write_text(CAPABILITY_FLOW, encoding="utf-8")
+
+    exit_code = cli.main(
+        [
+            "run-yaml",
+            str(flow_file),
+            "--capability-builders",
+            "tests.runner._flow_builders:fake_slider_builder",
+        ]
+    )
+
+    assert exit_code == 2
+    assert "mapping of builder callables" in capsys.readouterr().err
+
+
+def test_cli_run_yaml_unknown_builder_is_assembly_error(tmp_path, capsys):
+    flow_file = tmp_path / "flow.yaml"
+    flow_file.write_text(CAPABILITY_FLOW, encoding="utf-8")
+
+    exit_code = cli.main(["run-yaml", str(flow_file)])
+
+    assert exit_code == 2
+    assert "unknown capability builder" in capsys.readouterr().err
