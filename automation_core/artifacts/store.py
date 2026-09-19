@@ -1,8 +1,24 @@
 import json
+import re
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from time import time
 from typing import Dict, Optional
+
+
+# Windows forbids these characters in path components. Artifact components
+# derive from user-controlled identifiers (e.g. adb serials like ip:port),
+# so they are scrubbed to keep artifact writes valid on every filesystem.
+_UNSAFE_COMPONENT_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
+
+_WINDOWS_RESERVED_NAMES = {
+    "CON",
+    "PRN",
+    "AUX",
+    "NUL",
+    *(f"COM{index}" for index in range(1, 10)),
+    *(f"LPT{index}" for index in range(1, 10)),
+}
 
 
 @dataclass(frozen=True)
@@ -29,8 +45,14 @@ class ArtifactStore:
 
     def _sanitize_component(self, value: str, field_name: str) -> str:
         cleaned = value.replace("\\", "/").split("/")[-1].strip()
+        cleaned = _UNSAFE_COMPONENT_CHARS.sub("_", cleaned)
+        # Windows silently drops trailing dots/spaces and reserves device
+        # names such as CON or NUL; make the component unambiguous instead.
+        cleaned = cleaned.rstrip(" .")
         if cleaned in {"", ".", ".."}:
             raise ValueError(f"invalid {field_name}")
+        if cleaned.upper() in _WINDOWS_RESERVED_NAMES:
+            cleaned = f"_{cleaned}"
         return cleaned.replace(" ", "_")
 
     def build_path(self, run_id: str, artifact_type: str, name: str) -> Path:

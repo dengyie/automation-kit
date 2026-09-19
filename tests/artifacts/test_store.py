@@ -69,3 +69,45 @@ def test_artifact_store_uses_run_and_type_namespaces():
     path = store.build_path("run-42", "ui_tree", "startup.json")
 
     assert str(path) == "/artifacts/run-42/ui_tree/startup.json"
+
+
+def test_artifact_store_scrubs_windows_unsafe_characters():
+    store = ArtifactStore(Path("artifacts"))
+
+    path = store.build_path("192.168.1.9:43427", "screenshot", "startup.png")
+
+    assert path.relative_to(store.root).as_posix() == (
+        "192.168.1.9_43427/screenshot/startup.png"
+    )
+
+
+def test_artifact_store_reserved_device_name_gets_prefix():
+    store = ArtifactStore(Path("artifacts"))
+
+    path = store.build_path("CON", "screenshot", "startup.png")
+
+    assert path.relative_to(store.root).as_posix() == "_CON/screenshot/startup.png"
+
+
+def test_artifact_store_trailing_dots_and_spaces_are_dropped():
+    store = ArtifactStore(Path("artifacts"))
+
+    path = store.build_path("run 1 . ", "screenshot", "shot .png")
+
+    assert path.relative_to(store.root).as_posix() == "run_1/screenshot/shot_.png"
+
+
+def test_artifact_store_record_writes_sanitized_directory(tmp_path):
+    store = ArtifactStore(tmp_path)
+
+    record = store.record(
+        run_id="10.0.2.2:5555",
+        artifact_type="page_source",
+        name="startup.xml",
+        metadata={"ok": "true"},
+    )
+
+    record.path.parent.mkdir(parents=True, exist_ok=True)
+    record.path.write_text("<hierarchy/>", encoding="utf-8")
+    assert record.path.read_text(encoding="utf-8") == "<hierarchy/>"
+    assert record.metadata_json() == '{"ok": "true"}'
