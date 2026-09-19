@@ -88,6 +88,8 @@ class Uia2Session:
             return self._type_text(**kwargs)
         if action_name == "swipe":
             return self._swipe(**kwargs)
+        if action_name == "element_bounds":
+            return self._element_bounds(**kwargs)
         if action_name == "wait_for_element":
             return self._wait_for_element(**kwargs)
 
@@ -200,6 +202,35 @@ class Uia2Session:
         if error is not None:
             return None, error
         return (x_value, y_value), None
+
+    def _element_bounds(self, **kwargs: Any) -> ActionResult:
+        selector = kwargs.get("selector")
+        if selector is None:
+            return ActionResult(False, "missing required parameter: selector")
+        element, error = self._resolve_element(selector=selector, by=kwargs.get("by"))
+        if error is not None:
+            return error
+        info = getattr(element, "info", None)
+        if not isinstance(info, dict):
+            return ActionResult(False, "element info unavailable")
+        bounds = info.get("bounds") or {}
+        try:
+            left = int(bounds["left"])
+            top = int(bounds["top"])
+            right = int(bounds["right"])
+            bottom = int(bounds["bottom"])
+        except (KeyError, TypeError, ValueError):
+            return ActionResult(False, "element bounds unavailable")
+        return ActionResult(
+            True,
+            "element_bounds",
+            data={
+                "x": left,
+                "y": top,
+                "width": right - left,
+                "height": bottom - top,
+            },
+        )
 
     def _wait_for_element(self, **kwargs: Any) -> ActionResult:
         selector = kwargs.get("selector")

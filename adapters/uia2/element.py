@@ -41,3 +41,26 @@ class Uia2Element:
         except Exception:
             return ""
         return value if isinstance(value, str) else ""
+
+    @property
+    def bounds(self):
+        """Element bounds as {x, y, width, height}, or None when unavailable.
+
+        Reads the lookup's snapshot info; uiautomator2 exposes bounds as
+        left/top/right/bottom screen pixels.
+        """
+        info = getattr(self._lookup, "info", None)
+        if not isinstance(info, dict):
+            return None
+        bounds = info.get("bounds") or {}
+        try:
+            left = int(bounds["left"])
+            top = int(bounds["top"])
+            return {
+                "x": left,
+                "y": top,
+                "width": int(bounds["right"]) - left,
+                "height": int(bounds["bottom"]) - top,
+            }
+        except (KeyError, TypeError, ValueError):
+            return None
