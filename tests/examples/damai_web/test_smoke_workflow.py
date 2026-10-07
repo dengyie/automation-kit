@@ -72,7 +72,7 @@ def test_damai_web_workflow_runs_against_injected_session():
     ]
 
 
-def test_damai_web_workflow_reports_provider_failure_without_raw_text():
+def test_damai_web_workflow_reports_provider_failure_with_raw_cause():
     class FailingSession(FakeSession):
         def execute_action(self, action_name, **kwargs):
             raise RuntimeError("navigation refused by browser")
@@ -89,7 +89,7 @@ def test_damai_web_workflow_reports_provider_failure_without_raw_text():
     assert result.status.value == "failed"
     assert result.failure.category.value == "provider"
     assert result.failure.code == "action_execution_failed"
-    assert "navigation refused by browser" not in payload
+    assert "navigation refused by browser" in payload
     assert session.stopped is True
 
 
@@ -103,6 +103,6 @@ def test_damai_web_workflow_runs_against_dry_run_session():
     payload = build_report_v2(result).to_dict()
 
     assert result.status.value == "succeeded"
-    assert payload["artifacts"][0]["path"] == (
+    assert Path(payload["artifacts"][0]["path"]).as_posix() == (
         "artifacts/damai-web-smoke-dry-run/screenshot/home.png"
     )

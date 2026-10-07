@@ -133,8 +133,9 @@ def test_action_exception_becomes_failed_step_and_report():
     assert result.failure is not None
     assert result.failure.category is FailureCategory.PROVIDER
     assert result.failure.code == "action_execution_failed"
-    assert result.failure.details == {"error_type": "ConnectionError"}
-    assert "driver socket died" not in str(result.to_dict())
+    assert result.failure.details["error_type"] == "ConnectionError"
+    assert result.failure.details["error_message"] == "driver socket died mid-action"
+    assert "driver socket died" in str(result.to_dict())
     assert [event["event_type"] for event in result.events] == [
         "workflow.start",
         "step.start",
@@ -319,7 +320,25 @@ def test_retry_attempts_are_visible_as_events():
 
 
 def test_retry_backoff_is_clamped_to_remaining_deadline():
-    provider = FlakyProvider()
+    class SlowFirstAttemptProvider(FlakyProvider):
+        """First attempt burns the whole deadline so the backoff clamp path
+        (``deadline exceeded during retry backoff``) is hit deterministically
+        instead of racing the sub-ms window between the sleep clock and the
+        wall-clock deadline."""
+
+        async def execute(self, request, context):
+            self.calls += 1
+            if self.calls == 1:
+                await asyncio.sleep(0.2)
+                return CapabilityResult(
+                    success=False,
+                    provider="flaky",
+                    error_code="temporary",
+                    retryable=True,
+                )
+            return CapabilityResult(success=True, provider="flaky")
+
+    provider = SlowFirstAttemptProvider()
     runtime = WorkflowRuntime(
         session_factory=lambda: RecordingSession(),
         capability_executor=_executor(provider),
@@ -530,6 +549,7 @@ def test_runtime_artifact_root_anchors_unwritten_paths():
     )
 
     handle = result.steps[0].artifact_result
-    assert handle.path.parts[:2] == ("/", "srv")
-    assert handle.path.parts[-1] == "home.png"
-    assert handle.path.parts[-3] == result.context.run_id
+    assert handle.path.as_posix().startswith("/srv/automation-artifacts/")
+    assert handle.path.name == "home.png"
+    assert handle.path.parent.name == "screenshot"
+    assert handle.path.parent.parent.name == result.context.run_id

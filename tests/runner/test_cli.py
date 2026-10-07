@@ -196,13 +196,13 @@ def test_cli_runs_dry_workflow_without_live_flag(capsys):
     assert report["events"][0]["task_id"] is None
     assert report["events"][0]["payload"]["workflow_name"] == "damai-web-smoke"
     assert report["events"][2]["payload"] == {"step_name": "open", "success": True}
-    assert report["artifacts"] == [
-        {
-            "artifact_type": "screenshot",
-            "path": "artifacts/damai-web-smoke-dry-run/screenshot/home.png",
-            "metadata": {},
-        },
+    assert [artifact["artifact_type"] for artifact in report["artifacts"]] == [
+        "screenshot",
     ]
+    assert Path(report["artifacts"][0]["path"]).as_posix() == (
+        "artifacts/damai-web-smoke-dry-run/screenshot/home.png"
+    )
+    assert report["artifacts"][0]["metadata"] == {}
     assert fixtures.CREATED_SESSIONS == []
 
 
@@ -1177,10 +1177,13 @@ def test_cli_emits_json_report_when_workflow_fails(tmp_path, capsys):
     assert report["success"] is False
     assert report["failure"]["category"] == "provider"
     assert report["failure"]["code"] == "action_execution_failed"
-    assert report["failure"]["message"] == "action failed: open"
+    assert report["failure"]["message"] == "action failed: open: RuntimeError"
     assert report["failure"]["retryable"] is False
-    assert report["failure"]["details"] == {"error_type": "RuntimeError"}
-    assert "driver socket closed" not in captured.out
+    assert report["failure"]["details"] == {
+        "error_type": "RuntimeError",
+        "error_message": "driver socket closed",
+    }
+    assert "driver socket closed" in captured.out
     assert [event["event_type"] for event in report["events"]] == [
         "workflow.start",
         "step.start",
@@ -1276,8 +1279,11 @@ def test_cli_emits_json_report_when_session_factory_fails(tmp_path, capsys):
     assert report["status"] == "failed"
     assert report["failure"]["category"] == "config"
     assert report["failure"]["code"] == "session_start_failed"
-    assert report["failure"]["details"] == {"error_type": "RuntimeError"}
-    assert "session startup failed" not in captured.out
+    assert report["failure"]["details"] == {
+        "error_type": "RuntimeError",
+        "error_message": "session startup failed",
+    }
+    assert "session startup failed" in captured.out
     assert [event["event_type"] for event in report["events"]] == [
         "workflow.start",
         "workflow.end",

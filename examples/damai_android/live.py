@@ -14,6 +14,7 @@ from automation_core.drivers import DriverSession
 SessionFactory = Callable[[], DriverSession]
 
 UIA2_UDID_ENV = "AUTOMATION_UIA2_UDID"
+PHONE_PLAYWRIGHT_UDID_ENV = "AUTOMATION_PHONE_PLAYWRIGHT_UDID"
 
 
 def create_session_factory(
@@ -24,8 +25,9 @@ def create_session_factory(
 ) -> SessionFactory:
     """Return a zero-arg session factory for the requested driver.
 
-    ``driver`` accepts ``appium`` or ``uia2``; ``udid`` only applies to
-    ``uia2`` (``None`` connects to the first adb device).
+    ``driver`` accepts ``appium``, ``uia2``, or ``phone_playwright``;
+    ``udid`` applies to ``uia2`` and ``phone_playwright`` (``None`` connects
+    to the default adb device).
     """
     if driver == "appium":
         raise ValueError(
@@ -34,6 +36,8 @@ def create_session_factory(
         )
     if driver == "uia2":
         return _uia2_factory(udid=udid, artifact_root=artifact_root)
+    if driver == "phone_playwright":
+        return _phone_playwright_factory(udid=udid, artifact_root=artifact_root)
     raise ValueError(f"unsupported driver: {driver}")
 
 
@@ -47,6 +51,42 @@ def uia2_session_factory() -> DriverSession:
         "uia2",
         udid=os.environ.get(UIA2_UDID_ENV) or None,
     )()
+
+
+def phone_playwright_session_factory() -> DriverSession:
+    """Zero-arg factory target for ``automation-runner run --factory``.
+
+    Reads the device serial from ``AUTOMATION_PHONE_PLAYWRIGHT_UDID`` (optional;
+    defaults to the active adb device).
+    """
+    return create_session_factory(
+        "phone_playwright",
+        udid=os.environ.get(PHONE_PLAYWRIGHT_UDID_ENV) or None,
+    )()
+
+
+def _phone_playwright_factory(
+    udid: Optional[str],
+    artifact_root: Optional[Any],
+) -> SessionFactory:
+    def factory() -> DriverSession:
+        from adapters.errors import AdapterStartupError
+        from adapters.phone_playwright import PhonePlaywrightSession
+        from phone_playwright import SyncPhonePlaywright
+
+        try:
+            pw = SyncPhonePlaywright()
+            pw.__enter__()
+            device = pw.connect(udid or "")
+            page = device.current_page
+        except Exception as exc:
+            raise AdapterStartupError("failed to create phone_playwright device") from exc
+        return PhonePlaywrightSession(
+            page,
+            artifact_root=artifact_root,
+        )
+
+    return factory
 
 
 def _uia2_factory(

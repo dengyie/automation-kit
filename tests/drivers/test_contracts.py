@@ -145,7 +145,7 @@ def test_artifact_store_builds_namespaced_paths():
 
     path = store.build_path("run-1", "screenshot", "home screen.png")
 
-    assert str(path) == "/artifacts/run-1/screenshot/home_screen.png"
+    assert path.as_posix() == "/artifacts/run-1/screenshot/home_screen.png"
 
 
 def test_artifact_store_records_metadata():
@@ -162,4 +162,4 @@ def test_artifact_store_records_metadata():
     assert isinstance(record, ArtifactRecord)
     assert record.task_id == "task-1"
     assert record.metadata == {"source": "driver"}
-    assert record.to_dict()["path"] == "/artifacts/run-1/trace/trace.json"
+    assert Path(record.to_dict()["path"]).as_posix() == "/artifacts/run-1/trace/trace.json"

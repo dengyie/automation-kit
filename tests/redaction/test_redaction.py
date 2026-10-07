@@ -71,6 +71,7 @@ def test_to_dict_objects_are_unwrapped_and_recursed():
 def test_paths_are_serialized_as_strings():
     from pathlib import Path
 
-    assert redact({"artifact": Path("artifacts/run-1/x.png")}) == {
-        "artifact": "artifacts/run-1/x.png"
-    }
+    serialized = redact({"artifact": Path("artifacts/run-1/x.png")})
+
+    assert isinstance(serialized["artifact"], str)
+    assert Path(serialized["artifact"]) == Path("artifacts/run-1/x.png")

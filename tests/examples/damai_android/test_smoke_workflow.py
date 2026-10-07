@@ -73,5 +73,6 @@ def test_damai_android_workflow_reports_provider_failure():
 
     assert result.status.value == "failed"
     assert result.failure.category is FailureCategory.PROVIDER
-    assert result.failure.details == {"error_type": "ConnectionError"}
+    assert result.failure.details["error_type"] == "ConnectionError"
+    assert result.failure.details["error_message"] == "device offline"
     assert session.stopped is True

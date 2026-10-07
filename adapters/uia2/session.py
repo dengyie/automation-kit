@@ -210,26 +210,20 @@ class Uia2Session:
         element, error = self._resolve_element(selector=selector, by=kwargs.get("by"))
         if error is not None:
             return error
-        info = getattr(element, "info", None)
-        if not isinstance(info, dict):
-            return ActionResult(False, "element info unavailable")
-        bounds = info.get("bounds") or {}
+        bounds = getattr(element, "bounds", None)
+        if not isinstance(bounds, dict):
+            return ActionResult(False, "element bounds unavailable")
         try:
-            left = int(bounds["left"])
-            top = int(bounds["top"])
-            right = int(bounds["right"])
-            bottom = int(bounds["bottom"])
+            x = int(bounds["x"])
+            y = int(bounds["y"])
+            width = int(bounds["width"])
+            height = int(bounds["height"])
         except (KeyError, TypeError, ValueError):
             return ActionResult(False, "element bounds unavailable")
         return ActionResult(
             True,
             "element_bounds",
-            data={
-                "x": left,
-                "y": top,
-                "width": right - left,
-                "height": bottom - top,
-            },
+            data={"x": x, "y": y, "width": width, "height": height},
         )
 
     def _wait_for_element(self, **kwargs: Any) -> ActionResult:

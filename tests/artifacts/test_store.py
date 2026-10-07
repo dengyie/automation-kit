@@ -19,7 +19,7 @@ def test_artifact_record_serializes_metadata():
         {"ok": "true", "source": "driver"},
         sort_keys=True,
     )
-    assert record.to_dict()["path"] == "/artifacts/run-1/trace/trace.json"
+    assert Path(record.to_dict()["path"]).as_posix() == "/artifacts/run-1/trace/trace.json"
 
 
 def test_artifact_store_rejects_invalid_name():
@@ -48,7 +48,7 @@ def test_artifact_store_normalizes_name():
 
     path = store.build_path("run-1", "screenshot", "home screen.png")
 
-    assert str(path) == "/artifacts/run-1/screenshot/home_screen.png"
+    assert path.as_posix() == "/artifacts/run-1/screenshot/home_screen.png"
 
 
 def test_artifact_store_sanitizes_run_and_type_components():
@@ -60,7 +60,7 @@ def test_artifact_store_sanitizes_run_and_type_components():
         "../startup.xml",
     )
 
-    assert str(path) == "/artifacts/run_42/page_source/startup.xml"
+    assert path.as_posix() == "/artifacts/run_42/page_source/startup.xml"
 
 
 def test_artifact_store_uses_run_and_type_namespaces():
@@ -68,7 +68,7 @@ def test_artifact_store_uses_run_and_type_namespaces():
 
     path = store.build_path("run-42", "ui_tree", "startup.json")
 
-    assert str(path) == "/artifacts/run-42/ui_tree/startup.json"
+    assert path.as_posix() == "/artifacts/run-42/ui_tree/startup.json"
 
 
 def test_artifact_store_scrubs_windows_unsafe_characters():

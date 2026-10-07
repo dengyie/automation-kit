@@ -28,6 +28,31 @@ from automation_runner.policies import CapabilityPolicy
 from automation_runner.steps import WorkflowStep
 
 
+def _exception_excerpt(exc: Exception, limit: int = 300) -> str:
+    """A bounded, single-line rendering of an exception for a failure report.
+
+    The runner otherwise reports ``action failed: <name>`` and drops the
+    cause, which is un-actionable for a broken step. Bound the length so a
+    driver trace never floods a report cell.
+    """
+    text = str(exc).strip() or exc.__class__.__name__
+    if len(text) > limit:
+        text = text[: limit - 3] + "..."
+    return text
+
+
+def _exception_details(exc: Exception) -> Dict[str, str]:
+    """Failure details that keep the cause.
+
+    ``error_type`` stays so consumers reading the old key keep working; the
+    added ``error_message`` carries the real cause through to the report.
+    """
+    return {
+        "error_type": type(exc).__name__,
+        "error_message": _exception_excerpt(exc),
+    }
+
+
 class _RunClock:
     """Deadline arithmetic anchored once per workflow run.
 
@@ -120,7 +145,7 @@ class WorkflowRuntime:
                     message="session start failed",
                     retryable=False,
                     source="runtime",
-                    details={"error_type": type(exc).__name__},
+                    details=_exception_details(exc),
                 )
                 status = WorkflowStatus.FAILED
             else:
@@ -389,15 +414,15 @@ class WorkflowRuntime:
                 context=context,
                 action_result=ActionResult(
                     success=False,
-                    message=f"{step.name} failed",
+                    message=f"{step.name} failed: {type(exc).__name__}",
                 ),
                 error=ExecutionFailure(
                     category=FailureCategory.PROVIDER,
                     code="action_execution_failed",
-                    message=f"action failed: {step.name}",
+                    message=f"action failed: {step.name}: {type(exc).__name__}",
                     retryable=False,
                     source="action",
-                    details={"error_type": type(exc).__name__},
+                    details=_exception_details(exc),
                 ),
             )
         duration_ms = int((time.monotonic() - started) * 1000)
@@ -455,7 +480,7 @@ class WorkflowRuntime:
                     message=f"artifact capture failed: {step.name}",
                     retryable=False,
                     source="runtime",
-                    details={"error_type": type(exc).__name__},
+                    details=_exception_details(exc),
                 ),
             )
         return StepExecutionResult(
@@ -657,7 +682,7 @@ class WorkflowRuntime:
                     message="provider execution failed",
                     retryable=False,
                     source="runtime",
-                    details={"error_type": type(exc).__name__},
+                    details=_exception_details(exc),
                 )
                 last_result = CapabilityResult(
                     success=False,
@@ -897,7 +922,7 @@ class WorkflowRuntime:
                 message=f"step failed: {step.name}",
                 retryable=False,
                 source="runtime",
-                details={"error_type": type(exc).__name__},
+                details=_exception_details(exc),
             ),
             action_message=f"{step.name} failed",
             capability_error_code="step_execution_failed",
@@ -939,6 +964,6 @@ class WorkflowRuntime:
                 message="session stop failed",
                 retryable=False,
                 source="runtime",
-                details={"error_type": type(exc).__name__},
+                details=_exception_details(exc),
             )
         return None

@@ -68,3 +68,28 @@ def test_uia2_connect_failure_becomes_startup_error(monkeypatch):
     factory = create_session_factory("uia2")
     with pytest.raises(AdapterStartupError):
         factory()
+
+
+def test_phone_playwright_factory_connects_and_wraps(monkeypatch):
+    # phone-playwright is an optional live-device SDK; the offline suite and
+    # CI never install it, so skip instead of failing on the import.
+    pytest.importorskip("phone_playwright")
+
+    class FakeDev:
+        current_page = object()
+
+    class FakePW:
+        def __enter__(self):
+            return self
+        def __exit__(self, *args):
+            pass
+        def connect(self, udid):
+            return FakeDev()
+
+    monkeypatch.setattr("phone_playwright.SyncPhonePlaywright", FakePW)
+
+    factory = create_session_factory("phone_playwright", udid="192.168.1.3:43037")
+    session = factory()
+
+    assert session.info.driver_name == "phone_playwright"
+    assert session.driver is FakeDev.current_page

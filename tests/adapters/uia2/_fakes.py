@@ -2,9 +2,13 @@
 
 
 class FakeUiObject:
-    def __init__(self, identifier, text=None):
+    def __init__(self, identifier, text=None, info=None):
         self.identifier = identifier
         self.text_value = text
+        # The real uiautomator2 UiObject exposes its snapshot as ``.info``;
+        # adapters/uia2/element.py reads bounds from it. ``None`` mirrors an
+        # element whose snapshot is unavailable.
+        self.info = info
         self.clicked = 0
         self.sent = []
         self.cleared = 0

@@ -2,7 +2,12 @@ import pytest
 
 from adapters.errors import AdapterArtifactError, AdapterStartupError
 from adapters.uia2 import Uia2Session, Uia2SessionFactory
-from tests.adapters.uia2._fakes import FakeDevice, FakePilImage, FlakyDevice
+from tests.adapters.uia2._fakes import (
+    FakeDevice,
+    FakePilImage,
+    FakeUiObject,
+    FlakyDevice,
+)
 
 
 def make_session(**kwargs):
@@ -66,6 +71,52 @@ def test_tap_defaults_to_text_locator():
 
     assert result.success is True
     assert device.calls[0] == ("selector", {"text": "登录"})
+
+
+_SNAPSHOT = {"bounds": {"left": 68, "top": 632, "right": 140, "bottom": 674}}
+
+
+def make_session_with_bounds(info):
+    device = FakeDevice(
+        elements={("text", "口味"): FakeUiObject("text=口味", info=info)}
+    )
+    return Uia2Session(device), device
+
+
+def test_element_bounds_reads_element_snapshot():
+    session, _ = make_session_with_bounds(_SNAPSHOT)
+
+    result = session.execute_action("element_bounds", selector="口味", by="text")
+
+    assert result.success is True
+    assert result.data == {"x": 68, "y": 632, "width": 72, "height": 42}
+
+
+def test_element_bounds_reports_unavailable_snapshot():
+    session, _ = make_session_with_bounds(None)
+
+    result = session.execute_action("element_bounds", selector="口味", by="text")
+
+    assert result.success is False
+    assert "bounds unavailable" in result.message
+
+
+def test_element_bounds_reports_unavailable_rect():
+    session, _ = make_session_with_bounds({"bounds": {}})
+
+    result = session.execute_action("element_bounds", selector="口味", by="text")
+
+    assert result.success is False
+    assert "bounds unavailable" in result.message
+
+
+def test_element_bounds_requires_selector():
+    session, _ = make_session()
+
+    result = session.execute_action("element_bounds")
+
+    assert result.success is False
+    assert "selector" in result.message
 
 
 def test_tap_by_coordinate():
