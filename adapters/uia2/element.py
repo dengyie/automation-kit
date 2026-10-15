@@ -82,12 +82,34 @@ class RefElement:
         dispatch_click: Callable[[int, int], Any],
         send_text: Optional[Callable[[str], Any]] = None,
         clear_text: Optional[Callable[[], Any]] = None,
+        viewport: Optional[Any] = None,
     ):
         self.snapshot_element = snapshot_element
         self.identifier = f"@{snapshot_element.ref}"
         self._dispatch_click = dispatch_click
         self._send_text = send_text
         self._clear_text = clear_text
+        self._viewport = viewport
+
+    def dispatch_point(self):
+        """Screen point the click dispatches at.
+
+        For partially visible elements the snapshot carries the full
+        physical bounds whose centre may sit outside the viewport; the
+        tap lands at the centre of the visible region
+        (bounds ∩ viewport) instead, falling back to the full centre
+        when nothing is visible or no viewport is known.
+        """
+        bounds = self.snapshot_element.bounds
+        if self._viewport is not None:
+            viewport_width, viewport_height = self._viewport
+            left = max(bounds.x, 0)
+            top = max(bounds.y, 0)
+            right = min(bounds.x + bounds.width, viewport_width)
+            bottom = min(bounds.y + bounds.height, viewport_height)
+            if right > left and bottom > top:
+                return ((left + right) // 2, (top + bottom) // 2)
+        return bounds.center
 
     def click(self) -> ActionResult:
         element = self.snapshot_element
@@ -95,7 +117,7 @@ class RefElement:
             return ActionResult(False, f"ref @{element.ref} is disabled")
         if not (element.clickable or element.editable or element.scrollable):
             return ActionResult(False, f"ref @{element.ref} is not interactable")
-        x, y = element.center
+        x, y = self.dispatch_point()
         try:
             self._dispatch_click(x, y)
         except Exception as exc:

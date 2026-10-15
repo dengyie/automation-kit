@@ -323,7 +323,7 @@ def test_scroll_into_view_finds_element_after_swipe():
     session, _ = make_session(device=device)
 
     result = session.execute_action(
-        "scroll_into_view", selector="关于本机", by="text"
+        "scroll_into_view", selector="关于本机", by="text", settle=0.0
     )
 
     assert result.success is True
@@ -347,7 +347,7 @@ def test_scroll_into_view_fails_after_exhausting_swipes():
     session, _ = make_session(device=device)
 
     result = session.execute_action(
-        "scroll_into_view", selector="不存在", by="text", max_swipes=2
+        "scroll_into_view", selector="不存在", by="text", max_swipes=2, settle=0.0
     )
 
     assert result.success is False
@@ -363,7 +363,7 @@ def test_scroll_into_view_matches_by_resource_id_short_form():
     session, _ = make_session(device=device)
 
     result = session.execute_action(
-        "scroll_into_view", selector="about_entry", by="id"
+        "scroll_into_view", selector="about_entry", by="id", settle=0.0
     )
 
     assert result.success is True
@@ -414,3 +414,98 @@ def test_sessions_do_not_share_snapshot_cache():
 
     assert result.success is True
     assert device.dump_count == 2
+
+
+def _partial_button_xml():
+    return "".join(
+        [
+            '<hierarchy rotation="0">',
+            _node(
+                cls="android.widget.FrameLayout",
+                bounds="[0,0][1080,2400]",
+                children=_node(
+                    text="贴边按钮",
+                    cls="android.widget.Button",
+                    clickable=True,
+                    bounds="[0,2350][540,2600]",
+                ),
+            ),
+            "</hierarchy>",
+        ]
+    )
+
+
+def test_tap_by_ref_taps_visible_region_centre_for_partial_element():
+    session, device = make_session(device=SnapshotDevice(hierarchy=_partial_button_xml()))
+
+    result = session.execute_action("tap", selector="@1", by="ref")
+
+    assert result.success is True
+    # Full-bounds centre (270, 2475) is below the 2400px viewport; the tap
+    # lands at the centre of the visible region instead.
+    assert ("click", 270, 2375) in device.calls
+
+
+def test_tap_by_ref_reports_dispatch_failure():
+    session, device = make_session(device=SnapshotDevice())
+
+    def failing_click(x, y):
+        raise RuntimeError("injection failed")
+
+    device.click = failing_click
+
+    result = session.execute_action("tap", selector="@1", by="ref")
+
+    assert result.success is False
+    assert "ref element click failed" in result.message
+
+
+def test_scroll_directions_swipe_geometry():
+    expected = {
+        # direction: (start_x, start_y, end_x, end_y) at 1080x2400, ratio 0.5
+        "down": (540, 600, 540, 1800),
+        "left": (810, 1200, 270, 1200),
+        "right": (270, 1200, 810, 1200),
+    }
+    for direction, geometry in expected.items():
+        device = SwitchingHierarchyDevice(
+            [SNAPSHOT_XML, _single_button_xml(text="关于本机")]
+        )
+        session, _ = make_session(device=device)
+
+        result = session.execute_action(
+            "scroll_into_view",
+            selector="关于本机",
+            by="text",
+            direction=direction,
+            settle=0.0,
+        )
+
+        swipes = [call for call in device.calls if call[0] == "swipe"]
+        assert result.success is True, direction
+        assert len(swipes) == 1, direction
+        assert swipes[0][1:5] == geometry, direction
+
+
+def test_scroll_settles_after_each_swipe(monkeypatch):
+    sleeps = []
+    monkeypatch.setattr(
+        "adapters.uia2.session.time.sleep", lambda seconds: sleeps.append(seconds)
+    )
+    device = SwitchingHierarchyDevice([SNAPSHOT_XML, _single_button_xml(text="关于本机")])
+    session, _ = make_session(device=device)
+
+    result = session.execute_action("scroll_into_view", selector="关于本机", by="text")
+
+    assert result.success is True
+    assert sleeps == [0.3]
+
+
+def test_semantic_snapshot_tolerates_bad_device_metadata():
+    session, _ = make_session(device=SnapshotDevice(current="not-a-dict"))
+
+    result = session.execute_action("semantic_snapshot")
+
+    assert result.success is True
+    assert "package_name" not in result.data
+    assert "activity_name" not in result.data

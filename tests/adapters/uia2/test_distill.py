@@ -200,3 +200,67 @@ def test_distill_min_element_size_filters_slivers():
     snapshot = distill_snapshot(thin_button, min_element_size=8)
 
     assert snapshot.elements == ()
+
+
+def test_distill_keeps_full_bounds_for_partially_visible_elements():
+    partial_xml = "".join(
+        [
+            "<hierarchy rotation=\"0\">",
+            _node(
+                cls="android.widget.FrameLayout",
+                bounds="[0,0][1080,2400]",
+                children=_node(
+                    text="贴边按钮",
+                    cls="android.widget.Button",
+                    clickable=True,
+                    bounds="[0,2350][540,2600]",
+                ),
+            ),
+            "</hierarchy>",
+        ]
+    )
+
+    snapshot = distill_snapshot(partial_xml)
+
+    # Included via the 50px visible intersection but carrying the full
+    # physical rectangle; ref dispatch clamps to the visible region.
+    button = snapshot.element(1)
+    assert button is not None
+    assert button.bounds.to_dict() == {
+        "x": 0,
+        "y": 2350,
+        "width": 540,
+        "height": 250,
+    }
+
+
+def test_distill_emits_scrollable_leaf_inside_clickable_container():
+    nested_xml = "".join(
+        [
+            "<hierarchy rotation=\"0\">",
+            _node(
+                cls="android.widget.FrameLayout",
+                bounds="[0,0][1080,2400]",
+                children=_node(
+                    cls="android.widget.LinearLayout",
+                    clickable=True,
+                    bounds="[0,100][1080,500]",
+                    children=_node(
+                        cls="androidx.recyclerview.widget.RecyclerView",
+                        scrollable=True,
+                        bounds="[100,200][1000,400]",
+                    ),
+                ),
+            ),
+            "</hierarchy>",
+        ]
+    )
+
+    snapshot = distill_snapshot(nested_xml)
+
+    # Without the scrollable-leaf clause in _has_interactive_descendants
+    # the container prunes early and the nested scrollable never gets a ref.
+    assert [(el.ref, el.role) for el in snapshot.elements] == [
+        (1, "item"),
+        (2, "scrollable"),
+    ]

@@ -108,20 +108,6 @@ class FakeDevice:
         self.calls.append(("clear_text",))
 
 
-class SwitchingHierarchyDevice(FakeDevice):
-    """Returns a different hierarchy dump per call (scroll simulation)."""
-
-    def __init__(self, hierarchies, **kwargs):
-        super().__init__(**kwargs)
-        self.hierarchies = list(hierarchies)
-        self.dump_count = 0
-
-    def dump_hierarchy(self):
-        index = min(self.dump_count, len(self.hierarchies) - 1)
-        self.dump_count += 1
-        return self.hierarchies[index]
-
-
 class DisconnectableDevice(FakeDevice):
     def disconnect(self):
         self.disconnect_count += 1

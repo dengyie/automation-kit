@@ -391,6 +391,7 @@ class Uia2Session:
             dispatch_click=dispatch_click,
             send_text=getattr(self.driver, "send_keys", None),
             clear_text=getattr(self.driver, "clear_text", None),
+            viewport=(snapshot.viewport_width, snapshot.viewport_height),
         ), None
 
     def _coordinate_dispatcher(self) -> Optional[Callable[[int, int], Any]]:
@@ -490,6 +491,9 @@ class Uia2Session:
         )
         if error is not None:
             return error
+        settle, error = _number_parameter(kwargs.get("settle", 0.3), "settle")
+        if error is not None:
+            return error
         direction = kwargs.get("direction", "up")
         if direction not in ("up", "down", "left", "right"):
             return ActionResult(False, f"invalid scroll direction: {direction}")
@@ -520,6 +524,10 @@ class Uia2Session:
             if swipe_error is not None:
                 return swipe_error
             attempts += 1
+            # Let the scroll animation settle before the next dump; dumping
+            # mid-animation would miss the target and overshoot the list.
+            if settle > 0:
+                time.sleep(settle)
 
     def _match_in_snapshot(
         self,

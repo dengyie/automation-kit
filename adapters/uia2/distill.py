@@ -254,7 +254,14 @@ def _collect_descendant_texts(node: _Node) -> List[str]:
 
 def _has_interactive_descendants(node: _Node) -> bool:
     for child in node.children:
-        if child.clickable or child.editable or child.checkable:
+        # Same interactive definition as the traversal above, so a
+        # scrollable leaf nested in a clickable container keeps its ref.
+        if (
+            child.clickable
+            or child.editable
+            or child.checkable
+            or (child.scrollable and not child.children)
+        ):
             return True
         if _has_interactive_descendants(child):
             return True
