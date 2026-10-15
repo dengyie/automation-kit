@@ -773,6 +773,14 @@ automation-kit 后执行完整测试。Python 3.8/3.11 测试环境统一用 pip
 | `git diff --check` | 通过 |
 | 根因修复（`11f3769`） | 元数据驱动 required-options、synthetic step result 统一、run clock 透传、`artifact_root` 显式化 |
 
+### 10.5 2026-10-16 验证基线（演进波 2：AI 无障碍原生）
+
+| 范围 | 结果 |
+| --- | --- |
+| automation-kit 全量离线测试 | `543 passed`（基线 473 + 演进波 2 新增 70），coverage `89.87%`（门禁 80%） |
+| wheel 构建 | 通过（`pip wheel --no-deps`，`automation_kit-0.4.0`，0.5.0 发布时统一 bump） |
+| boundary / 禁词守卫 | 通过（adapters 不 import SDK；core 无 selenium/appium/slidex/damai/dianping/webdriver 禁词） |
+
 ## 11. 当前状态与差距
 
 ### 11.1 已实现
@@ -805,6 +813,13 @@ automation-kit 后执行完整测试。Python 3.8/3.11 测试环境统一用 pip
   截图嵌入上限、`--artifact-root` 根约束、`</` 转义防注入）；声明式失败捕获
   （`capture_on="failure"`：happy path 记 SKIPPED，失败分支在会话存活时按声明顺序
   执行，捕获失败只记自身 failed step，不掩盖原始失败）。
+- 演进波 2：AI 无障碍原生（2026-10，详见 §12.15）。`automation_core.observations`
+  平台中立观测值模型（ScreenBounds/ScreenElement/ScreenSnapshot + `to_markdown`
+  语义视图）；uia2 adapter 视图蒸馏（视口裁剪/标签提升/语义角色推断）+ 温缓存
+  ref 快速下发（1s TTL 快照，`@N` 直击缓存坐标免二次 dump）+ `scroll_into_view`/
+  `press_back`/`press_home`/`semantic_snapshot` artifact + `find_element` 元素契约；
+  phone_playwright 快照映射到同一观测模型；report viewer 文本类 artifact（md/json/
+  txt/xml）内嵌 `<pre>` 预览（恒逃逸 + 尺寸上限 + artifact_root 根约束）。
 
 ### 11.2 本轮已完成交付
 
@@ -880,6 +895,7 @@ Patchright / stf）。原则：外部 SDK 一律依赖注入，不进 `automatio
 | 阶段 4 | Task 2 resolver 基线 | 多 provider 治理仅在真实需求出现后扩展 |
 | 阶段 5 | Task 7-8 | 业务 app 迁移与真实闭环证据 |
 | 演进波 | Task 9-10（已实现）、Task 11-12（已实现）、Task 13-14（规划） | 开源框架借鉴：uia2 adapter / live factory+patchright / YAML 层 / viewer+capture_on / HAR 工具 / 设备农场 |
+| 演进波 2 | W1-W4（已实现，§12.15） | AI 无障碍原生：观测值模型 / 蒸馏+ref 下发 / phone_playwright 映射 / viewer 文本预览 |
 
 ### 12.1 分层实施原则
 
@@ -1239,6 +1255,78 @@ openatx `atxserver2`（与 uia2 生态同源）vs `DeviceFarmer/stf`。Camoufox�
   测试与 `Requires-Dist` 双重验证。
 - kit minor 发布（0.5.0/0.6.0）必须同步：两 app 依赖范围 bump、`poetry.lock`
   再生成、跨仓契约 CI、本文 §11 状态与「公共 API 变更清单」。
+
+### 12.15 演进波 2：AI 无障碍原生（已实现，2026-10）
+
+本轮把手机端 AI 无障碍最佳实践（phone-playwright 框架：温缓存快速下发、视口感知
+语义蒸馏、语义 `@N` 引用）沉淀为平台通用能力，而不是留在单一 driver 内。原则沿用
+演进波 1：外部 SDK 依赖注入、观测值模型进 core（纯 stdlib）、算法留在 adapter 层。
+
+#### W1：平台中立观测值模型（L0，`automation_core/observations/`）
+
+- **所属层**：L0 core，纯 stdlib（pydantic 都不引），字段与 phone-playwright 的
+  PageSnapshot/CompactElement 对齐并平台中立。
+- **接口**：`ScreenBounds`（x/y/width/height + center + dict 往返）、
+  `ScreenElement`（role/text/bounds/ref/resource_id/clickable/editable/scrollable/
+  enabled，稀疏 dict 序列化）、`ScreenSnapshot`（viewport + 元组元素 + 设备元数据；
+  `element(ref)` 查找、`interactable()` 过滤、`to_markdown()` 语义视图、dict 往返，
+  `from_dict` 兼容 `"@N"` 字符串 ref）。`to_markdown()` 输出形态与 phone-playwright
+  对齐：`# Device Viewport: {w}x{h}` / `# Active App:` / `# Activity:` /
+  `## Interactive Elements:` / `- [@N] role: "text"`（不可交互 元素为 `(info)` 行）。
+- **边界**：不 import 任何 adapter / SDK；测试全部离线。
+
+#### W2：uia2 蒸馏与温缓存 ref 下发（L3，`adapters/uia2/`）
+
+- **蒸馏**：`distill_snapshot(xml, *, package_name, activity_name, device_id,
+  captured_at, min_element_size=8) -> ScreenSnapshot`，镜像 phone-playwright 语义
+  蒸馏器：视口几何裁剪、空容器折叠、后代文本标签提升（深度 5、去重）、
+  `@N` 引用按文档序编号、min_element_size 过滤、类名到语义角色推断
+  （edittext→input、button、checkbox、switch、tab、scrollable 列表、imageview→image
+  等）。解析失败归一 `HierarchyDistillError`。
+- **ref 快速下发**：`Uia2Session(snapshot_ttl=1.0)` 持有温缓存快照；
+  `tap/type_text/element_bounds` 接受 `@N` 引用，TTL 内直击缓存坐标（免二次
+  dump_hierarchy），过期或越界返回 typed 失败（含当前可交互元素数）。`snapshot_ttl=0`
+  语义为「总是刷新」。
+- **新动作**：`semantic_snapshot`（refresh 参数 + markdown 数据）、
+  `scroll_into_view`（每轮新 dump、text-contains/id 短形态/ref 匹配、几何 swipe）、
+  `press_back`/`press_home`（`press(key)` 优先、dedicated 方法兜底）、
+  `find_element`（ElementLookupSession 契约；ref/坐标选择器拒绝）。
+- **元素**：`RefElement`（`@N` 标识、enabled/interactable/editable 守卫、坐标下发
+  click、clear→send_text 输入）。
+- **artifact**：`semantic_snapshot` 落 markdown。
+- **顺带修复（预存缺陷）**：`_run_action` 现在透传 ActionResult（此前元素级失败被
+  包成 success=True 塞进 data）；phone_playwright 同款语义早已在位。
+- **边界**：不 import `uiautomator2`（boundary 测试钉住不变）；全部离线 fake 测试。
+
+#### W3：phone_playwright 快照映射（L3，`adapters/phone_playwright/`）
+
+- `snapshot_to_screen_snapshot(snap) -> ScreenSnapshot`：duck-typed 映射，缺失
+  viewport/elements 抛 ValueError；`"@N"` 字符串 ref 转 int；interactive 按 ref 存在
+  推断。`semantic_snapshot` 动作与 artifact 改为产出结构化 dict（`to_dict` +
+  `markdown`），不再返回裸 markdown 字符串——**这是行为变更，见下方 API 变更清单**。
+
+#### W4：viewer 文本类 artifact 内嵌预览（L2，`automation_runner/viewer.py`）
+
+- `.md/.json/.txt/.xml` 且位于 `--artifact-root` 内、≤5MB 的 artifact 以
+  `text_content` 内嵌，模板渲染 `<pre class="text-preview">`；内容恒 HTML 转义
+  （`&`→`&amp;` 等先于 `<`/`>`），叠加既有 `</` 数据岛转义，杜绝任何 payload 注入。
+  超限记 `oversize`、根外记 `external`、缺失记 `missing` 图像同款语义。
+- report schema v2 无任何变更（viewer 是纯渲染层）。
+
+#### 演进波 2 公共 API 变更清单（随 0.5.0 发布）
+
+- `automation_core.observations.*`：新增 `ScreenBounds`/`ScreenElement`/
+  `ScreenSnapshot`。
+- `adapters.uia2`：新增 `distill_snapshot`/`HierarchyDistillError`/`RefElement` 导出；
+  `Uia2Session` 新增 `snapshot_ttl` 参数、`find_element` 方法、动作
+  `semantic_snapshot`/`scroll_into_view`/`press_back`/`press_home`、artifact 类型
+  `semantic_snapshot`、`tap`/`type_text`/`element_bounds` 支持 `@N` ref 选择器；
+  `SUPPORTED_BY` 新增 `ref`。
+- `adapters.phone_playwright`：`semantic_snapshot` 动作 data 由 markdown 字符串改为
+  dict（含 `to_dict` 结构 + `markdown` 键）——行为变更。
+- `automation_runner.viewer`：prepared artifacts 新增 `text_content` 字段；
+  `.md/.json/.txt/.xml` artifact 由 `linked` 变为内嵌 `embedded`——行为变更。
+- report schema v2 / flow schema v1 无变化。
 
 ## 13. 本轮已实现文件
 
