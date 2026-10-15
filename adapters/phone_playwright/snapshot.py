@@ -63,13 +63,19 @@ def _element_from_compact(compact: Any) -> ScreenElement:
         getattr(bounds, "height", 0)
         or (int(bounds.bottom) - y if hasattr(bounds, "bottom") else 0)
     )
+    # CompactElement carries no explicit interaction flags (only ref/role/
+    # enabled/scrollable); infer them from the same signals the pruner
+    # assigns refs and roles on, matching the uia2 distiller's vocabulary.
+    role = str(getattr(compact, "role", "unknown") or "unknown")
+    ref = _ref_to_int(getattr(compact, "ref", None))
     return ScreenElement(
-        role=str(getattr(compact, "role", "unknown") or "unknown"),
+        role=role,
         text=str(getattr(compact, "text", "") or ""),
         bounds=ScreenBounds(x=x, y=y, width=width, height=height),
-        ref=_ref_to_int(getattr(compact, "ref", None)),
+        ref=ref,
         resource_id=_optional_str(getattr(compact, "resource_id", None)),
-        clickable=_ref_to_int(getattr(compact, "ref", None)) is not None,
+        clickable=ref is not None,
+        editable=role == "input",
         scrollable=bool(getattr(compact, "scrollable", False)),
         enabled=bool(getattr(compact, "enabled", True)),
     )

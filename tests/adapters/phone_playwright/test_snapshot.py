@@ -41,10 +41,12 @@ def test_maps_page_snapshot_to_core_model():
     assert first.bounds.to_dict() == {"x": 40, "y": 300, "width": 1000, "height": 100}
     assert first.resource_id == "com.example:id/account"
     assert first.clickable is True
-    assert first.editable is False
+    # role="input" maps to editable, matching the uia2 distiller vocabulary.
+    assert first.editable is True
     info = result.elements[1]
     assert info.ref is None
     assert info.clickable is False
+    assert info.editable is False
 
 
 def test_maps_empty_elements_tuple():
