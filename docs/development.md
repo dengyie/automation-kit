@@ -777,9 +777,17 @@ automation-kit 后执行完整测试。Python 3.8/3.11 测试环境统一用 pip
 
 | 范围 | 结果 |
 | --- | --- |
-| automation-kit 全量离线测试 | `543 passed`（基线 473 + 演进波 2 新增 70），coverage `89.87%`（门禁 80%） |
+| automation-kit 全量离线测试 | `549 passed`（基线 473 + 演进波 2 新增 76，含 final review 根因修复回归），coverage `90.10%`（门禁 80%） |
 | wheel 构建 | 通过（`pip wheel --no-deps`，`automation_kit-0.4.0`，0.5.0 发布时统一 bump） |
 | boundary / 禁词守卫 | 通过（adapters 不 import SDK；core 无 selenium/appium/slidex/damai/dianping/webdriver 禁词） |
+
+Final review（同日）根因修复闭环：ref 下发点夹取到可见区（bounds ∩ viewport）中心
+（部分可见元素点击不再出界）；phone_playwright 映射按 `role=="input"` 推断
+`editable`（跨 adapter 观测口径对齐）；`_has_interactive_descendants` 纳入
+scrollable 叶子（嵌套交互容器剪枝口径与 `is_interactive` 一致）；
+`scroll_into_view` 新增 `settle` 参数（默认 0.3s，swipe 后等动画稳定再 dump）；
+删除重复测试替身 `SwitchingHierarchyDevice`（`_fakes.py` 副本）与空跑死测试
+`test_core_actions_are_generic`（`automation_core/actions` 目录已不存在）。
 
 ## 11. 当前状态与差距
 
@@ -1286,9 +1294,12 @@ openatx `atxserver2`（与 uia2 生态同源）vs `DeviceFarmer/stf`。Camoufox�
 - **ref 快速下发**：`Uia2Session(snapshot_ttl=1.0)` 持有温缓存快照；
   `tap/type_text/element_bounds` 接受 `@N` 引用，TTL 内直击缓存坐标（免二次
   dump_hierarchy），过期或越界返回 typed 失败（含当前可交互元素数）。`snapshot_ttl=0`
-  语义为「总是刷新」。
+  语义为「总是刷新」。**下发点语义**：点击/聚焦坐标取元素可见区（bounds ∩ viewport）
+  中心——部分可见元素不再按完整 bounds 中心出界下发；`element_bounds` 仍返回完整
+  物理矩形（与 phone-playwright `CompactElement.bounds` 契约一致，几何计算方自己取交集）。
 - **新动作**：`semantic_snapshot`（refresh 参数 + markdown 数据）、
-  `scroll_into_view`（每轮新 dump、text-contains/id 短形态/ref 匹配、几何 swipe）、
+  `scroll_into_view`（每轮新 dump、text-contains/id 短形态/ref 匹配、几何 swipe、
+  `settle` 参数默认 0.3s——swipe 后等动画稳定再 dump）、
   `press_back`/`press_home`（`press(key)` 优先、dedicated 方法兜底）、
   `find_element`（ElementLookupSession 契约；ref/坐标选择器拒绝）。
 - **元素**：`RefElement`（`@N` 标识、enabled/interactable/editable 守卫、坐标下发
@@ -1302,8 +1313,10 @@ openatx `atxserver2`（与 uia2 生态同源）vs `DeviceFarmer/stf`。Camoufox�
 
 - `snapshot_to_screen_snapshot(snap) -> ScreenSnapshot`：duck-typed 映射，缺失
   viewport/elements 抛 ValueError；`"@N"` 字符串 ref 转 int；interactive 按 ref 存在
-  推断。`semantic_snapshot` 动作与 artifact 改为产出结构化 dict（`to_dict` +
-  `markdown`），不再返回裸 markdown 字符串——**这是行为变更，见下方 API 变更清单**。
+  推断、`editable` 按 `role=="input"` 推断（CompactElement 无交互标志字段，与 uia2
+  蒸馏器角色词表对齐）。`semantic_snapshot` 动作与 artifact 改为产出结构化 dict
+  （`to_dict` + `markdown`），不再返回裸 markdown 字符串——**这是行为变更，见下方
+  API 变更清单**。
 
 #### W4：viewer 文本类 artifact 内嵌预览（L2，`automation_runner/viewer.py`）
 
@@ -1319,9 +1332,10 @@ openatx `atxserver2`（与 uia2 生态同源）vs `DeviceFarmer/stf`。Camoufox�
   `ScreenSnapshot`。
 - `adapters.uia2`：新增 `distill_snapshot`/`HierarchyDistillError`/`RefElement` 导出；
   `Uia2Session` 新增 `snapshot_ttl` 参数、`find_element` 方法、动作
-  `semantic_snapshot`/`scroll_into_view`/`press_back`/`press_home`、artifact 类型
-  `semantic_snapshot`、`tap`/`type_text`/`element_bounds` 支持 `@N` ref 选择器；
-  `SUPPORTED_BY` 新增 `ref`。
+  `semantic_snapshot`/`scroll_into_view`（含可选 `settle`，默认 0.3s）/
+  `press_back`/`press_home`、artifact 类型 `semantic_snapshot`、
+  `tap`/`type_text`/`element_bounds` 支持 `@N` ref 选择器；`SUPPORTED_BY` 新增
+  `ref`。ref 点击/聚焦的下发点为可见区中心（final review 修复语义）。
 - `adapters.phone_playwright`：`semantic_snapshot` 动作 data 由 markdown 字符串改为
   dict（含 `to_dict` 结构 + `markdown` 键）——行为变更。
 - `automation_runner.viewer`：prepared artifacts 新增 `text_content` 字段；
