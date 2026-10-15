@@ -68,16 +68,94 @@ class FakePhoneLocator:
         return bool(self.visible)
 
 
+class FakeCompactElement:
+    """Mirrors phone_playwright.models.schema.CompactElement."""
+
+    def __init__(
+        self,
+        ref: Optional[str] = None,
+        role: str = "button",
+        text: str = "",
+        left: int = 0,
+        top: int = 0,
+        right: int = 0,
+        bottom: int = 0,
+        enabled: bool = True,
+        scrollable: bool = False,
+        resource_id: Optional[str] = None,
+    ) -> None:
+        self.ref = ref
+        self.role = role
+        self.text = text
+        self.enabled = enabled
+        self.scrollable = scrollable
+        self.resource_id = resource_id
+        self.left = left
+        self.top = top
+        self.right = right
+        self.bottom = bottom
+
+    @property
+    def width(self) -> int:
+        return max(0, self.right - self.left)
+
+    @property
+    def height(self) -> int:
+        return max(0, self.bottom - self.top)
+
+    @property
+    def bounds(self) -> "FakeCompactElement":
+        return self
+
+
 class FakePhoneSnapshot:
-    def __init__(self, content: str = "# Viewport: 1080x2400\n- [@1] button: \"Login\"") -> None:
-        self.content = content
+    """Mirrors phone_playwright.models.schema.PageSnapshot."""
+
+    def __init__(
+        self,
+        elements: Optional[List[FakeCompactElement]] = None,
+        viewport_width: int = 1080,
+        viewport_height: int = 2400,
+        package_name: Optional[str] = "com.example.app",
+        activity_name: Optional[str] = ".LoginActivity",
+        device_id: str = "dut-1",
+        timestamp: float = 1000.0,
+    ) -> None:
+        self.elements = (
+            elements
+            if elements is not None
+            else [
+                FakeCompactElement(
+                    ref="@1",
+                    role="button",
+                    text="Login",
+                    left=440,
+                    top=100,
+                    right=640,
+                    bottom=160,
+                )
+            ]
+        )
+        self.viewport_width = viewport_width
+        self.viewport_height = viewport_height
+        self.package_name = package_name
+        self.activity_name = activity_name
+        self.device_id = device_id
+        self.timestamp = timestamp
 
     def to_markdown(self) -> str:
-        return self.content
+        lines = [
+            f"# Device Viewport: {self.viewport_width}x{self.viewport_height}",
+            "## Interactive Elements:",
+        ]
+        for el in self.elements:
+            ref = f"- [{el.ref}]" if el.ref else "- (info)"
+            lines.append(f'{ref} {el.role}: "{el.text}"')
+        return "\n".join(lines)
 
     @property
     def summary_markdown(self) -> str:
-        return self.content
+        return self.to_markdown()
 
 
 class BaseFakePhonePage:

@@ -263,7 +263,11 @@ def test_semantic_snapshot_action():
     res = session.execute_action("semantic_snapshot")
 
     assert res.success is True
-    assert "Login" in res.data
+    assert res.data["viewport_width"] == 1080
+    assert res.data["package_name"] == "com.example.app"
+    assert res.data["activity_name"] == ".LoginActivity"
+    assert res.data["elements"][0]["ref"] == 1
+    assert '[@1] button: "Login"' in res.data["markdown"]
     assert any(c[0] == "snapshot" for c in page.calls)
 
 
@@ -382,7 +386,9 @@ def test_capture_artifact_semantic_snapshot(tmp_path):
 
     assert artifact.artifact_type == "semantic_snapshot"
     assert artifact.path.is_file()
-    assert "Login" in artifact.path.read_text(encoding="utf-8")
+    content = artifact.path.read_text(encoding="utf-8")
+    assert content.startswith("# Device Viewport: 1080x2400")
+    assert "[@1] button" in content
 
 
 def test_capture_artifact_unsupported_type(tmp_path):

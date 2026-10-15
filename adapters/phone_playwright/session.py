@@ -4,6 +4,7 @@ from typing import Any, Callable, Dict, Optional, Tuple
 
 from adapters.errors import AdapterArtifactError, AdapterStartupError
 from adapters.phone_playwright.element import PhonePlaywrightElement
+from adapters.phone_playwright.snapshot import snapshot_to_screen_snapshot
 from automation_core.artifacts import ArtifactStore
 from automation_core.drivers import (
     ActionResult,
@@ -430,10 +431,10 @@ class PhonePlaywrightSession:
                 include_screenshot=include_screenshot,
                 use_vision_fallback=use_vision_fallback,
             )
-            data_md = getattr(snap, "summary_markdown", None) or (
-                snap.to_markdown() if callable(getattr(snap, "to_markdown", None)) else str(snap)
-            )
-            return ActionResult(success=True, message="semantic_snapshot", data=data_md)
+            snapshot = snapshot_to_screen_snapshot(snap)
+            data = snapshot.to_dict()
+            data["markdown"] = snapshot.to_markdown()
+            return ActionResult(success=True, message="semantic_snapshot", data=data)
         except Exception as exc:
             return ActionResult(False, f"semantic_snapshot failed: {exc}")
 
@@ -589,13 +590,10 @@ class PhonePlaywrightSession:
             raise AdapterArtifactError("driver does not support semantic snapshot")
         try:
             snap = snap_fn()
+            snapshot = snapshot_to_screen_snapshot(snap)
         except Exception as exc:
             raise AdapterArtifactError("driver reported snapshot failed") from exc
-        content = (
-            getattr(snap, "summary_markdown", None)
-            or (snap.to_markdown() if callable(getattr(snap, "to_markdown", None)) else str(snap))
-        )
-        path.write_text(str(content), encoding="utf-8")
+        path.write_text(snapshot.to_markdown(), encoding="utf-8")
 
 
 class PhonePlaywrightSessionFactory:
