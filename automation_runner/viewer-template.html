@@ -32,6 +32,9 @@
   .artifact-state { font-size: 11px; color: #6b7684; }
   pre.failure { background: #fbf3f3; border: 1px solid #f0d8d8; border-radius: 8px;
                 padding: 10px 12px; font-size: 12px; white-space: pre-wrap; }
+  pre.text-preview { background: #f7f8fa; border: 1px solid #e8ebef; border-radius: 6px;
+                     padding: 8px 10px; font-size: 11px; white-space: pre-wrap;
+                     max-height: 360px; overflow: auto; margin-top: 6px; }
   details { margin-top: 6px; }
   summary { cursor: pointer; font-size: 12px; color: #5b6673; }
   pre.events { font-size: 11px; background: #f7f8fa; border: 1px solid #e8ebef;
@@ -131,6 +134,8 @@
         ' · ' + esc(artifact.path) + '</span>';
       if (artifact.embedded && artifact.data_uri) {
         html += '<img alt="' + esc(artifact.artifact_type) + '" src="' + artifact.data_uri + '">';
+      } else if (artifact.embedded && artifact.text_content != null) {
+        html += '<pre class="text-preview">' + artifact.text_content + '</pre>';
       }
       html += '</div>';
     });
@@ -155,6 +160,14 @@
         img.style.maxWidth = "100%";
         row.appendChild(document.createElement("br"));
         row.appendChild(img);
+      } else if (artifact.embedded && artifact.text_content != null) {
+        var pre = document.createElement("pre");
+        pre.className = "text-preview";
+        // Python pre-escapes the payload (& < >), so innerHTML renders the
+        // literal text without any markup risk.
+        pre.innerHTML = artifact.text_content;
+        row.appendChild(document.createElement("br"));
+        row.appendChild(pre);
       }
       list.appendChild(row);
     });

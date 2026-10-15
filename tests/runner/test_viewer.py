@@ -88,14 +88,71 @@ def test_render_state_transitions(tmp_path, monkeypatch):
     prepared = prepare_report(report, artifact_root=tmp_path)
     assert prepared["artifacts"][0]["state"] == "missing"
 
-    (tmp_path / "shot.xml").write_text("<xml/>")
-    xml_report = make_report(tmp_path, artifact_path="shot.xml")
-    prepared = prepare_report(xml_report, artifact_root=tmp_path)
+    (tmp_path / "shot.log").write_text("binary-not-previewable")
+    log_report = make_report(tmp_path, artifact_path="shot.log")
+    prepared = prepare_report(log_report, artifact_root=tmp_path)
     assert prepared["artifacts"][0]["state"] == "linked"
 
     monkeypatch.setattr("automation_runner.viewer.MAX_EMBED_BYTES", 4)
     prepared = prepare_report(report, artifact_root=tmp_path)
     assert prepared["artifacts"][0]["state"] == "oversize"
+
+
+def test_render_embeds_text_artifact_as_preview(tmp_path):
+    markdown = "# Device Viewport: 1080x2400\n- [@1] button: \"Login\""
+    (tmp_path / "snapshot.md").write_text(markdown, encoding="utf-8")
+    report = make_report(tmp_path, artifact_path="snapshot.md")
+
+    prepared = prepare_report(report, artifact_root=tmp_path)
+
+    assert prepared["artifacts"][0]["state"] == "embedded"
+    assert prepared["artifacts"][0]["embedded"] is True
+    assert prepared["artifacts"][0]["text_content"] == markdown
+
+    html = render_report_html(report, artifact_root=tmp_path)
+    assert 'class="text-preview"' in html
+    # The literal markdown must survive rendering (pre-escaped in the
+    # payload, decoded again by the browser).
+    assert "- [@1] button:" in html
+
+
+def test_text_artifact_content_is_markup_escaped(tmp_path):
+    (tmp_path / "snapshot.md").write_text(
+        "<script>alert(1)</script> & <b>", encoding="utf-8"
+    )
+    report = make_report(tmp_path, artifact_path="snapshot.md")
+
+    prepared = prepare_report(report, artifact_root=tmp_path)
+
+    assert prepared["artifacts"][0]["text_content"] == (
+        "&lt;script&gt;alert(1)&lt;/script&gt; &amp; &lt;b&gt;"
+    )
+    html = render_report_html(report, artifact_root=tmp_path)
+    assert "<script>alert(1)</script>" not in html
+
+
+def test_text_artifact_oversize_is_not_embedded(tmp_path, monkeypatch):
+    (tmp_path / "snapshot.md").write_text("too big", encoding="utf-8")
+    report = make_report(tmp_path, artifact_path="snapshot.md")
+    monkeypatch.setattr("automation_runner.viewer.MAX_EMBED_BYTES", 4)
+
+    prepared = prepare_report(report, artifact_root=tmp_path)
+
+    assert prepared["artifacts"][0]["state"] == "oversize"
+    assert prepared["artifacts"][0]["embedded"] is False
+    assert prepared["artifacts"][0]["text_content"] is None
+
+
+def test_text_artifact_outside_root_is_external(tmp_path):
+    outside = tmp_path.parent / "outside-snapshot.md"
+    outside.write_text("# leaked?", encoding="utf-8")
+    try:
+        report = make_report(tmp_path, artifact_path=str(outside))
+        prepared = prepare_report(report, artifact_root=tmp_path / "artifacts")
+        assert prepared["artifacts"][0]["state"] in {"external", "missing"}
+        assert prepared["artifacts"][0]["text_content"] is None
+    finally:
+        outside.unlink()
 
 
 def test_render_marks_paths_outside_artifact_root_external(tmp_path):

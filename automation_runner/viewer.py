@@ -19,6 +19,10 @@ _DATA_PLACEHOLDER = "__REPORT_DATA__"
 
 _EMBEDABLE_SUFFIXES = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
 
+# Text artifacts (distilled semantic snapshots, logs) render as <pre>
+# previews instead of being linked only.
+_TEXT_EMBEDABLE_SUFFIXES = {".md", ".json", ".txt", ".xml"}
+
 
 class ViewerError(ValueError):
     """Raised when a report cannot be rendered."""
@@ -65,6 +69,7 @@ def _artifact_entry(
         "metadata": entry.get("metadata") or {},
         "embedded": False,
         "data_uri": None,
+        "text_content": None,
         "state": "missing",
         "size_bytes": None,
     }
@@ -82,6 +87,22 @@ def _artifact_entry(
     suffix = resolved.suffix.lower()
     if not within_root:
         prepared["state"] = "external"
+        return prepared
+    if suffix in _TEXT_EMBEDABLE_SUFFIXES:
+        if prepared["size_bytes"] > MAX_EMBED_BYTES:
+            prepared["state"] = "oversize"
+            return prepared
+        try:
+            text = resolved.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            return prepared
+        # Stored escaped so the JSON payload can never inject markup; the
+        # overall ``</`` payload escape stays as the second line of defense.
+        prepared["text_content"] = (
+            text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        )
+        prepared["embedded"] = True
+        prepared["state"] = "embedded"
         return prepared
     if suffix not in _EMBEDABLE_SUFFIXES:
         prepared["state"] = "linked"
