@@ -5,7 +5,15 @@ package never imports ``uiautomator2`` itself, so automation-kit stays
 installable and testable without it.
 """
 
-from adapters.uia2.element import Uia2Element
+from adapters.uia2.distill import HierarchyDistillError, distill_snapshot
+from adapters.uia2.element import RefElement, Uia2Element
 from adapters.uia2.session import Uia2Session, Uia2SessionFactory
 
-__all__ = ["Uia2Element", "Uia2Session", "Uia2SessionFactory"]
+__all__ = [
+    "HierarchyDistillError",
+    "RefElement",
+    "Uia2Element",
+    "Uia2Session",
+    "Uia2SessionFactory",
+    "distill_snapshot",
+]

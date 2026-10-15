@@ -42,11 +42,13 @@ class FakeDevice:
         missing=(),
         screenshot_result=None,
         hierarchy_result=None,
+        current_result=None,
     ):
         self.elements = elements or {}
         self.missing = set(missing)
         self.screenshot_result = screenshot_result
         self.hierarchy_result = hierarchy_result
+        self.current_result = current_result
         self.calls = []
         self.disconnect_count = 0
         self.quit_count = 0
@@ -90,6 +92,34 @@ class FakeDevice:
         if callable(self.hierarchy_result):
             return self.hierarchy_result()
         return self.hierarchy_result
+
+    def app_current(self):
+        if callable(self.current_result):
+            return self.current_result()
+        return self.current_result
+
+    def press(self, key):
+        self.calls.append(("press", key))
+
+    def send_keys(self, text):
+        self.calls.append(("send_keys", text))
+
+    def clear_text(self):
+        self.calls.append(("clear_text",))
+
+
+class SwitchingHierarchyDevice(FakeDevice):
+    """Returns a different hierarchy dump per call (scroll simulation)."""
+
+    def __init__(self, hierarchies, **kwargs):
+        super().__init__(**kwargs)
+        self.hierarchies = list(hierarchies)
+        self.dump_count = 0
+
+    def dump_hierarchy(self):
+        index = min(self.dump_count, len(self.hierarchies) - 1)
+        self.dump_count += 1
+        return self.hierarchies[index]
 
 
 class DisconnectableDevice(FakeDevice):

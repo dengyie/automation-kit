@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Callable, Optional
 
 from automation_core.drivers import ActionResult
 
@@ -64,3 +64,67 @@ class Uia2Element:
             }
         except (KeyError, TypeError, ValueError):
             return None
+
+
+class RefElement:
+    """ElementHandle bound to a snapshot ref (@N) instead of a live lookup.
+
+    Interaction dispatches at the cached snapshot bounds (warm-cache fast
+    dispatch): ``click`` taps the element centre through the injected
+    coordinate dispatcher, ``input_text`` focuses first and then sends text
+    through the injected text channel. The wrapped snapshot element is a
+    borrowed, read-only observation; the wrapper closes nothing.
+    """
+
+    def __init__(
+        self,
+        snapshot_element: Any,
+        dispatch_click: Callable[[int, int], Any],
+        send_text: Optional[Callable[[str], Any]] = None,
+        clear_text: Optional[Callable[[], Any]] = None,
+    ):
+        self.snapshot_element = snapshot_element
+        self.identifier = f"@{snapshot_element.ref}"
+        self._dispatch_click = dispatch_click
+        self._send_text = send_text
+        self._clear_text = clear_text
+
+    def click(self) -> ActionResult:
+        element = self.snapshot_element
+        if not element.enabled:
+            return ActionResult(False, f"ref @{element.ref} is disabled")
+        if not (element.clickable or element.editable or element.scrollable):
+            return ActionResult(False, f"ref @{element.ref} is not interactable")
+        x, y = element.center
+        try:
+            self._dispatch_click(x, y)
+        except Exception as exc:
+            return ActionResult(False, f"ref element click failed: {exc}")
+        return ActionResult(success=True, message="ref element click")
+
+    def input_text(self, text: str, clear: bool = True) -> ActionResult:
+        element = self.snapshot_element
+        if not element.editable:
+            return ActionResult(
+                False,
+                f"ref @{element.ref} is not an editable input",
+            )
+        focused = self.click()
+        if not focused.success:
+            return focused
+        if not callable(self._send_text):
+            return ActionResult(False, "driver does not support ref text input")
+        try:
+            if clear and callable(self._clear_text):
+                self._clear_text()
+            self._send_text(text)
+        except Exception as exc:
+            return ActionResult(False, f"ref element input failed: {exc}")
+        return ActionResult(success=True, message="ref element input")
+
+    def text(self) -> str:
+        return self.snapshot_element.text
+
+    @property
+    def bounds(self):
+        return self.snapshot_element.bounds.to_dict()
