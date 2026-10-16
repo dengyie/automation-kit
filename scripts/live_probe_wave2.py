@@ -69,24 +69,27 @@ def main():
     print("\n".join(md.splitlines()[:20]))
 
     section("2. tap by @N ref (warm cache)")
-    refs = [e for e in data.get("elements", []) if e.get("ref") and e.get("enabled")]
+    refs = [e for e in data.get("elements", []) if e.get("ref") and e.get("enabled", True)]
     if not refs:
         print("NO tappable ref found on current screen; skipping tap")
         tap_ref = None
     else:
-        target = refs[0]
-        tap_ref = target["ref"]
+        # Prefer the launcher Settings icon; fall back to the first ref
+        target = next((e for e in refs if e.get("text") == "设置"), refs[0])
+        tap_ref = f"@{target['ref']}"
         print("target:", tap_ref, target.get("role"), repr(target.get("text"))[:60], target.get("bounds"))
         dumps_before = device.dumps
         time.sleep(0.05)
-        tap_result = session.execute_action("tap", ref=tap_ref)
+        tap_result = session.execute_action("tap", selector=tap_ref, by="ref")
         print("tap success:", tap_result.success, "| message:", tap_result.message)
         print("dumps used by tap:", device.dumps - dumps_before, "(expect 0 if within TTL)")
         print("device clicks:", device.clicks)
+        time.sleep(2.0)
+        print("current app after tap:", device.app_current().get("package"))
 
     section("3. element_bounds by ref")
     if tap_ref:
-        bounds_result = session.execute_action("element_bounds", ref=tap_ref)
+        bounds_result = session.execute_action("element_bounds", selector=tap_ref, by="ref")
         print("success:", bounds_result.success, "| data:", bounds_result.data)
 
     section("4. press_back / press_home")
@@ -99,12 +102,16 @@ def main():
     print("current app after home:", device.app_current().get("package"))
 
     section("5. scroll_into_view on Settings (text selector)")
-    # Open the system Settings app — safe, always present.
-    device.app_start("com.android.settings")
-    time.sleep(2.0)
-    print("current app:", device.app_current().get("package"))
+    # Requirements: the tap in step 2 opened the system Settings app. If not
+    # (e.g. the launcher icon was absent), open it via adb-safe app_start.
+    package_now = device.app_current().get("package")
+    if package_now != "com.android.settings":
+        device.app_start("com.android.settings")
+        time.sleep(2.0)
+        package_now = device.app_current().get("package")
+    print("current app:", package_now)
     scroll_result = session.execute_action(
-        "scroll_into_view", by="text", selector="Battery", direction="up", max_swipes=4
+        "scroll_into_view", by="text", selector="电池", direction="up", max_swipes=6
     )
     print("scroll success:", scroll_result.success, "| message:", scroll_result.message)
     print("scroll data:", scroll_result.data)

@@ -777,9 +777,10 @@ automation-kit 后执行完整测试。Python 3.8/3.11 测试环境统一用 pip
 
 | 范围 | 结果 |
 | --- | --- |
-| automation-kit 全量离线测试 | `549 passed`（基线 473 + 演进波 2 新增 76，含 final review 根因修复回归），coverage `90.10%`（门禁 80%） |
+| automation-kit 全量离线测试 | `551 passed`（基线 473 + 演进波 2 新增 78，含 review 根因修复与真机回归），coverage `90.01%`（门禁 80%） |
 | wheel 构建 | 通过（`pip wheel --no-deps`，`automation_kit-0.4.0`，0.5.0 发布时统一 bump） |
 | boundary / 禁词守卫 | 通过（adapters 不 import SDK；core 无 selenium/appium/slidex/damai/dianping/webdriver 禁词） |
+| 真机验证（Samsung SM-F900F，Android 13，10.144.144.52:5555） | uia2 全链路通过：多窗口语义快照（视口 1080x2376）、`@12` warm-cache ref 点击（0 次额外 dump，命中可见区中心）、`element_bounds`、`scroll_into_view`（1 swipe + settle 命中「电池」→ ref 点击 0 dump 打开子页）、`press_back`/`press_home`；完整链路 3 次 dump 完成 观测→滚动→点击→再观测 |
 
 Final review（同日）根因修复闭环：ref 下发点夹取到可见区（bounds ∩ viewport）中心
 （部分可见元素点击不再出界）；phone_playwright 映射按 `role=="input"` 推断
@@ -788,6 +789,13 @@ scrollable 叶子（嵌套交互容器剪枝口径与 `is_interactive` 一致）
 `scroll_into_view` 新增 `settle` 参数（默认 0.3s，swipe 后等动画稳定再 dump）；
 删除重复测试替身 `SwitchingHierarchyDevice`（`_fakes.py` 副本）与空跑死测试
 `test_core_actions_are_generic`（`automation_core/actions` 目录已不存在）。
+
+真机探针回归（同日，`db33461`）发现并根因修复多窗口 dump 缺陷：uiautomator
+层级 dump 常见多个顶层窗口节点（如 SystemUI 导航栏 [0,2218][1080,2376] 与应用
+窗口并存，顺序不确定），`parse_hierarchy` 原只取首个节点并以它的 bounds 当视口，
+快照塌缩成 158px 导航条且应用子树从不遍历。现解析全部顶层窗口为合成根的孩子，
+视口取窗口 bounds 并集（单窗口/裸 node dump 行为不变），3 个新单测覆盖并集、
+跨窗口 ref 顺序与顺序无关性；`scripts/live_probe_wave2.py` 为真机能力探针。
 
 ## 11. 当前状态与差距
 
