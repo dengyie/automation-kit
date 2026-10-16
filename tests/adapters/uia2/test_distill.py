@@ -264,3 +264,97 @@ def test_distill_emits_scrollable_leaf_inside_clickable_container():
         (1, "item"),
         (2, "scrollable"),
     ]
+
+
+MULTI_WINDOW_XML = "".join(
+        [
+            "<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>",
+            '<hierarchy rotation="0">',
+            # Window 1: systemui navigation bar strip at the screen bottom
+            # (1080x158); it is NOT the whole screen and may be dumped first.
+            _node(
+                cls="android.widget.FrameLayout",
+                bounds="[0,2218][1080,2376]",
+                children=_node(
+                    desc="主屏幕",
+                    cls="android.widget.ImageView",
+                    clickable=True,
+                    bounds="[424,2218][655,2376]",
+                ),
+            ),
+            # Window 2: full-screen app window, dumped second.
+            _node(
+                cls="android.widget.FrameLayout",
+                bounds="[0,0][1080,2376]",
+                children="".join(
+                    [
+                        _node(text="设置", bounds="[440,100][640,160]"),
+                        _node(
+                            text="返回上一层",
+                            cls="android.widget.Button",
+                            clickable=True,
+                            bounds="[40,300][500,400]",
+                        ),
+                    ]
+                ),
+            ),
+            "</hierarchy>",
+        ]
+    )
+
+
+def test_parse_hierarchy_unions_multi_window_viewport():
+    root, viewport = parse_hierarchy(MULTI_WINDOW_XML)
+
+    assert (viewport.width, viewport.height) == (1080, 2376)
+    # Both window roots stay traversable under the synthetic root
+    assert len(root.children) == 2
+
+
+def test_distill_multi_window_dumps_elements_from_all_windows():
+    snapshot = distill_snapshot(MULTI_WINDOW_XML)
+
+    assert (snapshot.viewport_width, snapshot.viewport_height) == (1080, 2376)
+    # Refs assigned in document order across windows: nav bar first, then app;
+    # the pure display node from the app window carries no ref.
+    assert [(el.ref, el.text) for el in snapshot.elements] == [
+        (1, "主屏幕"),
+        (None, "设置"),
+        (2, "返回上一层"),
+    ]
+
+
+def test_distill_multi_window_order_does_not_change_viewport():
+    # Window order in the dump is nondeterministic; the viewport union must
+    # not depend on which window is dumped first.
+    app_window = _node(
+        cls="android.widget.FrameLayout",
+        bounds="[0,0][1080,2376]",
+        children=_node(
+            text="设置主页", bounds="[440,100][640,160]"
+        ),
+    )
+    nav_window = _node(
+        desc="主屏幕",
+        cls="android.widget.ImageView",
+        clickable=True,
+        bounds="[424,2218][655,2376]",
+    )
+    swapped_xml = "".join(
+        [
+            "<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>",
+            '<hierarchy rotation="0">',
+            app_window,
+            nav_window,
+            "</hierarchy>",
+        ]
+    )
+
+    snapshot = distill_snapshot(swapped_xml)
+
+    assert (snapshot.viewport_width, snapshot.viewport_height) == (1080, 2376)
+    # App window first, nav bar second: same viewport union, document-order refs
+    assert [(el.ref, el.text) for el in snapshot.elements] == [
+        (None, "设置主页"),
+        (1, "主屏幕"),
+    ]

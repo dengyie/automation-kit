@@ -59,24 +59,49 @@ class _Node:
 
 
 def parse_hierarchy(xml_text: str) -> Tuple[_Node, ScreenBounds]:
-    """Parse a uiautomator XML dump into the node tree and viewport bounds."""
+    """Parse a uiautomator XML dump into a node tree and viewport bounds.
+
+    A dump may carry several top-level window nodes (for example a
+    ``com.android.systemui`` navigation bar window layered next to the app
+    window, in nondeterministic order); all of them are kept as children of
+    a synthetic root whose bounds are their union, so the viewport reflects
+    the whole screen instead of whichever window happened to be dumped first.
+    """
     try:
         root = ET.fromstring(xml_text)
     except ET.ParseError as exc:
         raise HierarchyDistillError(f"hierarchy dump is not valid XML: {exc}") from exc
 
-    node = root if root.tag == "node" else None
-    if node is None:
+    if root.tag == "node":
+        parsed = _parse_node(root)
+        if parsed is None:
+            raise HierarchyDistillError("hierarchy root node has no usable bounds")
+        return parsed, parsed.bounds
+
+    window_nodes = [
+        parsed
+        for parsed in (_parse_node(child) for child in root.findall("node"))
+        if parsed is not None
+    ]
+    if not window_nodes:
         for child in root.iter("node"):
-            node = child
-            break
-    if node is None:
+            parsed = _parse_node(child)
+            if parsed is not None:
+                window_nodes.append(parsed)
+                break
+    if not window_nodes:
         raise HierarchyDistillError("hierarchy dump contains no node entries")
 
-    parsed = _parse_node(node)
-    if parsed is None:
-        raise HierarchyDistillError("hierarchy root node has no usable bounds")
-    return parsed, parsed.bounds
+    if len(window_nodes) == 1:
+        return window_nodes[0], window_nodes[0].bounds
+
+    viewport = window_nodes[0].bounds
+    for extra in window_nodes[1:]:
+        viewport = _union(viewport, extra.bounds)
+    synthetic = _Node()
+    synthetic.bounds = viewport
+    synthetic.children = window_nodes
+    return synthetic, viewport
 
 
 def distill_snapshot(
@@ -222,6 +247,14 @@ def _parse_bounds(raw: str) -> Optional[ScreenBounds]:
         width=max(0, right - left),
         height=max(0, bottom - top),
     )
+
+
+def _union(a: ScreenBounds, b: ScreenBounds) -> ScreenBounds:
+    left = min(a.x, b.x)
+    top = min(a.y, b.y)
+    right = max(a.x + a.width, b.x + b.width)
+    bottom = max(a.y + a.height, b.y + b.height)
+    return ScreenBounds(x=left, y=top, width=right - left, height=bottom - top)
 
 
 def _intersection(a: ScreenBounds, b: ScreenBounds) -> Optional[ScreenBounds]:
