@@ -304,6 +304,11 @@ class Uia2Session:
             )
             if error is not None:
                 return error
+            # A missing selector resolves to a live handle with exists=False
+            # on a real device instead of raising, so the "not None" test
+            # alone reported success for absent elements (live 2026-10-17).
+            if not element.exists:
+                return None
             return element
 
         result = retry_until(

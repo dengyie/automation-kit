@@ -7,6 +7,7 @@ from tests.adapters.uia2._fakes import (
     FakePilImage,
     FakeUiObject,
     FlakyDevice,
+    LateAppearingDevice,
 )
 
 
@@ -249,6 +250,36 @@ def test_wait_for_element_times_out():
 
     assert result.success is False
     assert "timed out" in result.message
+
+
+def test_wait_for_element_times_out_when_lookup_reports_not_exists():
+    """The live contract: u2 answers a missing selector with exists=False.
+
+    Regression (live 2026-10-17): the wait predicate only tested "lookup
+    returned an object", so every absent selector reported success and the
+    publish-success check could pass without the page.
+    """
+    session, device = make_session()
+    device.elements[("text", "不存在")] = FakeUiObject("text=不存在", exists=False)
+
+    result = session.execute_action(
+        "wait_for_element", selector="不存在", timeout=0.05, interval=0
+    )
+
+    assert result.success is False
+    assert "timed out" in result.message
+
+
+def test_wait_for_element_waits_until_lookup_reports_exists():
+    session, _ = make_session()
+    session.driver = LateAppearingDevice(appear_after=2)
+
+    result = session.execute_action(
+        "wait_for_element", selector="设置", timeout=5, interval=0
+    )
+
+    assert result.success is True
+    assert result.data == "text=设置"
 
 
 def test_wait_for_element_rejects_unknown_by():

@@ -65,6 +65,26 @@ class Uia2Element:
         except (KeyError, TypeError, ValueError):
             return None
 
+    @property
+    def exists(self) -> bool:
+        """Whether the wrapped lookup currently resolves to a real node.
+
+        uiautomator2 hands back a live UiObject for a selector that matches
+        nothing (``exists`` is False) instead of raising, so presence checks
+        must ask the handle — a bare "lookup returned an object" test reports
+        every absent selector as present (live 2026-10-17). Older clients
+        expose ``exists()`` as a method; lookups that expose neither are
+        treated as present, keeping the exception-based doubles working.
+        """
+        probe = getattr(self._lookup, "exists", None)
+        if probe is None:
+            return True
+        try:
+            value = probe() if callable(probe) else probe
+        except Exception:
+            return True
+        return bool(value)
+
 
 class RefElement:
     """ElementHandle bound to a snapshot ref (@N) instead of a live lookup.

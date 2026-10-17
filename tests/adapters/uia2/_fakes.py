@@ -2,13 +2,16 @@
 
 
 class FakeUiObject:
-    def __init__(self, identifier, text=None, info=None):
+    def __init__(self, identifier, text=None, info=None, exists=True):
         self.identifier = identifier
         self.text_value = text
         # The real uiautomator2 UiObject exposes its snapshot as ``.info``;
         # adapters/uia2/element.py reads bounds from it. ``None`` mirrors an
         # element whose snapshot is unavailable.
         self.info = info
+        # Real clients answer a selector that matches nothing with a live
+        # object whose ``exists`` is False rather than raising.
+        self.exists = exists
         self.clicked = 0
         self.sent = []
         self.cleared = 0
@@ -139,6 +142,29 @@ class FlakyDevice(FakeDevice):
         if self.lookup_count <= self.fail_times:
             raise KeyError("not yet")
         return super().__call__(**kwargs)
+
+
+class LateAppearingDevice(FakeDevice):
+    """Models a real client: absent selectors resolve to exists=False first.
+
+    Unlike ``missing`` (which raises), the real uiautomator2 driver answers a
+    selector that matches nothing with a live object whose ``exists`` is
+    False. This double flips to a present object after ``appear_after``
+    lookups so wait-for-presence can be exercised.
+    """
+
+    def __init__(self, appear_after, **kwargs):
+        super().__init__(**kwargs)
+        self.appear_after = appear_after
+        self.lookup_count = 0
+
+    def __call__(self, **kwargs):
+        self.calls.append(("selector", dict(kwargs)))
+        self.lookup_count += 1
+        kind, value = next(iter(kwargs.items()))
+        return FakeUiObject(
+            f"{kind}={value}", exists=self.lookup_count > self.appear_after
+        )
 
 
 class FakePilImage:
