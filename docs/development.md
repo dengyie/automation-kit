@@ -910,7 +910,7 @@ Patchright / stf）。原则：外部 SDK 一律依赖注入，不进 `automatio
 | 阶段 3 | Task 0、Task 6 发布、Task 8 发布门禁 | 版本、wheel、正式包源矩阵 |
 | 阶段 4 | Task 2 resolver 基线 | 多 provider 治理仅在真实需求出现后扩展 |
 | 阶段 5 | Task 7-8 | 业务 app 迁移与真实闭环证据 |
-| 演进波 | Task 9-10（已实现）、Task 11-12（已实现）、Task 13-14（规划） | 开源框架借鉴：uia2 adapter / live factory+patchright / YAML 层 / viewer+capture_on / HAR 工具 / 设备农场 |
+| 演进波 | Task 9-10（已实现）、Task 11-12（已实现）、Task 13（已实现，§12.13）、Task 14（规划，触发条件制） | 开源框架借鉴：uia2 adapter / live factory+patchright / YAML 层 / viewer+capture_on / HAR 工具 / 设备农场 |
 | 演进波 2 | W1-W4（已实现，§12.15） | AI 无障碍原生：观测值模型 / 蒸馏+ref 下发 / phone_playwright 映射 / viewer 文本预览 |
 
 ### 12.1 分层实施原则
@@ -1251,13 +1251,37 @@ Patchright / stf）。原则：外部 SDK 一律依赖注入，不进 `automatio
   `run-yaml`/`report-view` 子命令；`pyproject` 新增 optional `pyyaml` 与
   `[tool.poetry.extras] yaml`。
 
-### 12.13 演进波 Task 13-14（已规划，未实现）
+### 12.13 演进波 Task 13-14（Task 13 已实现 2026-10；Task 14 规划，触发条件制）
 
-#### Task 13：HAR 抓包工具（damai `tools/inspect_network.py`）
+#### Task 13：HAR 抓包工具（damai `tools/inspect_network.py`，已实现）
 
-Playwright 内建 HAR 录制（`new_context(record_har_path=..., record_har_mode="full")`
-）→ redact 清洗 → artifact。原始 HAR 仅落本地临时目录；清洗后的 artifact 才可保留；
-不做成 capability/provider（单一需求不预建抽象）；生产 workflow 不依赖。
+- **接口**：`inspect_network.py --url <authorized-url> --output <cleaned.har>
+  [--engine playwright|patchright] [--headed] [--wait-seconds N] [--wait-until
+  commit|domcontentloaded|load|networkidle]`；可编程面 `inspect_url()` /
+  `sanitize_har()`（纯函数，返回 `(cleaned, RedactionStats)`）/ `summarize_har()`。
+- **录制**：Playwright 内建 HAR（`new_context(record_har_path=..., **HAR_RECORD_OPTIONS)`，
+  `record_har_mode="full"`、`record_har_content="omit"`）。录制选项是 damai
+  `live_factory.HAR_RECORD_OPTIONS` 常量而非 CLI 开关：响应体从不入 HAR，故清洗器
+  永远无需扫描任意正文。`create_live_session_factory(record_har_path=...)` 是唯一
+  新增生产面参数（工具专用；生产 workflow 不传，仍拿裸 context）。
+- **清洗**：词表单一来源 `automation_core.redaction`（`SENSITIVE_KEY_TERMS` /
+  `REDACTED` 直接 import，不另立第二份）。按 HAR 位置清洗——header/queryString/
+  postData.params 的敏感**名**置换成对；HAR cookie **值**一律置换（不论名）；
+  `url`/`redirectURL` 及 header 值（HTTP/2 `:path`、`Location` 等）内的 query
+  参数逐对置换；`postData.text` 若为 JSON 递归清洗、否则按表单键值对清洗；
+  任意深度的敏感**键**整体置换。输入文档不被修改。
+- **数据红线**：原始 HAR 仅存在于 `tempfile.TemporaryDirectory` 内，函数返回前随
+  临时目录删除；只有清洗后的 artifact 落盘；不写公开 report。词表是键名词表，
+  平台特有签名（如 MTOP `x-sgext`/`_m_h5_tk`）不在表内 → 文档与 CLI 均声明
+  「分享前需人工复核」。
+- **边界**：`tools/` 不是 capability/provider（单一需求不预建抽象），不被 setuptools
+  打包（`packages.find` 只含 `automation_app_damai*`），生产 workflow 不依赖。
+  真机/授权环境验收（小节中的 live gate）：实测真实 chromium HAR 录制 → 清洗 →
+  artifact，`httpbin.org/cookies/set?token=...` 场景全文档零明文残留。
+- **测试**：`tests/test_inspect_network.py`（fake HAR 清洗矩阵 + fake engine 录制编排，
+  离线；含 `:path` 伪头回归）/ 扩展 `tests/test_live_factory.py`（HAR 选项只在显式
+  要求时下发）。
+- **独立提交**：`chore: add authorized har inspection tool for damai`。
 
 #### Task 14：设备农场（触发条件制）
 
