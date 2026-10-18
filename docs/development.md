@@ -45,7 +45,7 @@ Android 和图像自动化应用提供底层能力的通用平台。
 
 ### 1.3 架构状态
 
-- 当前 `0.5.0`（2026-10-18 发布准备，见 §10.6）：在 `0.4.0` 的 runtime 模型收口
+- 当前 `0.5.0`（2026-10-18 发布，见 §10.6/§10.7）：在 `0.4.0` 的 runtime 模型收口
   （2026-09-03，随该版本 legacy 路径不复存在）之上叠加 §12.12 的 additive 公共 API
   （`adapters.uia2`、`capture_on`、`run-yaml`/`report-view`、optional pyyaml）。
   `ExecutionContext` / `ExecutionFailure` / step result 模型、Provider V2 单一异步入口、
@@ -61,8 +61,11 @@ Android 和图像自动化应用提供底层能力的通用平台。
   `WorkflowStep.artifact(capture_on="failure")`（声明式失败截图）随 `0.5.0` 交付；
   kit 版本已 bump 至 `0.5.0`，两个 app 仓依赖范围同步 bump 至 `>=0.5.0,<0.6.0`
   （damai 随本次发布提交；dianping 已先行提交 pin，其 lock 本轮一并补齐），三仓
-  `poetry.lock` 均用 Poetry 2.4.1 重新生成并通过 `poetry check --lock`。剩余发布步骤
-  （合并 `main`、打 tag、PyPI）等待管理者授权后执行。
+  `poetry.lock` 均用 Poetry 2.4.1 重新生成并通过 `poetry check --lock`。合并与打 tag
+  已于 2026-10-18 执行：三仓 `feat/evolution-m1-m2` 快进至 `main` 且 CI 全绿，kit 打
+  `v0.5.0`、两个 app 各打 `v0.3.0`（见 §10.7）。**PyPI 发布不具备条件**（四仓均只有
+  `ci.yml`，无 publish workflow；无 `~/.pypirc`、无 `TWINE_*`/`PYPI_*`；`automation-kit`
+  在 PyPI 为 404），`0.5.0` 的对外分发仍是 sibling path / `pip install -e`。
 - 目标 `1.0.x`：冻结 workflow、capability、错误和 report v2 公共契约；在此之前目标
   设计允许破坏性调整，不添加没有外部需求支撑的兼容包装。
 
@@ -815,8 +818,36 @@ scrollable 叶子（嵌套交互容器剪枝口径与 `is_interactive` 一致）
 | damai 元数据一致性 | `automation_app_damai.__version__` 由 `0.1.0` 修正为 `0.3.0`，与 pyproject 及 dianping 惯例一致 |
 | 两仓 `git diff --check` | 通过 |
 
-发布剩余步骤（等待管理者授权）：合并 `feat/evolution-m1-m2` 至 `main`、打版本 tag、
-PyPI 发布；跨仓顺序固定为 automation-kit → Slidex → app。
+### 10.7 2026-10-18 发布执行（合并 `main` + 版本 tag）
+
+管理者授权后执行，跨仓顺序 automation-kit → Slidex → app。三仓均为快进合并
+（`main` 完全包含于 `feat/evolution-m1-m2`，`feat..main = 0`），远端 `main` 用
+`git push origin feat/evolution-m1-m2:main` 推进，未直接编辑受保护分支的工作区；
+三仓 `git diff --check` 通过。
+
+| 仓库 | `main` 提交 | tag | `main` CI |
+| --- | --- | --- | --- |
+| automation-kit | `a29bb82` | `v0.5.0` | test 3.8 / 3.11 通过 |
+| automation-app-damai | `3f6e5d5` | `v0.3.0` | test 3.8 / 3.11 + slidex-contract 通过 |
+| automation-app-dianping | `66172e6` | `v0.3.0` | test 3.8 / 3.11 + slidex-contract 通过 |
+
+两个 app 的 CI 在 kit `main` 已是 `0.5.0` 之后运行，`poetry check --lock` 在真实
+`main` 上解析 `automation-kit>=0.5.0,<0.6.0` 通过——这是本次发布唯一可自动验证的
+跨仓证据。
+
+**Slidex 未随本批发布**：其 `automation-kit` extra 仍声明 `>=0.4.0,<0.5.0`，与已发布
+的 `0.5.0` 不一致，按既定顺序本应先改；但执行时该仓工作区正被另一并发会话占用
+（分支 `fix/cdp-probe-followup`，`slidex/solver.py` 与 `tests/test_cdp_mode.py` 有
+未提交改动），且其 `main` 当时 CI 为红（`a1f4bdd`：Python 3.10 上
+`_cdp_http_base("127.0.0.1:9222")` 因 `urlparse` 的版本差异返回 `http://9222`，而
+3.12 同一次运行是绿的）。为避免把并发会话的在途改动卷进发布提交，本次未触碰该仓，
+pin bump 与 tag 顺延。
+
+**PyPI 未发布（不具备条件）**：四仓均只有 `ci.yml`、无 publish workflow；无
+`~/.pypirc`、无 `TWINE_*` / `PYPI_*`；`https://pypi.org/pypi/automation-kit/json`
+返回 404。故 `v0.5.0` 是仓库内的版本基线而非包源制品，对外消费仍是 sibling path 与
+`pip install -e`。补齐发布能力（PyPI 凭据 + publish workflow + 从包源安装的制品矩阵）
+是新的工作项，不计入本次发布。
 
 ## 11. 当前状态与差距
 
@@ -890,8 +921,10 @@ PyPI 发布；跨仓顺序固定为 automation-kit → Slidex → app。
 发布后不使用 sibling path 也能从包源完成安装与离线测试，兼容失败会阻止发布。
 对应详细任务：Task 0、Task 6 的版本发布部分、Task 8 的发布门禁。
 2026-10-18 进展：`0.5.0` 发布准备完成（版本 bump、两仓 pin 与 `poetry.lock` 重生成、
-wheel 构建与隔离安装验证，见 §10.6）；正式发布动作（合并受保护 `main`、打 tag、
-发布到包源）与「从包源安装的发布制品矩阵」尚未执行，需管理者授权。
+wheel 构建与隔离安装验证，见 §10.6）；合并 `main` 与打 tag 已执行（kit `v0.5.0`、
+两 app `v0.3.0`，见 §10.7）。未完成的两项：Slidex 的 pin bump（因并发占用顺延）与
+PyPI 发布（无凭据/无 publish workflow，不具备条件）。「从包源安装的发布制品矩阵」
+随之仍为空。
 
 #### 阶段 4：provider 运行治理
 
