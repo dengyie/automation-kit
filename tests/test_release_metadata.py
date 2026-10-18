@@ -142,3 +142,53 @@ def test_ci_always_passes_expected_version_to_smoke():
     for name, line in invocations:
         tail = line.split("smoke_installed_package.py", 1)[1].strip()
         assert tail, f"{name} 调用冒烟时没传期望版本：{line}"
+
+
+def test_ci_package_job_installs_both_artifact_kinds():
+    """发版同时上传 wheel 和 sdist，两个都得被真的装一遍。
+
+    sdist 不是 wheel 的同义反复：pip 装 wheel 只是解包，装 sdist 要现场调用 build
+    backend 构建，产物内容由 `include`/包发现规则决定——一个漏了 `schemas/` 的 sdist
+    在 wheel 分支上永远暴露不出来。矩阵只留 wheel 等于给 sdist 免检。
+    """
+    yaml = pytest.importorskip("yaml")
+    workflow = yaml.safe_load(
+        (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    )
+    job = workflow["jobs"]["package"]
+    kinds = job["strategy"]["matrix"]["artifact"]
+    assert set(kinds) == {"wheel", "sdist"}, kinds
+
+    body = yaml.safe_dump(job, allow_unicode=True)
+    for suffix in ("*.whl", "*.tar.gz"):
+        assert suffix in body, f"package job 没有取 {suffix} 的路径，矩阵里那一支会拿到空值"
+
+    # 构建步骤加了 --wheel 就只产 wheel，sdist 分支会因取不到文件而失败（或更糟：
+    # 静默装到上一次构建残留的 tarball）。
+    for step in job["steps"]:
+        run = step.get("run", "")
+        if "python -m build" in run:
+            assert "--wheel" not in run, f"构建步骤退化成只产 wheel：{step.get('name')}"
+
+
+def test_verify_job_installs_published_sdist_too():
+    """发布后自证不能只装 wheel：默认安装路径永远命中 wheel，sdist 会全程免检。
+
+    `--no-binary` 是唯一能把 pip 从 wheel 拽回源码构建的开关；少了它，这一步只是把
+    上面那步重跑一遍。同时必须换新 venv——同一解释器里 wheel 已装，pip 会判定「已满足」
+    而不构建，这一步沦为假绿。
+    """
+    yaml = pytest.importorskip("yaml")
+    workflow = yaml.safe_load(
+        (REPO_ROOT / ".github" / "workflows" / "publish.yml").read_text(encoding="utf-8")
+    )
+    steps = workflow["jobs"]["verify-from-index"]["steps"]
+    runs = [step.get("run", "") for step in steps]
+    sdist_runs = [run for run in runs if "--no-binary" in run]
+    assert sdist_runs, "verify-from-index 没有强制源码构建的分支，包源上的 sdist 无人验证"
+    sdist_run = sdist_runs[0]
+    assert "automation-kit" in sdist_run, sdist_run
+    # 必须独立 venv：与 wheel 那步共用解释器时 pip 直接判定已满足，压根不会构建。
+    assert "venv" in sdist_run, sdist_run
+    # 两种制品都得跑到冒烟上，否则「装了」只是声明。
+    assert len([run for run in runs if "smoke_installed_package.py" in run]) >= 2, runs

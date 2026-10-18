@@ -2,9 +2,10 @@ name: publish
 
 # 包源发布。只在 tag 上自动触发；手动 dispatch 用于 TestPyPI 演练与补发。
 #
-# 包源上的版本号不可覆盖、也不可删除，所以三道门禁全部前置：完整离线测试（含
-# 版本/tag/CHANGELOG/打包资源一致性，见 tests/test_release_metadata.py）→ 构建并
-# 从 wheel 冒烟 → 发布后从包源装一遍再冒烟。任一道不过就不发布。
+# 包源上的版本号不可覆盖、也不可删除，所以门禁尽量前置：完整离线测试（含版本/tag/
+# CHANGELOG/打包资源一致性，见 tests/test_release_metadata.py）→ 构建 sdist 与 wheel
+# （两种制品在 ci.yml 的 package job 里各装一遍冒烟）→ 发布后从包源把两种制品各装一遍
+# 再冒烟。任一道不过就不发布。
 #
 # 认证走 PyPI Trusted Publishing（OIDC），仓库里不存长期 token；PyPI 侧需要为该
 # workflow 配好 trusted publisher（project / owner / repo / workflow / environment
@@ -124,3 +125,22 @@ jobs:
           fi
           python -m pip install $INDEX_ARGS "automation-kit[yaml]==$VERSION"
           python "${{ github.workspace }}/scripts/smoke_installed_package.py" "$VERSION"
+      - name: 从包源装 sdist（强制源码构建）并冒烟
+        # 发版上传两种制品，上面那步默认拿到的是 wheel，sdist 就没人装过。--no-binary
+        # 逼 pip 下载 tarball 并现场调用 build backend 构建，这才是「包源上的 sdist
+        # 可用」的证据。必须换新 venv：同一解释器里 wheel 已装，pip 会判定「已满足」
+        # 而根本不构建，这一步就变成空跑。
+        working-directory: ${{ runner.temp }}
+        env:
+          VERSION: ${{ needs.build.outputs.version }}
+          TARGET: ${{ needs.publish-testpypi.result == 'success' && 'testpypi' || 'pypi' }}
+        run: |
+          set -euo pipefail
+          INDEX_ARGS=""
+          if [ "$TARGET" = "testpypi" ]; then
+            INDEX_ARGS="--index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/"
+          fi
+          python -m venv sdist-venv
+          ./sdist-venv/bin/python -m pip install $INDEX_ARGS \
+            --no-binary automation-kit "automation-kit[yaml]==$VERSION"
+          ./sdist-venv/bin/python "${{ github.workspace }}/scripts/smoke_installed_package.py" "$VERSION"

@@ -861,7 +861,7 @@ pin bump 与 tag 顺延。
 | --- | --- |
 | `scripts/smoke_installed_package.py` | 安装件自证：断言被测 `automation_core` 来自 site-packages 而非源码树、版本三方一致、随包资源齐全、console script 可执行、`[yaml]` extra 已声明、CLI 与 flow 校验器可用 |
 | `.github/workflows/publish.yml` | tag `v*` 触发正式发布；`workflow_dispatch` 支持 TestPyPI 演练；发布后从包源安装并跑同一个自证脚本 |
-| `.github/workflows/ci.yml` 的 `package` job | 离线半边：构建 wheel → 干净环境安装 → 从非仓库目录跑自证（不依赖 sibling path） |
+| `.github/workflows/ci.yml` 的 `package` job | 离线半边：构建 wheel + sdist → 矩阵两支各在干净环境装一种 → 从非仓库目录跑自证（不依赖 sibling path） |
 | `tests/test_release_metadata.py` | 版本门禁：pyproject / `__version__` / CHANGELOG 标题一致，声明的包资源存在，tag 与版本匹配（由 `GITHUB_REF_TYPE` / `GITHUB_REF_NAME` 驱动，本地无环境变量时不误报） |
 
 **为什么自证不是 pytest**：`tests/__init__.py` 的存在会让 pytest 把仓库根插进
@@ -871,7 +871,7 @@ pin bump 与 tag 顺延。
 `pyproject.toml`、`CHANGELOG.md`、`docs/`，是仓库绑定的，对 wheel 跑它只会假红，不能
 当制品验收。
 
-**发布门禁自身的两个洞（2026-10-19 复查后修掉）**：
+**发布门禁自身的三个洞（2026-10-19 复查后修掉）**：
 
 1. **`verify-from-index` 在 tag 路径上根本不会跑（假绿）**。它 `needs` 两个发布 job，而
    `if` 只写了两个 result 判定、漏了 `always()`。实测（临时分支上放一个探针 workflow）：
@@ -893,6 +893,19 @@ pin bump 与 tag 顺延。
    反向验证（每条都跑过，确认门禁真的会红）：`PYTHONPATH` 指向仓库 → 来源断言失败；
    期望版本传 `9.9.9` → 版本断言失败；卸掉 PyYAML → yaml 功能检查失败而「已声明」仍通过
    （这正是原先会静默放过的情形）。
+3. **制品矩阵只覆盖 wheel，sdist 全程免检**。发布上传 sdist + wheel 两种制品，但离线
+   `package` job 只装 wheel，`verify-from-index` 默认命中的也是 wheel——sdist 是唯一
+   「从没被安装过」的制品。sdist 不是 wheel 的同义反复：pip 装 wheel 只是解包，装 sdist
+   要现场调用 build backend 构建，内容由 `include`/包发现规则决定——一个漏了
+   `schemas/` 的 sdist 在 wheel 分支上永远暴露不出来。实测（2026-10-19，CI 同款
+   `python -m build` 产出的 `automation_kit-0.5.0.tar.gz`）：tarball 含 4 个声明资源，
+   干净 venv 里 `pip install "<sdist>[yaml]"` 成功并由声明带出 pyyaml，自证 8 项全 ok——
+   即当前 sdist 本身没问题，缺的是「每次 push 都会检查」这件事。修法：`ci.yml` 的
+   `package` job 改 `artifact: [wheel, sdist]` 矩阵（构建步骤不能加 `--wheel`，否则 sdist
+   分支取不到 tarball）；`verify-from-index` 增加一条 `--no-binary automation-kit` +
+   独立 venv 的源码构建腿（共用解释器时 pip 判定「已满足」而根本不构建，这条腿会沦为
+   空跑）。两条不变量分别由 `test_ci_package_job_installs_both_artifact_kinds` 与
+   `test_verify_job_installs_published_sdist_too` 钉住。
 
 **一次性的 PyPI 侧配置**（仓库内无法自动完成，是正式发布的前置）：在 PyPI 与
 TestPyPI 各配一个 trusted publisher，字段固定为 project `automation-kit`、owner

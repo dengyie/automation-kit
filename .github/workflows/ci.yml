@@ -21,19 +21,28 @@ jobs:
       - run: python -m pytest -q
 
   package:
-    # 制品矩阵里可离线验证的那一半：把 wheel 装进干净环境（不装工作区源码、不用
+    # 制品矩阵里可离线验证的那一半：把制品装进干净环境（不装工作区源码、不用
     # sibling path），再从仓库外的目录跑安装件自证。验收标准是「不依赖 sibling
     # path 也能安装并跑通」，把它做成每次 push 的门禁，而不是发版前的手工核对。
+    #
+    # 矩阵两支对应发版同时上传的两种制品。只验 wheel 不够：sdist 走的是完全不同的
+    # 路径（pip 现场调用 build backend 构建，再看包内容对不对），一个漏了 schemas/
+    # 的 sdist 在 wheel 分支上永远看不出来。
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        artifact: [wheel, sdist]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: 构建 wheel
+      - name: 构建制品（wheel + sdist）
+        # 不能加 --wheel：矩阵的 sdist 分支靠同一个 dist/ 目录取 tarball。
         run: |
           python -m pip install build
-          python -m build --wheel
+          python -m build
       - name: 取 pyproject 声明版本
         id: version
         run: |
@@ -42,11 +51,16 @@ jobs:
           text = pathlib.Path("pyproject.toml").read_text(encoding="utf-8")
           print("version=" + re.search(r'version = "([^"]+)"', text).group(1))
           PY
-      - name: 安装 wheel 并冒烟（仓库外 cwd，防止源码遮住安装件）
+      - name: 安装 ${{ matrix.artifact }} 并冒烟（仓库外 cwd，防止源码遮住安装件）
         working-directory: ${{ runner.temp }}
         run: |
           # 带 [yaml] 安装：让 pip 真的消费 extra 元数据（extra 写坏会在这里失败），
           # 也让 pyyaml 由声明带出，而不是手工补装——手工补装会掩盖 extra 声明错误。
-          WHEEL=$(ls "${{ github.workspace }}"/dist/*.whl)
-          python -m pip install "${WHEEL}[yaml]"
+          case "${{ matrix.artifact }}" in
+            wheel) ARTIFACT=$(ls "${{ github.workspace }}"/dist/*.whl) ;;
+            sdist) ARTIFACT=$(ls "${{ github.workspace }}"/dist/*.tar.gz) ;;
+            *) echo "未知制品类型：${{ matrix.artifact }}" >&2; exit 1 ;;
+          esac
+          echo "装的是：$ARTIFACT"
+          python -m pip install "${ARTIFACT}[yaml]"
           python "${{ github.workspace }}/scripts/smoke_installed_package.py" "${{ steps.version.outputs.version }}"

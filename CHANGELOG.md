@@ -38,6 +38,14 @@
 - `tests/test_release_metadata.py` 新增三个门禁测试：tag 门禁确实读 `GITHUB_REF_*` 且会因
   错误 tag 失败；`verify-from-index` 的 `if` 必须带 `always()`；所有 workflow 调用冒烟时
   必须传期望版本（漏传等于版本门禁不存在）。
+- 制品矩阵补上 sdist 腿：发布上传 sdist + wheel 两种制品，但原先只有 wheel 被安装过。
+  `ci.yml` 的 `package` job 改为 `artifact: [wheel, sdist]` 矩阵（构建步骤不能加 `--wheel`）；
+  `verify-from-index` 增加 `--no-binary automation-kit` + 独立 venv 的源码构建腿（共用
+  解释器时 pip 判定「已满足」而不构建，这条腿会沦为空跑）。实测当前 `0.5.0` sdist 本身
+  无问题（tarball 含 4 个声明资源、干净 venv 安装成功并由声明带出 pyyaml、自证 8 项全 ok），
+  补的是「每次 push 都会检查」这件事；两条不变量由
+  `test_ci_package_job_installs_both_artifact_kinds` 与
+  `test_verify_job_installs_published_sdist_too` 钉住。
 
 ## 0.5.0
 
