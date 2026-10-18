@@ -1,0 +1,122 @@
+name: publish
+
+# 包源发布。只在 tag 上自动触发；手动 dispatch 用于 TestPyPI 演练与补发。
+#
+# 包源上的版本号不可覆盖、也不可删除，所以三道门禁全部前置：完整离线测试（含
+# 版本/tag/CHANGELOG/打包资源一致性，见 tests/test_release_metadata.py）→ 构建并
+# 从 wheel 冒烟 → 发布后从包源装一遍再冒烟。任一道不过就不发布。
+#
+# 认证走 PyPI Trusted Publishing（OIDC），仓库里不存长期 token；PyPI 侧需要为该
+# workflow 配好 trusted publisher（project / owner / repo / workflow / environment
+# 五项必须与本文件一致）。一次性配置步骤见 docs/development.md §10.8。
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "发布目标（演练请选 testpypi）"
+        type: choice
+        options:
+          - testpypi
+          - pypi
+        default: testpypi
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: 取 pyproject 声明版本
+        id: version
+        run: |
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import pathlib, re
+          text = pathlib.Path("pyproject.toml").read_text(encoding="utf-8")
+          print("version=" + re.search(r'version = "([^"]+)"', text).group(1))
+          PY
+      - name: 离线测试（含发布元数据门禁）
+        run: |
+          python -m pip install -e ".[yaml]"
+          python -m pip install "pytest>=8,<9" "pytest-cov>=5,<6"
+          python -m pytest -q
+      - name: 构建 sdist 与 wheel
+        run: |
+          python -m pip install build
+          python -m build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish-pypi:
+    if: github.event_name == 'push' || inputs.target == 'pypi'
+    needs: build
+    runs-on: ubuntu-latest
+    # environment 名必须与 PyPI 侧 trusted publisher 里填的一致（见 §10.8）
+    environment: pypi
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
+
+  publish-testpypi:
+    if: github.event_name == 'workflow_dispatch' && inputs.target == 'testpypi'
+    needs: build
+    runs-on: ubuntu-latest
+    environment: testpypi
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          packages-dir: dist/
+
+  verify-from-index:
+    # 发布后立刻从包源装一遍：这一步才是「不依赖 sibling path 也能装上并跑通」
+    # 的真正证据，也是发现「wheel 里少东西」的最后一道网。
+    needs: [build, publish-pypi, publish-testpypi]
+    if: needs.publish-pypi.result == 'success' || needs.publish-testpypi.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: 从包源安装并冒烟
+        working-directory: ${{ runner.temp }}
+        env:
+          VERSION: ${{ needs.build.outputs.version }}
+          TARGET: ${{ needs.publish-testpypi.result == 'success' && 'testpypi' || 'pypi' }}
+        run: |
+          set -euo pipefail
+          # TestPyPI 只放本仓制品，依赖仍要从真 PyPI 取，故两个 index 都要给。
+          INDEX_ARGS=""
+          if [ "$TARGET" = "testpypi" ]; then
+            INDEX_ARGS="--index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/"
+          fi
+          python -m pip install $INDEX_ARGS "automation-kit[yaml]==$VERSION"
+          python "${{ github.workspace }}/scripts/smoke_installed_package.py" "$VERSION"

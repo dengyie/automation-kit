@@ -19,3 +19,32 @@ jobs:
       - run: python -m pip install -e ".[yaml]"
       - run: python -m pip install "pytest>=8,<9" "pytest-cov>=5,<6"
       - run: python -m pytest -q
+
+  package:
+    # 制品矩阵里可离线验证的那一半：把 wheel 装进干净环境（不装工作区源码、不用
+    # sibling path），再从仓库外的目录跑安装件自证。验收标准是「不依赖 sibling
+    # path 也能安装并跑通」，把它做成每次 push 的门禁，而不是发版前的手工核对。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: 构建 wheel
+        run: |
+          python -m pip install build
+          python -m build --wheel
+      - name: 取 pyproject 声明版本
+        id: version
+        run: |
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import pathlib, re
+          text = pathlib.Path("pyproject.toml").read_text(encoding="utf-8")
+          print("version=" + re.search(r'version = "([^"]+)"', text).group(1))
+          PY
+      - name: 安装 wheel 并冒烟（仓库外 cwd，防止源码遮住安装件）
+        working-directory: ${{ runner.temp }}
+        run: |
+          python -m pip install "${{ github.workspace }}"/dist/*.whl
+          python -m pip install "pyyaml>=6,<7"
+          python "${{ github.workspace }}/scripts/smoke_installed_package.py" "${{ steps.version.outputs.version }}"
