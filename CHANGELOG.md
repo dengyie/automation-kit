@@ -2,6 +2,26 @@
 
 已发布版本历史。架构与开发规范在 `docs/development.md`，本文件不承担规范职责。
 
+## Unreleased
+
+发布能力与制品验收（见 `docs/development.md` §10.8）。纯发布工具链与测试，运行时行为、
+公共接口、report schema v2 与 flow schema v1 均无变化。
+
+- `.github/workflows/publish.yml`：tag `v*` 触发正式发布（PyPI trusted publishing，
+  OIDC，无存储 token）；`workflow_dispatch` 支持 TestPyPI 演练；发布后从包源安装并跑
+  安装件自证。
+- `.github/workflows/ci.yml` 新增 `package` job：构建 wheel → 干净环境安装 → 自证，
+  离线验证制品（不依赖 sibling path）。
+- `scripts/smoke_installed_package.py`：安装件自证脚本。断言 `automation_core` 来自
+  site-packages、版本三方一致、随包资源齐全、console script 可执行、`[yaml]` extra 已
+  声明、CLI 与 flow 校验器可用。设计成独立脚本而非 pytest，因为本仓测试套件是仓库绑定
+  的（读 pyproject/CHANGELOG/docs），且 `tests/__init__.py` 会让 pytest 把仓库根放进
+  `sys.path`，对 wheel 跑套件只会测到源码树。
+- `tests/test_release_metadata.py`：版本门禁。pyproject / `automation_core.__version__`
+  / CHANGELOG 标题一致，声明的包资源存在，tag 与版本匹配。
+- `tests/test_imports.py` 的版本字面量断言改为只断言 `__version__` 非空，精确一致性统一
+  由 `tests/test_release_metadata.py` 保证，避免版本号散落多处。
+
 ## 0.5.0
 
 发布准备完成于 2026-10-18，验证基线见 `docs/development.md` §10.6。

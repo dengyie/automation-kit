@@ -849,6 +849,46 @@ pin bump 与 tag 顺延。
 `pip install -e`。补齐发布能力（PyPI 凭据 + publish workflow + 从包源安装的制品矩阵）
 是新的工作项，不计入本次发布。
 
+### 10.8 2026-10-19 发布能力落地（publish workflow + 安装件自证）
+
+§10.7 记的两项未完成中，Slidex 的 pin bump 已补上；PyPI 正式发布本身仍缺凭据。本节
+记录为补齐发布能力新增的机制、验证证据与一次性外部配置。
+
+新增文件（kit 提交 `6804be9`，CI run `39162177107`：`package` / `test (3.8)` /
+`test (3.11)` 全绿）：
+
+| 文件 | 作用 |
+| --- | --- |
+| `scripts/smoke_installed_package.py` | 安装件自证：断言被测 `automation_core` 来自 site-packages 而非源码树、版本三方一致、随包资源齐全、console script 可执行、`[yaml]` extra 已声明、CLI 与 flow 校验器可用 |
+| `.github/workflows/publish.yml` | tag `v*` 触发正式发布；`workflow_dispatch` 支持 TestPyPI 演练；发布后从包源安装并跑同一个自证脚本 |
+| `.github/workflows/ci.yml` 的 `package` job | 离线半边：构建 wheel → 干净环境安装 → 从非仓库目录跑自证（不依赖 sibling path） |
+| `tests/test_release_metadata.py` | 版本门禁：pyproject / `__version__` / CHANGELOG 标题一致，声明的包资源存在，tag 与版本匹配（由 `GITHUB_REF_TYPE` / `GITHUB_REF_NAME` 驱动，本地无环境变量时不误报） |
+
+**为什么自证不是 pytest**：`tests/__init__.py` 的存在会让 pytest 把仓库根插进
+`sys.path`，于是「装好 wheel 再跑测试」实际测的是源码树——这是假绿。自证改成独立可
+执行文件、从非仓库 cwd 运行，并显式断言 `automation_core.__file__` 落在 site-packages；
+该断言已用 `PYTHONPATH` 指向源码树反向验证过会以非零退出失败。同理，本仓测试套件读
+`pyproject.toml`、`CHANGELOG.md`、`docs/`，是仓库绑定的，对 wheel 跑它只会假红，不能
+当制品验收。
+
+**一次性的 PyPI 侧配置**（仓库内无法自动完成，是正式发布的前置）：在 PyPI 与
+TestPyPI 各配一个 trusted publisher，字段固定为 project `automation-kit`、owner
+`dengyie`、repo `automation-kit`、workflow `publish.yml`，environment 名分别为
+`pypi` 与 `testpypi`——必须与 `publish.yml` 的 `environment:` 逐字一致。配置完成后
+的发布流程：改版本 → 补 CHANGELOG → 提交并快进 `main` → 打 `v<version>` tag 推送 →
+workflow 构建、测试、发布，再从包源安装自证。首次建议先 `workflow_dispatch` +
+`target=testpypi` 演练（TestPyPI 侧需要 `--extra-index-url` 才能解析 pyyaml 等真实依赖）。
+
+**Slidex pin bump 已补（2026-10-19）**：并发占用解除后，slidex `0.6.39` 把
+`automation-kit` extra 从 `>=0.4.0,<0.5.0` 提到 `>=0.5.0,<0.6.0`，并把
+`slidex/integrations/automation_kit.py` 的 `ImportError` 文案从 `>=0.3.0` 对齐到
+`>=0.5.0`（详见 slidex `CHANGELOG.md` 的 0.6.39 节）。slidex 无 tag、不上包源，其
+「发布」就是 `main` 上的版本 bump，app 通过 git SHA 消费。
+
+**并发教训**：`E:/code/*` 的工作树被多个会话共用，`git status` 的结论会过期。§10.7 的
+Slidex 顺延正是撞上这一点。此后每次编辑或提交前都重查分支与远端 HEAD，一旦发现不是
+本次任务的在途改动就退出、不提交。
+
 ## 11. 当前状态与差距
 
 ### 11.1 已实现
@@ -922,9 +962,13 @@ pin bump 与 tag 顺延。
 对应详细任务：Task 0、Task 6 的版本发布部分、Task 8 的发布门禁。
 2026-10-18 进展：`0.5.0` 发布准备完成（版本 bump、两仓 pin 与 `poetry.lock` 重生成、
 wheel 构建与隔离安装验证，见 §10.6）；合并 `main` 与打 tag 已执行（kit `v0.5.0`、
-两 app `v0.3.0`，见 §10.7）。未完成的两项：Slidex 的 pin bump（因并发占用顺延）与
-PyPI 发布（无凭据/无 publish workflow，不具备条件）。「从包源安装的发布制品矩阵」
-随之仍为空。
+两 app `v0.3.0`，见 §10.7）。2026-10-19 进展：发布能力本身落地——`publish.yml`
+（tag 触发正式发布 / `workflow_dispatch` 演练 TestPyPI）、`ci.yml` 的 `package` job
+（构建 wheel → 安装 → 自证）与版本门禁测试（`tests/test_release_metadata.py`），
+见 §10.8；Slidex 的 pin bump 已补（slidex `0.6.39` 声明 `>=0.5.0,<0.6.0`）。
+仍未完成的一项：PyPI 正式发布——缺 PyPI 侧的 trusted publisher 配置（或 token），
+`v0.5.0` 目前仍是仓库内版本基线而非包源制品。因此「从包源安装的发布制品矩阵」依旧是
+空的，但它现在有了可执行的机制：配好凭据后走一次 tag 即可把它填上。
 
 #### 阶段 4：provider 运行治理
 
@@ -1482,6 +1526,10 @@ openatx `atxserver2`（与 uia2 生态同源）vs `DeviceFarmer/stf`。Camoufox�
 5. 仓库默认测试通过；涉及公共契约时跨仓兼容测试通过。
 6. 公共接口、架构、状态或验收命令变化时同步更新本文。
 7. 不重新引入开发日志、重复架构文档、隐藏项目状态或已完成计划目录。
+8. 发布动作（打 tag、触发 publish workflow、上架包源）与合并同序
+   automation-kit -> Slidex -> app；先确认上游 `main` 已是待发布版本且 CI 全绿，再打
+   下游 tag。制品验收一律从非仓库目录跑 `scripts/smoke_installed_package.py`，不得用
+   仓库测试套件代替（理由见 §10.8）。
 
 ## 15. 维护文档集合
 
