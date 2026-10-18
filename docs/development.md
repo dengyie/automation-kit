@@ -60,9 +60,9 @@ Android 和图像自动化应用提供底层能力的通用平台。
   `automation-runner report-view`（离线 HTML viewer）、
   `WorkflowStep.artifact(capture_on="failure")`（声明式失败截图）随 `0.5.0` 交付；
   kit 版本已 bump 至 `0.5.0`，两个 app 仓依赖范围同步 bump 至 `>=0.5.0,<0.6.0`
-  （dianping 已先行提交；damai 随本次发布提交），`poetry.lock` 已用 Poetry 2.4.1
-  重新生成并通过 `poetry check --lock`。剩余发布步骤（合并 `main`、打 tag、PyPI）
-  等待管理者授权后执行。
+  （damai 随本次发布提交；dianping 已先行提交 pin，其 lock 本轮一并补齐），三仓
+  `poetry.lock` 均用 Poetry 2.4.1 重新生成并通过 `poetry check --lock`。剩余发布步骤
+  （合并 `main`、打 tag、PyPI）等待管理者授权后执行。
 - 目标 `1.0.x`：冻结 workflow、capability、错误和 report v2 公共契约；在此之前目标
   设计允许破坏性调整，不添加没有外部需求支撑的兼容包装。
 
@@ -810,6 +810,7 @@ scrollable 叶子（嵌套交互容器剪枝口径与 `is_interactive` 一致）
 | wheel/sdist 构建 | `automation_kit-0.5.0-py3-none-any.whl` + `automation_kit-0.5.0.tar.gz`；资源齐全：report schema v1/v2、flow schema v1、`viewer-template.html`、`adapters/uia2`、`examples`、console script `automation-runner` |
 | 隔离安装 | 干净 venv 安装 `automation_kit-0.5.0[yaml]` 通过（带出 pyyaml）；`automation-runner --version` 输出 `automation-runner 0.5.0` |
 | damai 依赖范围与 lock | `automation-kit>=0.5.0,<0.6.0`；`poetry lock` 重生成（kit 0.5.0 经 sibling path 解析，仅 kit 条目与 content-hash 变化），`poetry check --lock` 通过 |
+| dianping 依赖范围与 lock | pin `>=0.5.0,<0.6.0` 已于 2026-09-13 先行提交，但其 `poetry.lock` 长期漂移（缺 Pillow 与 slidex extra，无 CI job 校验）；`poetry lock` 曾直接无法解析——slidex extra 的 Python `>=3.10` 与项目 `>=3.8` 冲突，而「3.8 CI 不装 slidex」此前只是注释。补 PEP 621 环境标记（`; python_version >= "3.10"`）使该约束由元数据强制，重生成后 kit 记录 0.5.0、`poetry check --lock` 通过、wheel 元数据带 marker；CI 行为不变（契约 job 走 `-e ../slidex`）；dianping `252 passed` / coverage `83.00%` |
 | damai 全量测试 | `56 passed`，coverage `92.09%` |
 | damai 元数据一致性 | `automation_app_damai.__version__` 由 `0.1.0` 修正为 `0.3.0`，与 pyproject 及 dianping 惯例一致 |
 | 两仓 `git diff --check` | 通过 |
