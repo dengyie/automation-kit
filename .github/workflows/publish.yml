@@ -99,7 +99,11 @@ jobs:
     # 发布后立刻从包源装一遍：这一步才是「不依赖 sibling path 也能装上并跑通」
     # 的真正证据，也是发现「wheel 里少东西」的最后一道网。
     needs: [build, publish-pypi, publish-testpypi]
-    if: needs.publish-pypi.result == 'success' || needs.publish-testpypi.result == 'success'
+    # always() 不可省。实测（2026-10-19 临时探针）：needs 里的依赖被 skip 时，依赖方
+    # job 会被 skip——即使它自己的 if 条件为真。tag 路径上 publish-testpypi 恒被 skip，
+    # 所以少了 always() 时这道最关键的验证会在最需要它的时刻静默不执行，而整个 run
+    # 仍然报成功。
+    if: always() && (needs.publish-pypi.result == 'success' || needs.publish-testpypi.result == 'success')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

@@ -871,6 +871,29 @@ pin bump 与 tag 顺延。
 `pyproject.toml`、`CHANGELOG.md`、`docs/`，是仓库绑定的，对 wheel 跑它只会假红，不能
 当制品验收。
 
+**发布门禁自身的两个洞（2026-10-19 复查后修掉）**：
+
+1. **`verify-from-index` 在 tag 路径上根本不会跑（假绿）**。它 `needs` 两个发布 job，而
+   `if` 只写了两个 result 判定、漏了 `always()`。实测（临时分支上放一个探针 workflow）：
+   **`needs` 里的依赖被 skip 时，依赖方 job 会被 skip——哪怕它自己的 `if` 条件为真**，
+   只有 `always() && ...` 能把它救回来。tag 路径上 `publish-testpypi` 恒被 skip，于是这道
+   「发布后从包源装一遍」的最关键验证会在最需要它的时刻静默不执行，而整个 run 仍报成功。
+   修法即补 `always()`；该语义已由 `tests/test_release_metadata.py::
+   test_verify_job_runs_even_when_one_publish_job_is_skipped` 钉住，防止被"简化"回去。
+2. **安装件自证有几处可以假绿，一并收紧**：`automation_runner` 也纳入 site-packages 来源
+   断言（原先只查 `automation_core`）；CLI 子进程固定 cwd 到临时目录（`python -m` 会把
+   cwd 放进 `sys.path`，从仓库根跑时子进程会导入源码树而非安装件）；console script 从
+   「入口点存在」升级为「真的执行 `automation-runner --version`」（入口点存在不等于命令
+   可用：`[tool.poetry.scripts]` 指向的可调用对象写错时，包装脚本照样装得上、只在运行时
+   报错）；`yaml` extra 从「元数据里声明了」升级为「真能解析一份最小 YAML 流」（缺 PyYAML
+   明确失败，不再静默跳过）；flow 校验器加反向对照（必须拒绝非法流，否则「接受合法流」
+   什么也没证明）；`ci.yml` 的 `package` job 改为 `pip install "<wheel>[yaml]"`，让 pip
+   真正消费 extra 元数据，而不是手工补装 pyyaml——手工补装恰好会掩盖 extra 声明错误。
+
+   反向验证（每条都跑过，确认门禁真的会红）：`PYTHONPATH` 指向仓库 → 来源断言失败；
+   期望版本传 `9.9.9` → 版本断言失败；卸掉 PyYAML → yaml 功能检查失败而「已声明」仍通过
+   （这正是原先会静默放过的情形）。
+
 **一次性的 PyPI 侧配置**（仓库内无法自动完成，是正式发布的前置）：在 PyPI 与
 TestPyPI 各配一个 trusted publisher，字段固定为 project `automation-kit`、owner
 `dengyie`、repo `automation-kit`、workflow `publish.yml`，environment 名分别为

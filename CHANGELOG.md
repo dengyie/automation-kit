@@ -22,6 +22,23 @@
 - `tests/test_imports.py` 的版本字面量断言改为只断言 `__version__` 非空，精确一致性统一
   由 `tests/test_release_metadata.py` 保证，避免版本号散落多处。
 
+复查（2026-10-19）修掉发布门禁自身的一个假绿并收紧自证：
+
+- `publish.yml` 的 `verify-from-index` 补 `always()`。实测 `needs` 里的依赖被 skip 时，
+  依赖方 job 也会被 skip（哪怕它自己的 `if` 为真）；tag 路径上 `publish-testpypi` 恒被
+  skip，所以原先这道「发布后从包源装一遍」的最关键验证会在最需要它的时刻静默不执行，
+  而 run 仍报成功。
+- `scripts/smoke_installed_package.py` 收紧：`automation_runner` 也断言来自 site-packages；
+  CLI 子进程固定 cwd（`python -m` 会把 cwd 放进 `sys.path`，从仓库根跑时会导入源码树）；
+  console script 改为真的执行 `automation-runner --version`；`yaml` extra 增加「真能解析
+  最小 YAML 流」的功能检查（缺 PyYAML 明确失败而非静默跳过）；flow 校验器增加反向对照
+  （必须拒绝非法流）。
+- `ci.yml` 的 `package` job 改为 `pip install "<wheel>[yaml]"`，让 pip 真正消费 extra
+  元数据（原先是手工补装 pyyaml，会掩盖 extra 声明错误）。
+- `tests/test_release_metadata.py` 新增三个门禁测试：tag 门禁确实读 `GITHUB_REF_*` 且会因
+  错误 tag 失败；`verify-from-index` 的 `if` 必须带 `always()`；所有 workflow 调用冒烟时
+  必须传期望版本（漏传等于版本门禁不存在）。
+
 ## 0.5.0
 
 发布准备完成于 2026-10-18，验证基线见 `docs/development.md` §10.6。

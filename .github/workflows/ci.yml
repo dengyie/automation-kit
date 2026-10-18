@@ -45,6 +45,8 @@ jobs:
       - name: 安装 wheel 并冒烟（仓库外 cwd，防止源码遮住安装件）
         working-directory: ${{ runner.temp }}
         run: |
-          python -m pip install "${{ github.workspace }}"/dist/*.whl
-          python -m pip install "pyyaml>=6,<7"
+          # 带 [yaml] 安装：让 pip 真的消费 extra 元数据（extra 写坏会在这里失败），
+          # 也让 pyyaml 由声明带出，而不是手工补装——手工补装会掩盖 extra 声明错误。
+          WHEEL=$(ls "${{ github.workspace }}"/dist/*.whl)
+          python -m pip install "${WHEEL}[yaml]"
           python "${{ github.workspace }}/scripts/smoke_installed_package.py" "${{ steps.version.outputs.version }}"

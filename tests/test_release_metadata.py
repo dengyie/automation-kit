@@ -15,6 +15,8 @@ import os
 import re
 from pathlib import Path
 
+import pytest
+
 import automation_core
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -88,3 +90,55 @@ def test_tag_check_rejects_mismatched_tag():
     # 漏了 v 前缀、或 tag 落后于版本，都必须报错
     assert _tag_mismatch("tag", automation_core.__version__, automation_core.__version__) is not None
     assert _tag_mismatch("tag", "v0.0.1", automation_core.__version__) is not None
+
+
+def test_release_tag_gate_reads_github_env(monkeypatch):
+    """tag 门禁靠 `GITHUB_REF_TYPE` / `GITHUB_REF_NAME` 取上下文。
+
+    变量名或读取方式一旦写错，这道门禁在发布时就是死的（本地永远走「非 tag 构建」
+    分支而静默通过）。这里直接驱动 `test_release_tag_matches_version` 本体，证明它
+    真的会因错误的 tag 失败、因正确的 tag 通过——否则「发布门禁会检查 tag」只是注释
+    里的一句话。
+    """
+    monkeypatch.setenv("GITHUB_REF_TYPE", "tag")
+    monkeypatch.setenv("GITHUB_REF_NAME", f"v{automation_core.__version__}.999")
+    with pytest.raises(AssertionError):
+        test_release_tag_matches_version()
+
+    monkeypatch.setenv("GITHUB_REF_NAME", f"v{automation_core.__version__}")
+    test_release_tag_matches_version()
+
+    monkeypatch.setenv("GITHUB_REF_TYPE", "branch")
+    monkeypatch.setenv("GITHUB_REF_NAME", "feat/evolution-m1-m2")
+    test_release_tag_matches_version()
+
+
+def test_verify_job_runs_even_when_one_publish_job_is_skipped():
+    """发布后的「从包源装一遍」必须能在 tag 路径上真的跑起来。
+
+    实测语义（2026-10-19 临时探针）：`needs` 里的依赖被 **skip** 时，依赖方 job 会被
+    skip——即使它自己的 `if` 条件为真。tag 路径上 `publish-testpypi` 恒被 skip，所以
+    `verify-from-index` 的 `if` 必须带 `always()`；少了它，这道最关键的验证会在最需要
+    它的时刻静默不执行，而整个 run 仍然显示成功（假绿）。
+    """
+    yaml = pytest.importorskip("yaml")
+    workflow = yaml.safe_load(
+        (REPO_ROOT / ".github" / "workflows" / "publish.yml").read_text(encoding="utf-8")
+    )
+    condition = workflow["jobs"]["verify-from-index"]["if"]
+    assert "always()" in condition, condition
+    assert "needs.publish-pypi.result == 'success'" in condition, condition
+    assert "needs.publish-testpypi.result == 'success'" in condition, condition
+
+
+def test_ci_always_passes_expected_version_to_smoke():
+    """冒烟脚本不传期望版本就跳过版本比对：CI 里漏掉这个参数，版本门禁等于没有。"""
+    invocations = []
+    for workflow in sorted((REPO_ROOT / ".github" / "workflows").glob("*.yml")):
+        for line in workflow.read_text(encoding="utf-8").splitlines():
+            if "smoke_installed_package.py" in line:
+                invocations.append((workflow.name, line.strip()))
+    assert invocations, "没有任何 workflow 调用安装件冒烟，制品矩阵又空了"
+    for name, line in invocations:
+        tail = line.split("smoke_installed_package.py", 1)[1].strip()
+        assert tail, f"{name} 调用冒烟时没传期望版本：{line}"
