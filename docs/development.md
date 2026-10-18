@@ -907,13 +907,15 @@ pin bump 与 tag 顺延。
    空跑）。两条不变量分别由 `test_ci_package_job_installs_both_artifact_kinds` 与
    `test_verify_job_installs_published_sdist_too` 钉住。
 
-**一次性的 PyPI 侧配置**（仓库内无法自动完成，是正式发布的前置）：在 PyPI 与
+**一次性的 PyPI 侧配置（仅在要发布时执行，2026-10-19 起为可选步骤）**：在 PyPI 与
 TestPyPI 各配一个 trusted publisher，字段固定为 project `automation-kit`、owner
 `dengyie`、repo `automation-kit`、workflow `publish.yml`，environment 名分别为
 `pypi` 与 `testpypi`——必须与 `publish.yml` 的 `environment:` 逐字一致。配置完成后
 的发布流程：改版本 → 补 CHANGELOG → 提交并快进 `main` → 打 `v<version>` tag 推送 →
 workflow 构建、测试、发布，再从包源安装自证。首次建议先 `workflow_dispatch` +
 `target=testpypi` 演练（TestPyPI 侧需要 `--extra-index-url` 才能解析 pyyaml 等真实依赖）。
+**注意**：经核实（§11.3 阶段 3 的 2026-10-19 定级），本仓与四仓现状不发布包源**没有任何
+功能损失**，此配置只对「对外分发 / 换不可变坐标」有意义，非阻塞项。
 
 **Slidex pin bump 已补（2026-10-19）**：并发占用解除后，slidex `0.6.39` 把
 `automation-kit` extra 从 `>=0.4.0,<0.5.0` 提到 `>=0.5.0,<0.6.0`，并把
@@ -1002,9 +1004,17 @@ wheel 构建与隔离安装验证，见 §10.6）；合并 `main` 与打 tag 已
 （tag 触发正式发布 / `workflow_dispatch` 演练 TestPyPI）、`ci.yml` 的 `package` job
 （构建 wheel → 安装 → 自证）与版本门禁测试（`tests/test_release_metadata.py`），
 见 §10.8；Slidex 的 pin bump 已补（slidex `0.6.39` 声明 `>=0.5.0,<0.6.0`）。
-仍未完成的一项：PyPI 正式发布——缺 PyPI 侧的 trusted publisher 配置（或 token），
-`v0.5.0` 目前仍是仓库内版本基线而非包源制品。因此「从包源安装的发布制品矩阵」依旧是
-空的，但它现在有了可执行的机制：配好凭据后走一次 tag 即可把它填上。
+**2026-10-19 定级（发布改为可选，不再算未完成项）**：核实了消费侧的真实取用方式——三个
+消费仓（slidex / damai / dianping）**本地与 CI 一律 sibling 检出 + `pip install -e`**
+（damai/dianping CI 先 checkout kit 仓再 `-e ../automation-kit`，自己用 `--no-deps` 装；
+slidex CI 装 `[dev,remote]` + editable kit，刻意不带 `automation-kit` extra），本地开发用
+poetry path 依赖（`{ path = "../automation-kit", develop = true }`）。也就是说 pyproject 里
+那句 `automation-kit>=0.5.0,<0.6.0` **从未被任何包源解析过**，它只是兼容范围的声明。
+结论：不发布包源对本仓与四仓现状**没有任何功能损失**，故阶段 3 的「从包源安装的发布制品
+矩阵」不再是交付要求；发布降级为**可选**动作，收益仅在「换成不可变坐标 `==0.5.0`、让那句
+范围声明在干净环境可解析、或对外分发」时兑现，机制已就位（配好 trusted publisher 后走一次
+tag 即可），但不再阻塞任何里程碑。相应地，`v0.5.0` 是仓库内版本基线这一点属于**既定状态
+而非缺口**（tag `v0.5.0` 已打在发布基线上）。
 
 #### 阶段 4：provider 运行治理
 
@@ -1565,7 +1575,10 @@ openatx `atxserver2`（与 uia2 生态同源）vs `DeviceFarmer/stf`。Camoufox�
 8. 发布动作（打 tag、触发 publish workflow、上架包源）与合并同序
    automation-kit -> Slidex -> app；先确认上游 `main` 已是待发布版本且 CI 全绿，再打
    下游 tag。制品验收一律从非仓库目录跑 `scripts/smoke_installed_package.py`，不得用
-   仓库测试套件代替（理由见 §10.8）。
+   仓库测试套件代替（理由见 §10.8）。**上架包源是可选步骤**（2026-10-19 定级）：本地与
+   四仓 CI 一律 sibling 检出 + `pip install -e`，pyproject 里的 `automation-kit>=0.5.0,
+   <0.6.0` 从未被包源解析，故不发布不构成缺口；tag 与 publish workflow 照旧保留，需要
+   对外分发时再配凭据即可（见 §11.3 阶段 3）。
 
 ## 15. 维护文档集合
 

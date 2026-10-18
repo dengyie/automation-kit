@@ -46,6 +46,12 @@
   补的是「每次 push 都会检查」这件事；两条不变量由
   `test_ci_package_job_installs_both_artifact_kinds` 与
   `test_verify_job_installs_published_sdist_too` 钉住。
+- 发布定位澄清（文档，无代码行为变更）：核实消费侧真实取用方式后确认——本地与四仓 CI
+  一律 sibling 检出 + `pip install -e ../automation-kit`，pyproject 里的
+  `automation-kit>=0.5.0,<0.6.0` 从未被任何包源解析。故**上架包源是可选动作、不是缺口**：
+  `v0.5.0` 作为仓库内版本基线属既定状态（tag 已打在发布基线上）。`docs/development.md`
+  §10.8（PyPI 配置标为可选）、§11.3 阶段 3（从交付要求降级为可选，含核实依据）、§14 第 8 条
+  同步更新；publish 机制与 `package` 门禁保留，需要对外分发时配好凭据走一次 tag 即可。
 
 ## 0.5.0
 
