@@ -4,7 +4,7 @@ import importlib.util
 def test_automation_core_imports():
     import automation_core
 
-    assert automation_core.__version__ == "0.4.0"
+    assert automation_core.__version__ == "0.5.0"
 
 
 def test_automation_core_public_modules_import():

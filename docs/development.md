@@ -45,21 +45,24 @@ Android 和图像自动化应用提供底层能力的通用平台。
 
 ### 1.3 架构状态
 
-- 当前 `0.4.0`（runtime 模型收口完成于 2026-09-03，随本版本起 legacy 路径不复存在）：`ExecutionContext` /
-  `ExecutionFailure` / step result 模型、Provider V2 单一异步入口、`WorkflowRuntime`、
-  runtime-owned `ReportCollector` 和 report schema v2 已是唯一路径；CLI/examples 已完全
-  切到 runtime 结果模型，legacy `ManagedWorkflow` / `LegacyWorkflowResult` /
-  `run_workflow_steps` / `WorkflowRunner` / task runner / action batch / `RunState` /
-  task event 模型已删除。
+- 当前 `0.5.0`（2026-10-18 发布准备，见 §10.6）：在 `0.4.0` 的 runtime 模型收口
+  （2026-09-03，随该版本 legacy 路径不复存在）之上叠加 §12.12 的 additive 公共 API
+  （`adapters.uia2`、`capture_on`、`run-yaml`/`report-view`、optional pyyaml）。
+  `ExecutionContext` / `ExecutionFailure` / step result 模型、Provider V2 单一异步入口、
+  `WorkflowRuntime`、runtime-owned `ReportCollector` 和 report schema v2 仍是唯一路径；
+  CLI/examples 已完全切到 runtime 结果模型，legacy `ManagedWorkflow` /
+  `LegacyWorkflowResult` / `run_workflow_steps` / `WorkflowRunner` / task runner /
+  action batch / `RunState` / task event 模型已删除。
 - CLI 只产出 report schema v2；`report-schema-v1.json` 保持冻结，仅作为已发布的历史
   schema 资源继续可查询（`automation-runner report-schema --version 1`）。
 - 2026-09 演进波（开源框架借鉴，Task 9-12）：`adapters/uia2`（uiautomator2 轻量
   Android adapter）、`automation-runner run-yaml`（YAML 流描述层，flow schema v1）、
   `automation-runner report-view`（离线 HTML viewer）、
-  `WorkflowStep.artifact(capture_on="failure")`（声明式失败截图）已在
-  `feat/evolution-m1-m2` 分支交付，随 `0.5.0` 发布合并；两个 app 仓依赖范围随发布
-  同步 bump 至 `>=0.5.0,<0.6.0`（dianping 已先行提交）。发布前必须重新生成
-  `poetry.lock`（pyproject 新增 optional pyyaml 与 dev group pyyaml）。
+  `WorkflowStep.artifact(capture_on="failure")`（声明式失败截图）随 `0.5.0` 交付；
+  kit 版本已 bump 至 `0.5.0`，两个 app 仓依赖范围同步 bump 至 `>=0.5.0,<0.6.0`
+  （dianping 已先行提交；damai 随本次发布提交），`poetry.lock` 已用 Poetry 2.4.1
+  重新生成并通过 `poetry check --lock`。剩余发布步骤（合并 `main`、打 tag、PyPI）
+  等待管理者授权后执行。
 - 目标 `1.0.x`：冻结 workflow、capability、错误和 report v2 公共契约；在此之前目标
   设计允许破坏性调整，不添加没有外部需求支撑的兼容包装。
 
@@ -67,7 +70,7 @@ Android 和图像自动化应用提供底层能力的通用平台。
 
 | 仓库 | 平台角色 | 拥有内容 | 禁止内容 | 当前版本/状态 |
 | --- | --- | --- | --- | --- |
-| `automation-kit` | 执行内核与公共 SDK | 核心模型、能力契约、runner、通用 adapter、报告 | 业务规则、Slidex 或厂商硬依赖 | `0.4.0` |
+| `automation-kit` | 执行内核与公共 SDK | 核心模型、能力契约、runner、通用 adapter、报告 | 业务规则、Slidex 或厂商硬依赖 | `0.5.0` |
 | `slidex` | 可选视觉能力 provider | slider、OCR、图像识别、人工兜底、视觉 telemetry | 点评/大麦流程、反向要求核心依赖 Slidex | `0.5.0` |
 | `automation-app-damai` | Web/业务应用 | 大麦配置、流程、业务验收、workflow step 声明 | 通用执行内核、视觉算法 | `0.3.0` |
 | `automation-app-dianping` | Android/业务应用 | 点评配置、流程、业务验收、workflow step 声明 | 通用执行内核、OCR 实现 | `0.3.0` |
@@ -690,7 +693,7 @@ artifacts 与 artifact 事件；失败或取消的 artifact step 仅携带 names
 ## 9. 版本与兼容
 
 - automation-kit 公共契约采用语义化版本。
-- app 的发布元数据声明 `automation-kit>=0.4.0,<0.5.0`；Poetry 仅在开发锁中使用
+- app 的发布元数据声明 `automation-kit>=0.5.0,<0.6.0`；Poetry 仅在开发锁中使用
   sibling path 解析当前源码，wheel 不得包含本机路径。
 - Slidex 的 automation-kit extra 声明兼容范围并运行跨仓契约测试。
 - manifest 的 provider 版本描述 provider 行为版本，不替代 Python 包版本。
@@ -778,7 +781,7 @@ automation-kit 后执行完整测试。Python 3.8/3.11 测试环境统一用 pip
 | 范围 | 结果 |
 | --- | --- |
 | automation-kit 全量离线测试 | `551 passed`（基线 473 + 演进波 2 新增 78，含 review 根因修复与真机回归），coverage `90.01%`（门禁 80%） |
-| wheel 构建 | 通过（`pip wheel --no-deps`，`automation_kit-0.4.0`，0.5.0 发布时统一 bump） |
+| wheel 构建 | 通过（`pip wheel --no-deps`，当时产物 `automation_kit-0.4.0`；0.5.0 bump 见 §10.6） |
 | boundary / 禁词守卫 | 通过（adapters 不 import SDK；core 无 selenium/appium/slidex/damai/dianping/webdriver 禁词） |
 | 真机验证（Samsung SM-F900F，Android 13，10.144.144.52:5555） | uia2 全链路通过：多窗口语义快照（视口 1080x2376）、`@12` warm-cache ref 点击（0 次额外 dump，命中可见区中心）、`element_bounds`、`scroll_into_view`（1 swipe + settle 命中「电池」→ ref 点击 0 dump 打开子页）、`press_back`/`press_home`；完整链路 3 次 dump 完成 观测→滚动→点击→再观测 |
 
@@ -796,6 +799,23 @@ scrollable 叶子（嵌套交互容器剪枝口径与 `is_interactive` 一致）
 快照塌缩成 158px 导航条且应用子树从不遍历。现解析全部顶层窗口为合成根的孩子，
 视口取窗口 bounds 并集（单窗口/裸 node dump 行为不变），3 个新单测覆盖并集、
 跨窗口 ref 顺序与顺序无关性；`scripts/live_probe_wave2.py` 为真机能力探针。
+
+### 10.6 2026-10-18 验证基线（v0.5.0 发布准备）
+
+| 范围 | 结果 |
+| --- | --- |
+| automation-kit 全量离线测试 | `554 passed`，coverage `91.51%`（门禁 80%） |
+| 版本同步 | `pyproject.toml`、`automation_core.__version__`、`tests/test_imports.py` 断言三处一致为 `0.5.0` |
+| `poetry check --lock`（Poetry 2.4.1，与 CI 同版本） | 通过；`poetry.lock` 内容无变化——版本号不参与 content-hash，故 kit 只需改 pyproject 与 `__version__` |
+| wheel/sdist 构建 | `automation_kit-0.5.0-py3-none-any.whl` + `automation_kit-0.5.0.tar.gz`；资源齐全：report schema v1/v2、flow schema v1、`viewer-template.html`、`adapters/uia2`、`examples`、console script `automation-runner` |
+| 隔离安装 | 干净 venv 安装 `automation_kit-0.5.0[yaml]` 通过（带出 pyyaml）；`automation-runner --version` 输出 `automation-runner 0.5.0` |
+| damai 依赖范围与 lock | `automation-kit>=0.5.0,<0.6.0`；`poetry lock` 重生成（kit 0.5.0 经 sibling path 解析，仅 kit 条目与 content-hash 变化），`poetry check --lock` 通过 |
+| damai 全量测试 | `56 passed`，coverage `92.09%` |
+| damai 元数据一致性 | `automation_app_damai.__version__` 由 `0.1.0` 修正为 `0.3.0`，与 pyproject 及 dianping 惯例一致 |
+| 两仓 `git diff --check` | 通过 |
+
+发布剩余步骤（等待管理者授权）：合并 `feat/evolution-m1-m2` 至 `main`、打版本 tag、
+PyPI 发布；跨仓顺序固定为 automation-kit → Slidex → app。
 
 ## 11. 当前状态与差距
 
@@ -868,6 +888,9 @@ scrollable 叶子（嵌套交互容器剪枝口径与 `is_interactive` 一致）
 版本范围、源码 sibling 检出、四仓契约 CI 和本地 wheel 隔离安装已经建立。验收：正式
 发布后不使用 sibling path 也能从包源完成安装与离线测试，兼容失败会阻止发布。
 对应详细任务：Task 0、Task 6 的版本发布部分、Task 8 的发布门禁。
+2026-10-18 进展：`0.5.0` 发布准备完成（版本 bump、两仓 pin 与 `poetry.lock` 重生成、
+wheel 构建与隔离安装验证，见 §10.6）；正式发布动作（合并受保护 `main`、打 tag、
+发布到包源）与「从包源安装的发布制品矩阵」尚未执行，需管理者授权。
 
 #### 阶段 4：provider 运行治理
 
@@ -1294,7 +1317,8 @@ openatx `atxserver2`（与 uia2 生态同源）vs `DeviceFarmer/stf`。Camoufox�
 - 外部 SDK（uiautomator2/patchright/playwright）只能出现在 lazy factory；boundary
   测试与 `Requires-Dist` 双重验证。
 - kit minor 发布（0.5.0/0.6.0）必须同步：两 app 依赖范围 bump、`poetry.lock`
-  再生成、跨仓契约 CI、本文 §11 状态与「公共 API 变更清单」。
+  再生成、跨仓契约 CI、本文 §11 状态与「公共 API 变更清单」；`0.5.0` 的这一组同步
+  已于 2026-10-18 完成，见 §10.6。
 
 ### 12.15 演进波 2：AI 无障碍原生（已实现，2026-10）
 
