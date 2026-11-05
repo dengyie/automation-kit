@@ -152,6 +152,9 @@ def _build_policy(raw: Optional[Dict[str, Any]], index: int) -> Optional[Capabil
             timeout=raw["timeout"] if "timeout" in raw else None,
             max_attempts=raw["max_attempts"] if "max_attempts" in raw else 1,
             backoff=raw["backoff"] if "backoff" in raw else 0.0,
+            backoff_multiplier=(
+                raw["backoff_multiplier"] if "backoff_multiplier" in raw else 1.0
+            ),
         )
     except (TypeError, ValueError) as exc:
         raise FlowError(f"flow step #{index}: invalid policy: {exc}") from exc

@@ -4,9 +4,15 @@ from automation_core.capabilities.errors import (
     CapabilityNotFoundError,
     CapabilityOperationNotSupportedError,
     CapabilityProtocolError,
+    CapabilityProviderUnavailableError,
     CapabilityRegistrationError,
 )
 from automation_core.capabilities.executor import CapabilityExecutor
+from automation_core.capabilities.health import (
+    HealthPolicy,
+    HealthSnapshot,
+    ProviderHealthBook,
+)
 from automation_core.capabilities.models import (
     CapabilityExecutionProfile,
     CapabilityManifest,
@@ -26,9 +32,13 @@ __all__ = [
     "CapabilityOperationNotSupportedError",
     "CapabilityProtocolError",
     "CapabilityProvider",
+    "CapabilityProviderUnavailableError",
     "CapabilityRegistrationError",
     "CapabilityRegistry",
     "CapabilityRequest",
+    "HealthPolicy",
+    "HealthSnapshot",
+    "ProviderHealthBook",
     "CapabilityResolver",
     "CapabilityResult",
 ]

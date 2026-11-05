@@ -16,3 +16,7 @@ class CapabilityOperationNotSupportedError(CapabilityError):
 
 class CapabilityProtocolError(CapabilityError):
     """Raised when a provider violates the capability contract."""
+
+
+class CapabilityProviderUnavailableError(CapabilityError):
+    """Raised when every provider of a capability is currently unhealthy."""

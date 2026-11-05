@@ -2,7 +2,10 @@ import asyncio
 import inspect
 from typing import Optional
 
-from automation_core.capabilities.errors import CapabilityProtocolError
+from automation_core.capabilities.errors import (
+    CapabilityProtocolError,
+    CapabilityProviderUnavailableError,
+)
 from automation_core.capabilities.models import (
     CapabilityExecutionProfile,
     CapabilityRequest,
@@ -26,8 +29,9 @@ class CapabilityExecutor:
 
         Resolver and protocol errors propagate unchanged so callers can
         distinguish platform wiring mistakes from provider runtime failures.
+        Advisory: resolution here never consumes a health probe.
         """
-        provider = self.resolver.resolve(request, platform=platform)
+        provider = self.resolver.peek(request, platform=platform)
         return self._profile(provider, request)
 
     async def execute(
@@ -37,22 +41,52 @@ class CapabilityExecutor:
         *,
         platform: Optional[str] = None,
     ) -> CapabilityResult:
-        provider = self.resolver.resolve(request, platform=platform)
-        self._profile(provider, request)
-        execute = getattr(provider, "execute", None)
-        if not callable(execute):
-            raise CapabilityProtocolError("provider must define async execute")
-        try:
-            result = execute(request, context)
-            if inspect.isawaitable(result):
-                result = await result
-        except CapabilityProtocolError:
-            raise
-        except asyncio.CancelledError:
-            raise
-        except Exception as exc:
-            return self._provider_failure(provider, exc)
-        return self._validate_result(result)
+        """Walk candidates in resolution order until one succeeds.
+
+        Failover semantics (development.md §11.3): each candidate must pass a
+        health probe before executing; a business failure or provider crash
+        records a failure and the walk continues to the next candidate. The
+        first success wins; when every candidate fails the last failure
+        result is returned, and when every breaker is open the walk raises
+        ``CapabilityProviderUnavailableError``. A provider crash is a health
+        signal, and so is a business failure — a solver that cannot solve
+        should fail over.
+        """
+        candidates = self.resolver.supported_candidates(
+            request, platform=platform
+        )
+        last_result: Optional[CapabilityResult] = None
+        for name, provider in candidates:
+            if not self.resolver.probe(name):
+                continue
+            self._profile(provider, request)
+            execute = getattr(provider, "execute", None)
+            if not callable(execute):
+                raise CapabilityProtocolError("provider must define async execute")
+            try:
+                result = execute(request, context)
+                if inspect.isawaitable(result):
+                    result = await result
+            except CapabilityProtocolError:
+                raise
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                self.resolver.record_failure(name)
+                last_result = self._provider_failure(provider, exc)
+                continue
+            result = self._validate_result(result)
+            if result.success:
+                self.resolver.record_success(name)
+                return result
+            self.resolver.record_failure(name)
+            last_result = result
+        if last_result is not None:
+            return last_result
+        names = ", ".join(name for name, _ in candidates)
+        raise CapabilityProviderUnavailableError(
+            f"capability {request.capability} has no healthy provider: {names}"
+        )
 
     @staticmethod
     def _profile(
