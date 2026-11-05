@@ -19,6 +19,9 @@ DriverFactory = Callable[[], Any]
 # native ``textContains``/``descriptionContains`` uiautomator2 kwargs.
 # ``ref``/``compact`` resolve against the latest distilled semantic
 # snapshot (``@N`` element indices) instead of a live UiObject lookup.
+# ``uiautomator`` accepts a composite descriptor dict (see
+# ``UIAUTOMATOR_DESCRIPTOR_KEYS``) dispatched as one ``Device(**kwargs)``
+# lookup; it has no single kwarg mapping of its own.
 SUPPORTED_BY: Dict[str, str] = {
     "id": "resourceId",
     "text": "text",
@@ -29,9 +32,57 @@ SUPPORTED_BY: Dict[str, str] = {
     "description-contains": "descriptionContains",
     "ref": "",
     "compact": "",
+    "uiautomator": "",
 }
 
 _REF_ALIASES = ("ref", "compact")
+
+# Whitelisted kwargs for the composite ``uiautomator`` descriptor, mirroring
+# the native UiSelector method set a caller may combine
+# (``new UiSelector().resourceId(...).instance(N)``). Keys are the native
+# uiautomator2 selector kwargs so the descriptor dispatches directly.
+UIAUTOMATOR_DESCRIPTOR_KEYS: Dict[str, type] = {
+    "resourceId": str,
+    "className": str,
+    "text": str,
+    "textContains": str,
+    "description": str,
+    "descriptionContains": str,
+    "instance": int,
+}
+
+
+def _normalize_uiautomator_descriptor(
+    selector: Any,
+) -> Tuple[Optional[Dict[str, Any]], Optional[ActionResult]]:
+    """Validate a composite descriptor into clean uiautomator2 kwargs."""
+    if not isinstance(selector, dict) or not selector:
+        return None, ActionResult(
+            False,
+            "uiautomator by requires a non-empty descriptor dict with keys: "
+            + ", ".join(sorted(UIAUTOMATOR_DESCRIPTOR_KEYS)),
+        )
+    unknown = sorted(set(selector) - set(UIAUTOMATOR_DESCRIPTOR_KEYS))
+    if unknown:
+        return None, ActionResult(
+            False,
+            "unsupported uiautomator descriptor key(s): " + ", ".join(unknown),
+        )
+    descriptor: Dict[str, Any] = {}
+    for key, value in selector.items():
+        if key == "instance":
+            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                return None, ActionResult(
+                    False,
+                    "uiautomator descriptor 'instance' must be a non-negative integer",
+                )
+        elif not isinstance(value, str) or not value:
+            return None, ActionResult(
+                False,
+                f"uiautomator descriptor '{key}' must be a non-empty string",
+            )
+        descriptor[key] = value
+    return descriptor, None
 
 # Snapshot selectors distillation can match on its own; xpath/class need a
 # live UiObject and are rejected for snapshot-scoped operations.
@@ -99,11 +150,12 @@ class Uia2Session:
                 break
         self._started = False
 
-    def find_element(self, by: Optional[str], selector: str) -> Any:
+    def find_element(self, by: Optional[str], selector: Any) -> Any:
         """Resolve a selector or snapshot ref to an ElementHandle.
 
         Implements the ``ElementLookupSession`` contract, mirroring the
-        Selenium/Appium/phone_playwright sessions.
+        Selenium/Appium/phone_playwright sessions. A dict selector is only
+        valid with the composite ``uiautomator`` by.
         """
         element, error = self._resolve_element(selector=selector, by=by)
         if error is not None:
@@ -334,15 +386,23 @@ class Uia2Session:
 
     def _resolve_element(
         self,
-        selector: str,
+        selector: Any,
         by: Optional[str],
         retry_lookup: bool = False,
     ) -> Tuple[Optional[Any], Optional[ActionResult]]:
-        if not isinstance(selector, str) or not selector.strip():
-            return None, ActionResult(False, "selector must be a non-empty string")
         resolved_by, error = _normalize_by(by)
         if error is not None:
             return None, error
+        if resolved_by == "uiautomator":
+            return self._resolve_descriptor_element(
+                selector, retry_lookup=retry_lookup
+            )
+        if not isinstance(selector, str) or not selector.strip():
+            return None, ActionResult(
+                False,
+                "selector must be a non-empty string (or a descriptor dict "
+                "with by='uiautomator')",
+            )
         if resolved_by in _REF_ALIASES:
             return self._resolve_ref(selector)
         try:
@@ -358,6 +418,26 @@ class Uia2Session:
                 f"element lookup failed: {selector}",
             )
         return Uia2Element(f"{resolved_by}={selector}", lookup), None
+
+    def _resolve_descriptor_element(
+        self,
+        selector: Any,
+        retry_lookup: bool = False,
+    ) -> Tuple[Optional[Any], Optional[ActionResult]]:
+        """Resolve a composite descriptor as one multi-kwarg device lookup."""
+        descriptor, error = _normalize_uiautomator_descriptor(selector)
+        if error is not None:
+            return None, error
+        try:
+            lookup = self.driver(**descriptor)
+        except Exception:
+            if retry_lookup:
+                raise
+            return None, ActionResult(
+                False,
+                f"element lookup failed: {descriptor}",
+            )
+        return Uia2Element(f"uiautomator={descriptor}", lookup), None
 
     def _resolve_ref(
         self,

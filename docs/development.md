@@ -1522,6 +1522,34 @@ openatx `atxserver2`（与 uia2 生态同源）vs `DeviceFarmer/stf`。Camoufox�
   `.md/.json/.txt/.xml` artifact 由 `linked` 变为内嵌 `embedded`——行为变更。
 - report schema v2 / flow schema v1 无变化。
 
+### 12.16 重启开发（2026-11）：publish uia2 对等性与 provider 运行治理
+
+重启时的既定残项：§11.3 阶段 4（provider 运行治理）与阶段 5（dianping publish
+uia2 对等性）。三轨推进：uia2 对等性（composite 定位 + app 侧翻译升级）、provider
+运行治理（第二 provider 解锁门控后建优先级/健康/熔断）、设备农场最小切入
+（设备注册表约定 + 探针 env 化 + 并行 smoke 编排），各小节随交付就地补记。
+
+#### R1：uia2 composite `uiautomator` descriptor by（L3，`adapters/uia2/`）
+
+- **背景**：dianping publish 配置存在两处无法被单方法 `by` 词表表达的构造——
+  `className(...).descriptionContains(...)`（店铺行）与
+  `resourceId(...).instance(N)`（图片缩略格），此前 app 侧以 dump 几何 + 原生
+  u2 直驱绕过（"kit translator rejects instance() chains"），选择器级对等性缺口。
+- **接口**：`SUPPORTED_BY` 新增 `uiautomator`；`by="uiautomator"` 接受**结构化
+  descriptor dict**，白名单键 = 原生 uiautomator2 selector kwargs：
+  `resourceId / className / text / textContains / description /
+  descriptionContains`（非空字符串）+ `instance`（非负 int，拒绝 bool），
+  经 `_normalize_uiautomator_descriptor` 校验后作为一次
+  `Device(**descriptor)` 多 kwarg 查找下发。未知键 typed 拒绝（fromParent/
+  childSelector 等 compound 构造不支持）。元素标识 `uiautomator={descriptor}`。
+- **范围控制**：composite 仅用于元素解析 + `tap`/`click`/`type_text`/
+  `element_bounds`/`wait_for_element`/`find_element` 动作；快照域操作
+  （`scroll_into_view`、ref 解析、`_match_in_snapshot`）保持单键 by，composite
+  typed 拒绝。字符串选择器 + `uiautomator` by 也 typed 拒绝（附 descriptor 提示）。
+- **边界**：不 import `uiautomator2` 不变；descriptor 校验纯函数；测试全部离线
+  fake（`tests/adapters/uia2/test_composite_selector.py`：分派、点击、校验矩阵、
+  快照域拒绝）。
+
 ## 13. 本轮已实现文件
 
 ### automation-kit
