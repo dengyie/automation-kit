@@ -1660,6 +1660,23 @@ final review 发现并修复三处 P1/P2（全部为本 wave 引入）：
   lane，`uia2-1..n`）与 `--uia2-probe {wave2,composite}` 选探针。
 - 验证基线：双云手机（mesh .51/.52）真机回归见 §10.9。
 
+#### R2 真机迭代批次（2026-11-06 第三批：dump 前台覆盖加固）
+
+真机测试核心发现（§10.9）：Redroid 云机 `dump_hierarchy` 窗口合并方向不定
+（有时仅 systemui overlay 窗），且 live UiSelector 只见活动窗——dump 与 live
+可完全不相交，overlay-only dump 会蒸馏出"合法但错误窗口"的语义快照。平台层
+根因修复（探针此前只是绕行）：
+
+- `_dump_covers_foreground`（session 私有，子串双证据：`package="{pkg}"` /
+  `resource-id="{pkg}:"`，零二次 XML 解析）；`app_current` 不可用 → 跳过校验
+  （容忍契约保持，test_semantic_snapshot_tolerates_bad_device_metadata 钉死）。
+- `_capture_snapshot` 有界重试：`snapshot_dump_attempts`（默认 3）/
+  `snapshot_dump_interval`（默认 0.4s）双构造器参数；重试耗尽优雅降级到最后
+  一次 dump（持续分歧由探针 alignment check 观测）；非字符串 dump 不重试；
+  成功才写缓存、ref 编号绑定单次 (dump, snapshot) 对的不变式保持。
+- composite 探针新增 `foreground.snapshot_alignment` 硬断言：快照元素必须携带
+  前台包 evidence（meta 对比是同义反复）。
+
 #### R1 app 侧：dianping publish 选择器对等（dianping 仓，随 0.6.0 消费）
 
 - `translate_uiautomator_selector` 结构化升级：多方法链与 `.instance(N)` 解析为

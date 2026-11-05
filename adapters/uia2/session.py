@@ -128,6 +128,8 @@ class Uia2Session:
         identifier: str = "uia2-session",
         artifact_root: Optional[Path] = None,
         snapshot_ttl: float = DEFAULT_SNAPSHOT_TTL,
+        snapshot_dump_attempts: int = 3,
+        snapshot_dump_interval: float = 0.4,
     ):
         self.driver = driver
         self.info = SessionInfo(
@@ -140,6 +142,12 @@ class Uia2Session:
         # ``semantic_snapshot`` reuses the distilled snapshot instead of
         # paying a second hierarchy dump.
         self.snapshot_ttl = snapshot_ttl
+        # Cloud-phone ROMs (Redroid, observed 2026-11-06) flap between merged
+        # and overlay-only hierarchy dumps; each capture is validated against
+        # the foreground package and re-dumped within this budget before it
+        # degrades gracefully to the last dump.
+        self.snapshot_dump_attempts = max(1, int(snapshot_dump_attempts))
+        self.snapshot_dump_interval = max(0.0, float(snapshot_dump_interval))
         self._snapshot: Optional[ScreenSnapshot] = None
         self._snapshot_at: float = -1.0
         self._started = False
@@ -500,18 +508,55 @@ class Uia2Session:
             return self._snapshot, None
         return self._capture_snapshot()
 
+    def _dump_covers_foreground(self, hierarchy: str, package_name: Optional[str]) -> bool:
+        """Whether the hierarchy shows evidence of the foreground app.
+
+        Cloud-phone ROMs (Redroid) flap between merged and overlay-only
+        dumps; an overlay-only dump distills into a legal-looking snapshot
+        of the wrong window. Evidence is substring-based so no second XML
+        parse is needed: the node ``package=`` attribute or a
+        ``resource-id="{pkg}:"`` prefix. When ``app_current`` is unavailable
+        (``package_name`` is None) the check is skipped — the tolerance
+        contract for devices without metadata must not regress.
+        """
+        if not package_name:
+            return True
+        return (
+            f'package="{package_name}"' in hierarchy
+            or f'resource-id="{package_name}:' in hierarchy
+        )
+
     def _capture_snapshot(self) -> Tuple[Optional[ScreenSnapshot], Optional[ActionResult]]:
         dump = getattr(self.driver, "dump_hierarchy", None)
         if not callable(dump):
             return None, ActionResult(False, "driver does not provide a UI hierarchy")
-        try:
-            hierarchy = dump()
-        except Exception as exc:
-            return None, ActionResult(False, f"hierarchy dump failed: {exc}")
-        if not isinstance(hierarchy, str):
-            return None, ActionResult(False, "hierarchy dump is not a string")
-
         package_name, activity_name = self._foreground_app()
+
+        hierarchy: Optional[str] = None
+        last_error = "hierarchy dump failed"
+        for attempt in range(self.snapshot_dump_attempts):
+            try:
+                candidate = dump()
+            except Exception as exc:
+                hierarchy = None
+                last_error = f"hierarchy dump failed: {exc}"
+            else:
+                if not isinstance(candidate, str):
+                    # A type error will not heal across retries.
+                    return None, ActionResult(False, "hierarchy dump is not a string")
+                hierarchy = candidate
+                if self._dump_covers_foreground(hierarchy, package_name):
+                    break
+                last_error = (
+                    "hierarchy dump lacks foreground package evidence: "
+                    f"{package_name}"
+                )
+            if attempt + 1 < self.snapshot_dump_attempts and self.snapshot_dump_interval:
+                time.sleep(self.snapshot_dump_interval)
+
+        if not isinstance(hierarchy, str):
+            return None, ActionResult(False, last_error)
+
         try:
             snapshot = distill_snapshot(
                 hierarchy,
@@ -784,11 +829,15 @@ class Uia2SessionFactory:
         identifier: str = "uia2-session",
         artifact_root: Optional[Path] = None,
         snapshot_ttl: float = DEFAULT_SNAPSHOT_TTL,
+        snapshot_dump_attempts: int = 3,
+        snapshot_dump_interval: float = 0.4,
     ):
         self.driver_factory = driver_factory
         self.identifier = identifier
         self.artifact_root = artifact_root
         self.snapshot_ttl = snapshot_ttl
+        self.snapshot_dump_attempts = snapshot_dump_attempts
+        self.snapshot_dump_interval = snapshot_dump_interval
 
     def create(self) -> Uia2Session:
         try:
@@ -800,6 +849,8 @@ class Uia2SessionFactory:
             identifier=self.identifier,
             artifact_root=self.artifact_root,
             snapshot_ttl=self.snapshot_ttl,
+            snapshot_dump_attempts=self.snapshot_dump_attempts,
+            snapshot_dump_interval=self.snapshot_dump_interval,
         )
 
 

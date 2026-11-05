@@ -106,11 +106,21 @@ def test_run_probe_all_checks_pass_on_scripted_device():
     names = [item["name"] for item in summary["checks"]]
     assert names == [
         "device.front_app",
+        "foreground.snapshot_alignment",
         "descriptor.single_key_lookup",
         "descriptor.instance_document_order",
         "descriptor.wait_for_element",
         "governance.failover_real_session",
     ]
+    alignment = next(
+        item
+        for item in summary["checks"]
+        if item["name"] == "foreground.snapshot_alignment"
+    )
+    # The fake reports app_current com.android.settings; the session-level
+    # foreground guard re-dumps until the hierarchy carries that package.
+    assert alignment["ok"] is True
+    assert "aligned on com.android.settings" in alignment["detail"]
     assert all(item["ok"] for item in summary["checks"])
 
 
@@ -181,6 +191,41 @@ def test_run_probe_reports_check_failure_without_crashing():
         not item["ok"] for item in descriptor_checks
     )
     assert all("no resource-id node" in item["detail"] for item in descriptor_checks)
+
+
+def test_foreground_alignment_reports_mismatch_as_failure():
+    """If the snapshot still lands on the wrong window after the session's
+    bounded retries, the gate must fail loudly instead of passing."""
+
+    class MisalignedDevice(FakeProbeDevice):
+        def app_current(self):
+            return {"package": "com.example.settings", "activity": ".Settings"}
+
+    summary = run_probe(MisalignedDevice(), "fake:5555")
+
+    alignment = next(
+        item
+        for item in summary["checks"]
+        if item["name"] == "foreground.snapshot_alignment"
+    )
+    assert alignment["ok"] is False
+    assert "lacks foreground evidence" in alignment["detail"]
+
+
+def test_foreground_alignment_degrades_to_unverifiable():
+    class NoMetadataDevice(FakeProbeDevice):
+        def app_current(self):
+            return "not-a-dict"
+
+    summary = run_probe(NoMetadataDevice(), "fake:5555")
+
+    alignment = next(
+        item
+        for item in summary["checks"]
+        if item["name"] == "foreground.snapshot_alignment"
+    )
+    assert alignment["ok"] is True
+    assert "unverifiable" in alignment["detail"]
 
 
 def test_run_probe_governance_fails_when_device_cannot_snapshot():

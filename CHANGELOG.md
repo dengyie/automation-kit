@@ -22,6 +22,18 @@
 
 ## Unreleased
 
+真机迭代（2026-11-06 双云测试发现，见总纲 §10.9）：Redroid 云机 `dump_hierarchy`
+窗口合并方向不定，overlay-only dump 会蒸馏出"合法但错误窗口"的语义快照。
+
+- `adapters.uia2`：`Uia2Session`/`Uia2SessionFactory` 新增可选参数
+  `snapshot_dump_attempts`（默认 3）与 `snapshot_dump_interval`（默认 0.4s）——
+  `_capture_snapshot` 现按前台包证据（节点 `package=` 属性或
+  `resource-id="{pkg}:"` 前缀）校验每次 dump 并有界重试；`app_current` 不可用时
+  跳过校验（容忍契约不变）；重试耗尽优雅降级到最后一次 dump。语义快照/@N ref/
+  scroll_into_view 全部受益。
+- `scripts/live_probe_composite.py`：新增 `foreground.snapshot_alignment` 硬断言
+  （快照元素必须携带前台包 evidence，meta 对比是同义反复）。
+
 发布能力与制品验收（见 `docs/development.md` §10.8）。纯发布工具链与测试，运行时行为、
 公共接口、report schema v2 与 flow schema v1 均无变化。
 
