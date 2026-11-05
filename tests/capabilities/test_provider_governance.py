@@ -452,3 +452,78 @@ def test_peek_does_not_consume_health_probe():
     # probe grant the actual execution relies on.
     assert isinstance(resolver.peek(make_request()), AutoProvider)
     assert resolver.probe("slidex") is True
+
+
+# --- backlog rootfixes 2026-11: cancellation-consistent failover etc. --------
+
+
+class NonCooperativeProvider(StubProvider):
+    """Mirrors slidex visual's unsupported-cancellation image contexts."""
+
+    result_name = "slidex"
+
+    def execution_profile(self, request):
+        return CapabilityExecutionProfile(cancellation="unsupported")
+
+
+def test_walk_skips_candidates_with_mismatched_cancellation_semantics():
+    """reference=unsupported (image context): cooperative manual must not
+    execute — the runtime promised no wait_for, so failover to a blocking
+    cooperative provider would hang unbounded."""
+    registry = CapabilityRegistry()
+    registry.register(
+        NonCooperativeProvider(make_manifest(), outcome="failure", retryable=False),
+        name="slidex",
+    )
+    registry.register(ManualProvider(make_manifest()), name="slidex-manual")
+    executor = CapabilityExecutor(CapabilityResolver(registry))
+    manual = registry.candidates("visual.challenge")[1].provider
+
+    result = asyncio.run(executor.execute(make_request(), make_context()))
+
+    # The auto provider's business failure is returned untouched; the
+    # mismatched manual candidate was skipped without any execution.
+    assert result.success is False
+    assert result.provider == "slidex"
+    assert manual.calls == 0
+
+
+def test_walk_fails_over_between_matching_cancellation_semantics():
+    registry = CapabilityRegistry()
+    registry.register(
+        AutoProvider(make_manifest(), outcome="failure", retryable=False),
+        name="slidex",
+    )
+    registry.register(ManualProvider(make_manifest()), name="slidex-manual")
+    executor = CapabilityExecutor(CapabilityResolver(registry))
+
+    result = asyncio.run(executor.execute(make_request(), make_context()))
+
+    assert result.success is True
+    assert result.data == {"who": "slidex-manual"}
+
+
+def test_descriptor_rejects_instance_only():
+    from adapters.uia2.session import _normalize_uiautomator_descriptor
+
+    descriptor, error = _normalize_uiautomator_descriptor({"instance": 0})
+
+    assert descriptor is None
+    assert error is not None
+    assert "attribute constraint" in error.message
+
+
+def test_register_replace_demotes_to_end_of_priority_group():
+    registry = CapabilityRegistry()
+    first = AutoProvider(make_manifest(priority=5))
+    second = AutoProvider(make_manifest(priority=5))
+    registry.register(first, name="first")
+    registry.register(second, name="second")
+    assert registry.get("visual.challenge") is first
+
+    registry.register(AutoProvider(make_manifest(priority=5)), name="first", replace=True)
+
+    assert [entry.name for entry in registry.candidates("visual.challenge")] == [
+        "second",
+        "first",
+    ]

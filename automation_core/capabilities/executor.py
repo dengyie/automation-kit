@@ -52,6 +52,14 @@ class CapabilityExecutor:
         signal, and so is a business failure — a solver that cannot solve
         should fail over.
 
+        Cancellation consistency (development.md §4.4): the runtime selects
+        its timeout/cancellation strategy from the highest-priority
+        candidate's execution profile (advisory peek). The walk therefore
+        only fails over between candidates whose ``profile.cancellation``
+        matches that reference — a mismatched candidate is skipped without
+        health impact, so the promised hard-timeout semantics always belong
+        to the provider that actually executes.
+
         Probe invariant: a granted probe is either resolved through
         ``record_success`` / ``record_failure`` or explicitly released before
         re-raising — otherwise the half-open grant latches and the provider
@@ -62,12 +70,21 @@ class CapabilityExecutor:
         candidates = self.resolver.supported_candidates(
             request, platform=platform
         )
+        # The reference semantics are those of the first supported candidate
+        # in resolution order — exactly what the runtime's advisory peek saw.
+        reference_cancellation = self._profile(
+            candidates[0][1], request
+        ).cancellation
         last_result: Optional[CapabilityResult] = None
         for name, provider in candidates:
             # Validate the candidate contract first: failures here are
             # wiring/config errors that must propagate without consuming a
             # health probe.
-            self._profile(provider, request)
+            profile = self._profile(provider, request)
+            if profile.cancellation != reference_cancellation:
+                # Different cancellation semantics would invalidate the
+                # runtime's timeout promise; skip without health impact.
+                continue
             execute = getattr(provider, "execute", None)
             if not callable(execute):
                 raise CapabilityProtocolError("provider must define async execute")

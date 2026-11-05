@@ -43,7 +43,8 @@ def build_lane_plan(
     include_dianping: bool = False,
     include_uia2: bool = False,
     dianping_udid: Optional[str] = None,
-    uia2_udid: Optional[str] = None,
+    uia2_udids: Optional[List[str]] = None,
+    uia2_probe: str = "wave2",
     dianping_repo: Optional[Path] = None,
     kit_root: Optional[Path] = None,
     base_env: Optional[Dict[str, str]] = None,
@@ -62,20 +63,26 @@ def build_lane_plan(
     plan: Dict[str, Dict[str, Any]] = {}
 
     if include_uia2:
-        env = dict(base_env)
-        env["AUTOMATION_UIA2_UDID"] = uia2_udid or env.get(
-            "AUTOMATION_UIA2_UDID", DEFAULT_UIA2_UDID
-        )
-        env["PYTHONPATH"] = str(kit_root)
-        plan["uia2"] = {
-            "argv": [
-                sys.executable,
-                str(kit_root / "scripts" / "live_probe_wave2.py"),
-            ],
-            "cwd": str(artifact_root / "uia2"),
-            "env": env,
-            "artifact_root": str(artifact_root / "uia2"),
-        }
+        # One lane per serial so several devices run concurrently; each lane
+        # names its probe script (wave2 observational or composite asserted).
+        assert uia2_probe in ("wave2", "composite"), f"unknown probe: {uia2_probe}"
+        serials = list(uia2_udids or [])
+        if not serials:
+            serials = [base_env.get("AUTOMATION_UIA2_UDID", DEFAULT_UIA2_UDID)]
+        for index, serial in enumerate(serials, start=1):
+            lane = "uia2" if len(serials) == 1 else f"uia2-{index}"
+            env = dict(base_env)
+            env["AUTOMATION_UIA2_UDID"] = serial
+            env["PYTHONPATH"] = str(kit_root)
+            plan[lane] = {
+                "argv": [
+                    sys.executable,
+                    str(kit_root / "scripts" / f"live_probe_{uia2_probe}.py"),
+                ],
+                "cwd": str(artifact_root / lane),
+                "env": env,
+                "artifact_root": str(artifact_root / lane),
+            }
 
     if include_dianping:
         env = dict(base_env)
@@ -213,8 +220,20 @@ def main(argv=None) -> int:
     parser.add_argument("--run-id", default=time.strftime("%Y%m%d-%H%M%S"))
     parser.add_argument("--dianping", action="store_true", help="run the dianping live smoke lane")
     parser.add_argument("--dianping-udid", default=None, help="adb serial for the dianping lane")
-    parser.add_argument("--uia2", action="store_true", help="run the uia2 adapter probe lane")
-    parser.add_argument("--uia2-udid", default=None, help="adb serial for the uia2 lane")
+    parser.add_argument("--uia2", action="store_true", help="run uia2 probe lanes (one per --uia2-udid)")
+    parser.add_argument(
+        "--uia2-udid",
+        action="append",
+        default=None,
+        metavar="SERIAL",
+        help="adb serial for a uia2 lane; repeat for parallel devices",
+    )
+    parser.add_argument(
+        "--uia2-probe",
+        choices=("wave2", "composite"),
+        default="wave2",
+        help="lane probe script: wave2 (observational) or composite (asserted)",
+    )
     parser.add_argument("--execute", action="store_true", help="actually spawn the lanes (default: dry plan)")
     args = parser.parse_args(argv)
 
@@ -223,7 +242,8 @@ def main(argv=None) -> int:
         include_dianping=args.dianping,
         include_uia2=args.uia2,
         dianping_udid=args.dianping_udid,
-        uia2_udid=args.uia2_udid,
+        uia2_udids=args.uia2_udid,
+        uia2_probe=args.uia2_probe,
     )
     run_root = KIT_ROOT / "live_artifacts" / args.run_id
 

@@ -634,18 +634,23 @@ class WorkflowRuntime:
         while attempts < policy.max_attempts:
             remaining = clock.remaining(context)
             if remaining is not None and remaining <= 0:
-                last_error = ExecutionFailure(
-                    category=FailureCategory.TIMEOUT,
-                    code="deadline_exceeded",
-                    message=f"workflow deadline exceeded before attempt: {step.name}",
-                    retryable=False,
-                    source="runtime",
-                )
-                last_result = CapabilityResult(
-                    success=False,
-                    provider="runtime",
-                    error_code="deadline_exceeded",
-                )
+                # A provider business failure (result-only) must not be
+                # masked by the deadline code; runtime timeout errors keep
+                # the historical deadline_exceeded report.
+                business_failure = last_error is None and last_result is not None
+                if not business_failure:
+                    last_error = ExecutionFailure(
+                        category=FailureCategory.TIMEOUT,
+                        code="deadline_exceeded",
+                        message=f"workflow deadline exceeded before attempt: {step.name}",
+                        retryable=False,
+                        source="runtime",
+                    )
+                    last_result = CapabilityResult(
+                        success=False,
+                        provider="runtime",
+                        error_code="deadline_exceeded",
+                    )
                 break
 
             attempts += 1
@@ -744,13 +749,18 @@ class WorkflowRuntime:
             if policy.backoff:
                 backoff_remaining = clock.remaining(context)
                 if backoff_remaining is not None and backoff_remaining <= 0:
-                    last_error = ExecutionFailure(
-                        category=FailureCategory.TIMEOUT,
-                        code="deadline_exceeded",
-                        message=f"workflow deadline exceeded during retry backoff: {step.name}",
-                        retryable=False,
-                        source="runtime",
-                    )
+                    # A provider business failure (result-only, no runtime
+                    # error) must not be masked by the deadline code; runtime
+                    # timeout errors keep the historical deadline report.
+                    business_failure = last_error is None and last_result is not None
+                    if not business_failure:
+                        last_error = ExecutionFailure(
+                            category=FailureCategory.TIMEOUT,
+                            code="deadline_exceeded",
+                            message=f"workflow deadline exceeded during retry backoff: {step.name}",
+                            retryable=False,
+                            source="runtime",
+                        )
                     break
                 delay = policy.backoff * (
                     policy.backoff_multiplier ** (attempts - 1)

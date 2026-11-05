@@ -1628,6 +1628,20 @@ final review 发现并修复三处 P1/P2（全部为本 wave 引入）：
    （PROVIDER/`provider_exception`）在报告中可区分。
 4. `health.probe`/`snapshot` 对未知名不再懒创建账本条目。
 
+#### R2 backlog 根因修复批次（2026-11-06，final review 遗留全部闭环）
+
+- **Cancellation-consistent failover**（见 §4.4 补记）：executor 走查按参考语义过滤。
+- **Deadline 覆盖守卫**：attempt 循环顶与 backoff 段的 `deadline_exceeded` 覆盖
+  只在记录的不是业务失败（result-only）时发生；runtime timeout 保持历史契约
+  （`test_retry_backoff_is_clamped_to_remaining_deadline` 钉住）。
+- **uia2 descriptor**：instance-only（无属性约束）typed 拒绝。
+- **registry**：`replace=True` 降位语义（同优先级组末位）docstring 定调 + 测试钉住。
+- **live 质量门**：新增 `scripts/live_probe_composite.py`（composite descriptor
+  文档序 instance 对照 + 真机 session 治理 failover，全硬断言 + JSON summary +
+  非零退出码，可作编排 lane 质量门）；编排器 `--uia2-udid` 支持多次（一设备一
+  lane，`uia2-1..n`）与 `--uia2-probe {wave2,composite}` 选探针。
+- 验证基线：双云手机（mesh .51/.52）真机回归见 §10.9。
+
 #### R1 app 侧：dianping publish 选择器对等（dianping 仓，随 0.6.0 消费）
 
 - `translate_uiautomator_selector` 结构化升级：多方法链与 `.instance(N)` 解析为
