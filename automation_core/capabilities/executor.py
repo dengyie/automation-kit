@@ -51,31 +51,50 @@ class CapabilityExecutor:
         ``CapabilityProviderUnavailableError``. A provider crash is a health
         signal, and so is a business failure — a solver that cannot solve
         should fail over.
+
+        Probe invariant: a granted probe is either resolved through
+        ``record_success`` / ``record_failure`` or explicitly released before
+        re-raising — otherwise the half-open grant latches and the provider
+        is bricked for the process lifetime. Candidate contract validation
+        (execution profile, async execute entrypoint) therefore runs *before*
+        the probe, so wiring errors never consume a grant.
         """
         candidates = self.resolver.supported_candidates(
             request, platform=platform
         )
         last_result: Optional[CapabilityResult] = None
         for name, provider in candidates:
-            if not self.resolver.probe(name):
-                continue
+            # Validate the candidate contract first: failures here are
+            # wiring/config errors that must propagate without consuming a
+            # health probe.
             self._profile(provider, request)
             execute = getattr(provider, "execute", None)
             if not callable(execute):
                 raise CapabilityProtocolError("provider must define async execute")
+            if not self.resolver.probe(name):
+                continue
             try:
                 result = execute(request, context)
                 if inspect.isawaitable(result):
                     result = await result
             except CapabilityProtocolError:
+                # A provider-side contract violation is not a wiring error;
+                # the probe was granted for a real execution attempt, so
+                # release it before propagating to keep the ledger consistent.
+                self.resolver.health.release(name)
                 raise
             except asyncio.CancelledError:
+                self.resolver.health.release(name)
                 raise
             except Exception as exc:
                 self.resolver.record_failure(name)
                 last_result = self._provider_failure(provider, exc)
                 continue
-            result = self._validate_result(result)
+            try:
+                result = self._validate_result(result)
+            except CapabilityProtocolError:
+                self.resolver.health.release(name)
+                raise
             if result.success:
                 self.resolver.record_success(name)
                 return result

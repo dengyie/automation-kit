@@ -73,8 +73,11 @@ class ProviderHealthBook:
 
         Grants at most one in-flight probe while ``half_open``; an open
         breaker only flips to half-open once the cooldown has elapsed.
+        Unknown names are trivially healthy and do not create ledger entries.
         """
-        entry = self._entry(name)
+        entry = self._providers.get(name)
+        if entry is None:
+            return True
         now = self._clock()
         if entry.state == "open":
             if entry.opened_at is None or now - entry.opened_at < self.policy.cooldown_seconds:
@@ -88,6 +91,18 @@ class ProviderHealthBook:
             entry.probe_granted = True
             return True
         return True
+
+    def release(self, name: str) -> None:
+        """Release an unconsumed probe grant without touching state.
+
+        The executor must call this whenever a granted probe's execution
+        aborts before an outcome can be recorded (protocol error, external
+        cancellation, invalid provider return) — otherwise ``probe_granted``
+        stays latched and the provider is bricked for the process lifetime.
+        """
+        entry = self._providers.get(name)
+        if entry is not None:
+            entry.probe_granted = False
 
     def record_success(self, name: str) -> None:
         entry = self._entry(name)
@@ -105,7 +120,9 @@ class ProviderHealthBook:
             entry.probe_granted = False
 
     def snapshot(self, name: str) -> HealthSnapshot:
-        entry = self._entry(name)
+        entry = self._providers.get(name)
+        if entry is None:
+            return HealthSnapshot(state="closed", consecutive_failures=0)
         return HealthSnapshot(
             state=entry.state,
             consecutive_failures=entry.consecutive_failures,

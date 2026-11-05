@@ -139,3 +139,56 @@ def test_runtime_fixed_backoff_keeps_historical_behavior(monkeypatch):
 
     assert result.success is True
     assert delays == [0.5, 0.5]
+
+
+# --- review fixes 2026-11: unavailable mapping + yaml policy field -----------
+
+
+def test_runtime_reports_all_breakers_open_as_provider_unavailable():
+    from automation_core.capabilities import (
+        CapabilityResult,
+        HealthPolicy,
+        ProviderHealthBook,
+    )
+
+    class AlwaysFailing(FakeProvider):
+        async def execute(self, request, context):
+            return CapabilityResult(
+                success=False,
+                provider="fake",
+                error_code="temporary",
+                retryable=False,
+            )
+
+    registry = CapabilityRegistry()
+    registry.register(AlwaysFailing(), name="only")
+    book = ProviderHealthBook(HealthPolicy(failure_threshold=1, cooldown_seconds=30.0))
+    executor = CapabilityExecutor(CapabilityResolver(registry, health=book))
+    book.record_failure("only")  # force the single breaker open
+    runtime = WorkflowRuntime(
+        session_factory=lambda: FakeSession(),
+        capability_executor=executor,
+        workflow_name="smoke",
+    )
+
+    result = asyncio.run(runtime.arun([capability_step()]))
+
+    assert result.success is False
+    step = result.steps[0]
+    assert step.error is not None
+    assert step.error.category.value == "resolution"
+    assert step.error.code == "provider_unavailable"
+    assert step.capability_result.error_code == "provider_unavailable"
+
+
+def test_yaml_loader_parses_backoff_multiplier():
+    from automation_runner.yaml_loader import _build_policy
+
+    policy = _build_policy(
+        {"max_attempts": 3, "backoff": 0.5, "backoff_multiplier": 2.0}, 0
+    )
+    assert policy.backoff == 0.5
+    assert policy.backoff_multiplier == 2.0
+
+    default_policy = _build_policy({"max_attempts": 2}, 0)
+    assert default_policy.backoff_multiplier == 1.0

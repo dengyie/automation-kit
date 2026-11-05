@@ -111,3 +111,35 @@ def test_policy_rejects_invalid_thresholds():
         HealthPolicy(failure_threshold=0)
     with pytest.raises(ValueError, match="cooldown_seconds"):
         HealthPolicy(cooldown_seconds=-1.0)
+
+
+# --- review fixes 2026-11: probe release + unknown names ---------------------
+
+
+def test_release_clears_latched_probe_grant():
+    book, clock = make_book(failure_threshold=1, cooldown_seconds=30.0)
+
+    book.record_failure("p")
+    clock.advance(30.0)
+    assert book.probe("p") is True  # half_open grant consumed
+
+    book.release("p")
+    # The release makes the provider probeable again (fresh grant).
+    assert book.probe("p") is True
+
+
+def test_release_on_unknown_name_is_a_noop():
+    book, _ = make_book()
+
+    book.release("never-registered")
+
+    assert book.snapshot("never-registered").state == "closed"
+
+
+def test_probe_unknown_name_is_healthy_without_ledger_entry():
+    book, _ = make_book()
+
+    assert book.probe("ghost") is True
+    # No lazy ledger entry: the book must not grow on unregistered probes.
+    assert book.snapshot("ghost").state == "closed"
+    assert "ghost" not in book._providers
