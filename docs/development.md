@@ -1436,6 +1436,24 @@ Patchright / stf）。原则：外部 SDK 一律依赖注入，不进 `automatio
 openatx `atxserver2`（与 uia2 生态同源）vs `DeviceFarmer/stf`。Camoufox（Firefox
 源码级反指纹）为页面级风控升级的最后预案，成本是放弃 Chromium 生态。
 
+**2026-11 最小切入（R3，`scripts/live_parallel_smoke.py`）**：触发条件经设备资产
+盘点实质半满足——OnePlus 7T（mesh `10.144.144.53`）与云手机 2（mesh
+`10.144.144.52:5555`）经 EasyTier 已可并行 adb 直连，连接织物不是瓶颈；缺的只是
+编排与设备身份约定。本仓交付：
+
+- `scripts/live_parallel_smoke.py`：双设备并行 smoke 编排器（dianping live
+  smoke 子进程 + uia2 wave-2 探针子进程，独立 env/artifact 根/日志，
+  `--execute` 才实际拉起，默认干跑打印计划；纯函数离线测试
+  `tests/scripts/test_live_parallel_smoke.py`）。
+- `scripts/live_probe_wave2.py` 硬编码 SERIAL 改 `AUTOMATION_UIA2_UDID` env
+  （对齐 examples/damai_android/live.py 惯例；缺省回落历史 mesh 节点）。
+- 设备注册表（设备名→serial→用途→健康判据）沉淀在 vault
+  `Note/Infra/automation-kit 设备池注册表.md`，不进本仓。
+- **atxserver2/stf 继续缓触发**：uia2 adapter 的鸭子注入意味着 atxserver2 管理
+  的 u2 设备对象可直接落入 `Uia2Session`，试点时零改造；stf 的浏览器远程操控与
+  现有 scrcpy + game-auto 控制台重叠且 Node 栈部署成本高。双设备并行实跑由
+  orchestrator 在设备在线时执行（`--execute`），结果回写 vault 运维手册。
+
 ### 12.14 演进波执行检查表补充
 
 - 外部 SDK（uiautomator2/patchright/playwright）只能出现在 lazy factory；boundary

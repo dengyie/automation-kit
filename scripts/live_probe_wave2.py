@@ -11,11 +11,16 @@ import time
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
+import os
+
 import uiautomator2 as u2
 
 from adapters.uia2.session import Uia2Session
 
-SERIAL = "10.144.144.52:5555"
+# Device serial via env (device-farm convention: examples/damai_android/live.py
+# uses the same variable); falls back to the historical mesh node so the
+# existing one-liner invocation keeps working.
+SERIAL = os.environ.get("AUTOMATION_UIA2_UDID", "10.144.144.52:5555")
 
 
 class CountingDevice:
