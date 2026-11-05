@@ -1550,6 +1550,40 @@ uia2 对等性）。三轨推进：uia2 对等性（composite 定位 + app 侧�
   fake（`tests/adapters/uia2/test_composite_selector.py`：分派、点击、校验矩阵、
   快照域拒绝）。
 
+#### R2：provider 运行治理（L0，`automation_core/capabilities/`）
+
+- **门控解锁**：slidex 侧新增 `SlidexManualCapability`（provider 名 `slidex-manual`，
+  包装现成 `ManualFallbackSession`）作为 `visual.challenge` 的第二个真实同类
+  provider——「自动求解失败→降级人工兜底」的故障转移语义真实成立，优先级/健康/
+  熔断的建设不属预建空壳。
+- **registry 多 provider 存储**：`register(provider, *, name=None, replace=False)`
+  增加 注册键 `name`（默认 = capability 名，未命名注册保持单 provider 旧语义与
+  `replace` 行为）；同 capability 可挂多个不同名 provider，`candidates(name)` 按
+  **manifest priority 降序 + 插入序**返回，`get` 返回最高优先级者。
+- **manifest**：新增 `priority: int = 0`（`to_dict` 同步携带），向后兼容默认值。
+- **健康账本**（新模块 `health.py`，纯 stdlib）：`ProviderHealthBook(HealthPolicy,
+  clock=...)`，closed/open/half-open 三态，`failure_threshold` 连续失败→open、
+  cooldown 到期放行**单个** half-open 探针、成功复位/失败重开；时钟注入保证
+  deterministic 测试。状态键 = 注册名。
+- **resolver**：`supported_candidates`（操作/平台过滤、不触健康）+ `probe` +
+  `resolve_candidate`（首个可探针候选，全 open → 新错误类
+  `CapabilityProviderUnavailableError` fail-closed）+ `peek`（advisory 解析，
+  **不消费探针**——供 `execution_profile` 使用，避免与 execute 的探针竞争）。
+- **executor 走查式故障转移**：`execute` 按序对每个通过探针的候选执行；业务失败
+  与 provider 异常都记健康账本并继续下一家；首个成功即返回；全败返回最后一个
+  失败结果；全 open 抛 unavailable。协议错误（CapabilityProtocolError）不记健康
+  直接上抛；CancelledError 照旧上抛。
+- **runtime 接线**：workflow metadata 的 `platform` 现在传入
+  `execution_profile`/`execute`（修复一直闲置的平台维度）；平台不匹配在 advisory
+  解析即按 wiring/RESOLUTION 失败，不触发 provider 调用。
+- **重试策略**：`CapabilityPolicy` 新增 `backoff_multiplier`（≥1，默认 1.0 = 固定
+  退避旧行为），退避延迟 = `backoff * multiplier**(attempt-1)`；YAML flow
+  policy 同步解析 `backoff_multiplier`。按错误类分类策略仍等真实需求，不预建。
+- **测试**：`tests/capabilities/test_health.py`（状态机全迁移路径）、
+  `test_provider_governance.py`（双 provider failover / 熔断路由 / 优先级 /
+  恢复）、`tests/runner/test_runtime_governance.py`（platform 传递、指数退避、
+  固定退避兼容）；存量 604 项全绿。
+
 ## 13. 本轮已实现文件
 
 ### automation-kit
