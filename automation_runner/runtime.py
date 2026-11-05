@@ -622,8 +622,9 @@ class WorkflowRuntime:
         last_result: Optional[CapabilityResult] = None
         last_error: Optional[ExecutionFailure] = None
 
+        platform = self.metadata.get("platform") if self.metadata else None
         try:
-            profile = executor.execution_profile(step.request)
+            profile = executor.execution_profile(step.request, platform=platform)
         except asyncio.CancelledError:
             raise
         except Exception as exc:
@@ -650,7 +651,7 @@ class WorkflowRuntime:
             try:
                 if profile.cancellation == "cooperative":
                     last_result = await self._execute_cooperative(
-                        executor, step, context, policy, remaining
+                        executor, step, context, policy, remaining, platform
                     )
                 else:
                     # Unsupported cancellation: no hard timeout may be promised
@@ -658,6 +659,7 @@ class WorkflowRuntime:
                     last_result = await executor.execute(
                         step.request,
                         context,
+                        platform=platform,
                     )
             except asyncio.TimeoutError:
                 last_error = ExecutionFailure(
@@ -734,7 +736,9 @@ class WorkflowRuntime:
                         source="runtime",
                     )
                     break
-                delay = policy.backoff
+                delay = policy.backoff * (
+                    policy.backoff_multiplier ** (attempts - 1)
+                )
                 if backoff_remaining is not None:
                     delay = min(delay, backoff_remaining)
                 await asyncio.sleep(delay)
@@ -771,8 +775,9 @@ class WorkflowRuntime:
         context: ExecutionContext,
         policy: CapabilityPolicy,
         remaining: Optional[float],
+        platform: Optional[str] = None,
     ) -> CapabilityResult:
-        execution = executor.execute(step.request, context)
+        execution = executor.execute(step.request, context, platform=platform)
         timeout = self._merge_timeout(policy.timeout, remaining)
         if timeout is None:
             return await execution

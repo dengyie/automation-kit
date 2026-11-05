@@ -23,6 +23,9 @@ class CapabilityManifest:
     operations: Tuple[str, ...]
     platforms: Tuple[str, ...] = ()
     default_cancellation: str = "cooperative"
+    # Resolution preference among providers of the same capability; higher
+    # wins. Only meaningful once a second same-capability provider exists.
+    priority: int = 0
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -63,6 +66,7 @@ class CapabilityManifest:
             "operations": list(self.operations),
             "platforms": list(self.platforms),
             "default_cancellation": self.default_cancellation,
+            "priority": self.priority,
             "metadata": redact(self.metadata),
         }
 
