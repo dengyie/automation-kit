@@ -19,6 +19,7 @@ def build(**overrides):
         "run_id": "run-1",
         "include_dianping": True,
         "include_uia2": True,
+        "uia2_udids": ["aa:5555"],
         "kit_root": Path("/fake/kit"),
         "dianping_repo": Path("/fake/dianping"),
         "base_env": {"PATH": "/bin", "DIANPING_DEVICE_UDID": "1A2B3C"},
@@ -34,7 +35,7 @@ def test_plan_builds_two_isolated_lanes():
     uia2 = plan["uia2"]
     dianping = plan["dianping"]
 
-    assert uia2["env"]["AUTOMATION_UIA2_UDID"] == DEFAULT_UIA2_UDID
+    assert uia2["env"]["AUTOMATION_UIA2_UDID"] == "aa:5555"
     assert uia2["env"]["PATH"] == "/bin"
     assert uia2["cwd"] == str(Path("/fake/kit/live_artifacts/run-1/uia2"))
     assert uia2["argv"][-1] == str(Path("/fake/kit/scripts/live_probe_wave2.py"))
@@ -53,7 +54,7 @@ def test_plan_builds_two_isolated_lanes():
 
 
 def test_plan_envs_do_not_cross_contaminate():
-    plan = build(base_env={"PATH": "/bin", "AUTOMATION_UIA2_UDID": "a:5555"})
+    plan = build()
 
     assert "DIANPING_LIVE_E2E" not in plan["uia2"]["env"]
     assert "DIANPING_DRIVER" not in plan["uia2"]["env"]
@@ -69,6 +70,26 @@ def test_plan_dianping_udid_override():
     plan = build(dianping_udid="OVERRIDE")
 
     assert plan["dianping"]["env"]["DIANPING_DEVICE_UDID"] == "OVERRIDE"
+
+
+def test_plan_multi_device_uia2_lanes():
+    plan = build(
+        include_dianping=False,
+        uia2_udids=["10.144.144.52:5555", "10.144.144.51:5555"],
+    )
+
+    assert set(plan) == {"uia2-1", "uia2-2"}
+    assert plan["uia2-1"]["env"]["AUTOMATION_UIA2_UDID"] == "10.144.144.52:5555"
+    assert plan["uia2-2"]["env"]["AUTOMATION_UIA2_UDID"] == "10.144.144.51:5555"
+    assert plan["uia2-2"]["cwd"].endswith("uia2-2")
+
+
+def test_plan_uia2_probe_choice():
+    plan = build(include_dianping=False, uia2_probe="composite")
+
+    assert plan["uia2"]["argv"][-1] == str(
+        Path("/fake/kit/scripts/live_probe_composite.py")
+    )
 
 
 def test_aggregate_mixed_outcomes_are_not_ok():
@@ -113,7 +134,8 @@ def test_execute_plan_spawns_lanes_concurrently_and_writes_summary(tmp_path):
             return b"%s ok" % self._lane.encode(), b""
 
     async def fake_spawn(*argv, cwd=None, env=None, stdout=None, stderr=None):
-        lane = "uia2" if "live_probe_wave2" in argv[1] else "dianping"
+        assert cwd is not None and Path(cwd).is_dir(), "cwd must exist pre-spawn"
+        lane = "uia2" if "live_probe_" in argv[1] else "dianping"
         return FakeProcess(lane)
 
     plan = build(kit_root=tmp_path, dianping_repo=tmp_path / "dp")
@@ -229,10 +251,13 @@ def test_main_execute_runs_lanes_and_writes_summary(monkeypatch, tmp_path, capsy
     kit_root = tmp_path / "kit"
     scripts_dir = kit_root / "scripts"
     scripts_dir.mkdir(parents=True)
-    # Harmless lane stand-in: main() must spawn the REAL subprocess machinery
+    # Harmless lane stand-ins: main() must spawn the REAL subprocess machinery
     # (cwd creation, teeing, summary) without touching adb/uiautomator2.
     (scripts_dir / "live_probe_wave2.py").write_text(
         "print('lane-ok')", encoding="utf-8"
+    )
+    (scripts_dir / "live_probe_composite.py").write_text(
+        "print('composite-ok')", encoding="utf-8"
     )
     monkeypatch.setattr(mod, "KIT_ROOT", kit_root)
     monkeypatch.setattr(mod, "DEFAULT_DIANPING_REPO", fake_repo)
@@ -245,6 +270,8 @@ def test_main_execute_runs_lanes_and_writes_summary(monkeypatch, tmp_path, capsy
             "--uia2",
             "--uia2-udid",
             "10.144.144.52:5555",
+            "--uia2-probe",
+            "composite",
             "--execute",
         ]
     )
@@ -253,9 +280,46 @@ def test_main_execute_runs_lanes_and_writes_summary(monkeypatch, tmp_path, capsy
     summary = json.loads(capsys.readouterr().out)
     assert summary["ok"] is True
     assert set(summary["lanes"]) == {"uia2"}
+    log = Path(summary["lanes"]["uia2"]["log"]).read_bytes()
+    assert b"composite-ok" in log
     written = json.loads(
         (tmp_path / "kit" / "live_artifacts" / "e2e-run" / "summary.json").read_text(
             encoding="utf-8"
         )
     )
     assert written["ok"] is True
+
+
+def test_main_execute_multi_device_lanes(monkeypatch, tmp_path, capsys):
+    """Two --uia2-udid flags fan out to two parallel device lanes."""
+    import sys
+
+    from scripts import live_parallel_smoke as mod
+
+    kit_root = tmp_path / "kit"
+    scripts_dir = kit_root / "scripts"
+    scripts_dir.mkdir(parents=True)
+    (scripts_dir / "live_probe_wave2.py").write_text(
+        "print('lane-ok')", encoding="utf-8"
+    )
+    monkeypatch.setattr(mod, "KIT_ROOT", kit_root)
+
+    rc = mod.main(
+        [
+            "--run-id",
+            "multi-run",
+            "--uia2",
+            "--uia2-udid",
+            "10.144.144.52:5555",
+            "--uia2-udid",
+            "10.144.144.51:5555",
+            "--execute",
+        ]
+    )
+
+    assert rc == 0
+    summary = json.loads(capsys.readouterr().out)
+    assert summary["ok"] is True
+    assert set(summary["lanes"]) == {"uia2-1", "uia2-2"}
+    assert summary["lanes"]["uia2-1"]["ok"] is True
+    assert summary["lanes"]["uia2-2"]["ok"] is True

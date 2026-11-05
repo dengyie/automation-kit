@@ -634,10 +634,11 @@ class WorkflowRuntime:
         while attempts < policy.max_attempts:
             remaining = clock.remaining(context)
             if remaining is not None and remaining <= 0:
-                # First hop: nothing attempted yet, the deadline IS the
-                # failure. Later hops: keep the real business failure that
-                # triggered the retry instead of masking it.
-                if last_error is None and last_result is None:
+                # A provider business failure (result-only) must not be
+                # masked by the deadline code; runtime timeout errors keep
+                # the historical deadline_exceeded report.
+                business_failure = last_error is None and last_result is not None
+                if not business_failure:
                     last_error = ExecutionFailure(
                         category=FailureCategory.TIMEOUT,
                         code="deadline_exceeded",
