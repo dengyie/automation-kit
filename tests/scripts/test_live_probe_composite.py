@@ -2,7 +2,11 @@
 
 import xml.etree.ElementTree as ET
 
-from scripts.live_probe_composite import _BOUNDS_RE, run_probe
+import re as _re
+
+from scripts.live_probe_composite import run_probe
+
+_BOUNDS_RE = _re.compile(r"\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]")
 
 
 class FakeProbeDevice:
@@ -126,7 +130,7 @@ def test_run_probe_instance_semantics_live_truth():
     )
     assert instance_check["ok"] is True
     assert "x3 live instances" in instance_check["detail"]
-    assert "dump and live agree" in instance_check["detail"]
+    assert "snapshot and live agree" in instance_check["detail"]
 
 
 def test_run_probe_records_dump_live_divergence_without_failing():
@@ -157,7 +161,7 @@ def test_run_probe_records_dump_live_divergence_without_failing():
     )
     assert instance_check["ok"] is True
     assert "x2 live instances" in instance_check["detail"]
-    assert "dump matches=3" in instance_check["detail"]
+    assert "snapshot matches=3" in instance_check["detail"]
 
 
 def test_run_probe_reports_check_failure_without_crashing():

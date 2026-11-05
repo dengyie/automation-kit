@@ -26,53 +26,11 @@ import asyncio
 import io
 import json
 import os
-import re
 import sys
 import time
-import xml.etree.ElementTree as ET
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 SERIAL = os.environ.get("AUTOMATION_UIA2_UDID", "10.144.144.52:5555")
-
-
-_BOUNDS_RE = re.compile(r"\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]")
-
-
-def _bounds_rect(raw: str) -> Optional[Dict[str, int]]:
-    match = _BOUNDS_RE.fullmatch(raw or "")
-    if match is None:
-        return None
-    left, top, right, bottom = (int(part) for part in match.groups())
-    return {"x": left, "y": top, "width": right - left, "height": bottom - top}
-
-
-def _descriptor_matches(node: ET.Element, descriptor: dict) -> bool:
-    """Dump-side mirror of the uiautomator2 attribute semantics."""
-    for key, expected in descriptor.items():
-        if key == "instance":
-            continue
-        if key == "resourceId":
-            actual = node.get("resource-id") or ""
-            if actual != expected:
-                return False
-        elif key == "className":
-            if (node.get("class") or "") != expected:
-                return False
-        elif key == "text":
-            if (node.get("text") or "") != expected:
-                return False
-        elif key == "textContains":
-            if expected not in (node.get("text") or ""):
-                return False
-        elif key == "description":
-            if (node.get("content-desc") or "") != expected:
-                return False
-        elif key == "descriptionContains":
-            if expected not in (node.get("content-desc") or ""):
-                return False
-        else:
-            return False
-    return True
 
 
 def run_probe(device, serial: str) -> dict:
@@ -123,27 +81,32 @@ def run_probe(device, serial: str) -> dict:
         {"name": "device.front_app", "ok": True, "detail": front_app}
     )
 
-    dump_source: list = []
+    def snapshot_elements() -> List[Dict[str, Any]]:
+        """Fresh semantic snapshot elements — SAME source as the live
+        selector (the accessibility view), so candidate discovery never
+        diverges from what ``uiautomator`` can resolve. The raw
+        ``dump_hierarchy`` was abandoned: the Redroid cloud phone merges
+        overlay windows into it nondeterministically, so dump and live can
+        disagree about which nodes exist at all.
+        """
+        outcome = session.execute_action("semantic_snapshot", refresh=True)
+        if not outcome.success:
+            raise AssertionError(f"semantic snapshot failed: {outcome.message}")
+        return list(outcome.data.get("elements", []))
 
-    def take_dump() -> str:
-        source = device.dump_hierarchy()
-        dump_source.append(source)
-        return source
-
-    def pick_target(source: str):
-        """Resource-id with the most dump matches (instance semantics needs
-        several nodes), tie-broken by first document order."""
-        root = ET.fromstring(source)
-        counts: Dict[str, List[ET.Element]] = {}
+    def pick_target(elements: List[Dict[str, Any]]):
+        """Resource-id with the most snapshot matches, tie-broken by first
+        document order (the snapshot's element order)."""
+        counts: Dict[str, List[Dict[str, Any]]] = {}
         order: List[str] = []
-        for node in root.iter("node"):
-            rid = node.get("resource-id") or ""
+        for element in elements:
+            rid = element.get("resource_id") or ""
             if not rid:
                 continue
             if rid not in counts:
                 counts[rid] = []
                 order.append(rid)
-            counts[rid].append(node)
+            counts[rid].append(element)
         if not counts:
             return None, []
         rid = max(order, key=lambda key: len(counts[key]))
@@ -151,10 +114,9 @@ def run_probe(device, serial: str) -> dict:
 
     # --- 1. composite descriptor ------------------------------------------------
     def c_descriptor_lookup():
-        source = take_dump()
-        target, _ = pick_target(source)
-        assert target is not None, "no resource-id node in current hierarchy"
-        rid = target.get("resource-id")
+        target, _ = pick_target(snapshot_elements())
+        assert target is not None, "no resource-id node in current snapshot"
+        rid = target.get("resource_id")
         element = session.find_element("uiautomator", {"resourceId": rid})
         assert element.exists is True, f"descriptor lookup missing: {rid}"
         return f"resourceId={rid}"
@@ -172,13 +134,11 @@ def run_probe(device, serial: str) -> dict:
         instance(0) deterministic, each live instance resolvable, and an
         instance beyond the live count failing closed.
         """
-        source = take_dump()
-        target, matches = pick_target(source)
-        assert target is not None, "no resource-id node in current hierarchy"
-        rid = target.get("resource-id")
-        # The dump is only used to PICK a candidate rid — the Redroid dump's
-        # window merge flaps between runs, so the live side is probed up to a
-        # ceiling instead of trusting the dump count.
+        target, matches = pick_target(snapshot_elements())
+        assert target is not None, "no resource-id node in current snapshot"
+        rid = target.get("resource_id")
+        # The snapshot is only used to PICK a candidate rid; the live side is
+        # probed up to a ceiling instead of trusting any static count.
         probe_ceiling = max(len(matches), 32)
 
         def bounds_for(index):
@@ -213,9 +173,9 @@ def run_probe(device, serial: str) -> dict:
                 f"got {beyond.data}"
             )
         divergence = (
-            f"dump matches={len(matches)} vs live instances={live_count}"
+            f"snapshot matches={len(matches)} vs live instances={live_count}"
             if live_count != len(matches)
-            else "dump and live agree"
+            else "snapshot and live agree"
         )
         ceiling_note = " [probe ceiling hit]" if hit_ceiling else ""
         return (
@@ -226,10 +186,9 @@ def run_probe(device, serial: str) -> dict:
     check("descriptor.instance_document_order", c_descriptor_instance_order)
 
     def c_descriptor_wait_for_element():
-        source = take_dump()
-        target, _ = pick_target(source)
-        assert target is not None, "no resource-id node in current hierarchy"
-        rid = target.get("resource-id")
+        target, _ = pick_target(snapshot_elements())
+        assert target is not None, "no resource-id node in current snapshot"
+        rid = target.get("resource_id")
         result = session.execute_action(
             "wait_for_element",
             by="uiautomator",
