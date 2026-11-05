@@ -1016,13 +1016,14 @@ poetry path 依赖（`{ path = "../automation-kit", develop = true }`）。也�
 tag 即可），但不再阻塞任何里程碑。相应地，`v0.5.0` 是仓库内版本基线这一点属于**既定状态
 而非缺口**（tag `v0.5.0` 已打在发布基线上）。
 
-#### 阶段 4：provider 运行治理
+#### 阶段 4：provider 运行治理（✅ 已完成 2026-11，见 §12.16 R2）
 
-交付：`CapabilityResolver`、provider 优先级、健康状态、平台级超时、重试策略和可选
-熔断；策略仍由 runtime 控制。Slidex adapter 已有单次调用超时，但跨 provider 治理仍
-未实现。验收：多 provider 选择、故障转移和取消能力完全由 deterministic 测试证明。
-对应详细任务：Task 2 的 resolver 基线；优先级/健康检查/熔断仅在出现第二个同类
-provider 后开启，不得在当前阶段预建空壳。
+交付：registry 多 provider 存储（注册键 + manifest priority）、确定性健康账本
+（closed/open/half-open，注入时钟）、executor 走查式故障转移、runtime 平台维度
+接线、`backoff_multiplier` 指数退避。验收达成方式：门控以真实第二 provider 解锁
+（slidex `SlidexManualCapability` 人工兜底，kit→slidex 合并序），多 provider
+选择、故障转移与取消能力全部由 deterministic 测试证明（test_provider_governance
+/ test_health / test_runtime_governance）。按错误类分类策略仍等真实需求，未预建。
 
 #### 阶段 5：真实应用闭环
 
@@ -1031,8 +1032,10 @@ provider 后开启，不得在当前阶段预建空壳。
 残留浏览器/设备会话。
 对应详细任务：Task 7、Task 8 中 app 侧 live 配置和证据门禁。
 2026-09 进展：damai live web session factory（`live_factory.py`，Task 10A）与
-patchright 引擎开关（Task 10B）已交付；dianping uia2 driver 路径（Task 9）已交付，
-publish 流程的 uia2 对等性（UiSelector 多方法翻译）仍为后续。
+patchright 引擎开关（Task 10B）已交付；dianping uia2 driver 路径（Task 9）已交付。
+2026-11 进展：publish 流程 uia2 对等性已交付（§12.16 R1——kit composite
+`uiautomator` descriptor by + dianping 翻译器结构化解析，app 仓同步提交）；真机
+live E2E（编辑器+不提交）在设备在线时执行，验收脚本与门禁已就位。
 
 ### 演进波（2026-09，开源框架借鉴）
 
@@ -1602,6 +1605,42 @@ uia2 对等性）。三轨推进：uia2 对等性（composite 定位 + app 侧�
   恢复）、`tests/runner/test_runtime_governance.py`（platform 传递、指数退避、
   固定退避兼容）；存量 604 项全绿。
 
+#### R1 app 侧：dianping publish 选择器对等（dianping 仓，随 0.6.0 消费）
+
+- `translate_uiautomator_selector` 结构化升级：多方法链与 `.instance(N)` 解析为
+  `("uiautomator", descriptor)` 复合描述符（单方法链保持 kit 单键 by 旧映射）；
+  支持转义引号参数；`.instance(` 出现在字符串参数内不再误读为位置约束；
+  `fromParent`/`childSelector`/未知方法/无约束裸 instance 仍拒绝。
+- `_pick_photo_tile` 改走 kit `find_element` 契约 + composite descriptor（删除
+  raw-u2 直驱绕过）；`_node_matches_selector`/`preferred_tap_rect`/
+  `clickable_ancestor_rect` 支持 descriptor 属性约束匹配（instance 在 dump 匹配
+  中忽略，位置语义由活体选择器解析）。
+- 死代码清理：`DianpingSelectors.rating_stars` 字段、`rating_star()`、
+  `rating_selector()`（旧定位方案，workflow 已改 label 锚定）删除；
+  `default_selectors()` 相应简化。
+
+#### R3：设备农场最小切入
+
+见 §12.13 Task 14 的 2026-11 补记（`scripts/live_parallel_smoke.py` 编排器 +
+探针 SERIAL env 化 + 设备注册表沉淀 vault；atxserver2/stf 缓触发）。
+
+#### 重启开发公共 API 变更清单（随 kit 0.6.0 发布）
+
+- `adapters.uia2`：`SUPPORTED_BY` 新增 `uiautomator`（dict descriptor 专用 by，
+  白名单 `resourceId/className/text/textContains/description/
+  descriptionContains/instance`）；字符串选择器 + `uiautomator` by typed 拒绝。
+- `automation_core.capabilities`：`CapabilityManifest.priority` 新字段；
+  `CapabilityRegistry.register` 新增 `name` 注册键参数；新增
+  `candidates()`；新增 `health` 模块（`ProviderHealthBook`/`HealthPolicy`/
+  `HealthSnapshot`）；`CapabilityResolver` 新增 `peek`/`supported_candidates`/
+  `resolve_candidate`/`probe`；executor `execute` 语义升级为多 provider 走查
+  故障转移（单 provider 行为不变）；新增错误类 `CapabilityProviderUnavailableError`。
+- `automation_runner`：`CapabilityPolicy.backoff_multiplier` 新字段（默认 1.0）；
+  runtime capability 解析接入 workflow metadata `platform`。
+- slidex（0.7.0）：新增 `SlidexManualCapability`（provider 名 `slidex-manual`，
+  manifest priority=-10）；`automation-kit` extra 范围扩展至 `<0.7.0`。
+- report schema v2 / flow schema v1 无变化。
+
 ## 13. 本轮已实现文件
 
 ### automation-kit
@@ -1628,6 +1667,24 @@ uia2 对等性）。三轨推进：uia2 对等性（composite 定位 + app 侧�
 - 修改两个 app 的 `tests/test_workflow.py`：证明新入口不直接依赖 Slidex 类型。
 
 上述生产行为均先写失败测试，再实现最小代码；仓库默认测试和跨仓兼容测试均已执行。
+
+### 重启开发 2026-11（§12.16）
+
+- automation-kit：修改 `adapters/uia2/session.py`（composite by）、
+  `automation_core/capabilities/{models,registry,resolver,executor,errors,__init__}.py`、
+  新增 `automation_core/capabilities/health.py`、修改
+  `automation_runner/{runtime,policies,yaml_loader}.py`；新增
+  `scripts/live_parallel_smoke.py`、修改 `scripts/live_probe_wave2.py`；测试新增
+  `tests/adapters/uia2/test_composite_selector.py`、`tests/capabilities/
+  test_health.py`、`tests/capabilities/test_provider_governance.py`、
+  `tests/runner/test_runtime_governance.py`、`tests/scripts/
+  test_live_parallel_smoke.py`。
+- slidex：修改 `slidex/integrations/automation_kit.py`（新增
+  `SlidexManualCapability`）、扩展 `tests/test_automation_kit_integration.py`
+  （含双 provider failover 门控证明）。
+- automation-app-dianping：修改 `automation_app_dianping/session.py`（翻译器
+  结构化升级 + 照片格选择改走 kit 契约）、`config.py`（死代码清理）、
+  `tests/test_drivers.py`、`tests/test_config.py`。
 
 ## 14. Agent 协作与合并规则
 
