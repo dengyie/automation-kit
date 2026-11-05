@@ -945,6 +945,20 @@ Slidex 顺延正是撞上这一点。此后每次编辑或提交前都重查分�
   未参测；恢复后以同脚本复测即可。
 - 不打 tag：publish 无凭据，上架保持可选定级。
 
+### 10.10 2026-11-06 复验基线（dump 前台覆盖加固迭代，§12.16 第三批）
+
+- 离线 645 项全绿；CI main 绿（`5f24857`）。
+- 云手机 2 复验：composite 探针 6/6 全绿（新增 `foreground.snapshot_alignment`
+  以元素级前台 evidence 断言——meta 对比是同义反复）；**wave2 scroll 段自愈**
+  （`scroll success: True`，1 次 swipe 命中「电池」——session 层守卫的直接证据）；
+  编排器 composite lane rc=0（run `cloudphones-20261106-v2`）。
+- 追加平台发现两个：① systemui 导航条亚秒级闪现/隐藏，overlay 节点不可作
+  instance 语义检查材料（探针候选已改为前台包优先、排除 systemui）；② 该 ROM
+  上 u2 `app_start` 静默失效而 shell `am start` 稳定，且 probe 自身 ref tap 会把
+  launcher 打进「批量整理」编辑态并抢回焦点（wave2 §5 先 HOME 退编辑态再 shell
+  启动，启动失败显式归因跳过）。
+- 云手机 1 仍离线（mesh 100% 丢包）。
+
 ## 11. 当前状态与差距
 
 ### 11.1 已实现
