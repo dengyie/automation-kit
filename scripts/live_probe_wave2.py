@@ -109,11 +109,29 @@ def main():
     section("5. scroll_into_view on Settings (text selector)")
     # Requirements: the tap in step 2 opened the system Settings app. If not
     # (e.g. the launcher icon was absent), open it via adb-safe app_start.
+    # A tap that long-pressed the launcher leaves it in batch-organize edit
+    # mode, which STEALS focus back from a freshly launched Settings on the
+    # Redroid cloud phone (observed 2026-11-06) — exit edit mode with HOME
+    # before launching, then verify the launch actually stuck instead of
+    # reporting a misleading "element not visible after N swipes".
     package_now = device.app_current().get("package")
     if package_now != "com.android.settings":
-        device.app_start("com.android.settings")
+        session.execute_action("press_home")
+        time.sleep(0.5)
+        # u2's app_start silently no-ops on this Redroid ROM (verified
+        # 2026-11-06: shell `am start` sticks, app_start does not), so the
+        # launch goes through shell directly.
+        device.shell("am start -n com.android.settings/.Settings")
         time.sleep(2.0)
         package_now = device.app_current().get("package")
+    if package_now != "com.android.settings":
+        print(
+            "scroll skipped: Settings did not come to foreground "
+            f"(front is {package_now}; ROM focus behavior)"
+        )
+        session.stop()
+        print("\nPROBE COMPLETE")
+        return
     print("current app:", package_now)
     scroll_result = session.execute_action(
         "scroll_into_view", by="text", selector="电池", direction="up", max_swipes=6
