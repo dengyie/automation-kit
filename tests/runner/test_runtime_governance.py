@@ -1,6 +1,7 @@
 """Runtime governance wiring: platform propagation and exponential backoff."""
 
 import asyncio
+import time
 
 import pytest
 
@@ -192,3 +193,51 @@ def test_yaml_loader_parses_backoff_multiplier():
 
     default_policy = _build_policy({"max_attempts": 2}, 0)
     assert default_policy.backoff_multiplier == 1.0
+
+
+def test_backoff_deadline_expiry_keeps_business_failure_code(monkeypatch):
+    """A deadline hit during backoff must not mask the business failure."""
+    from automation_core.capabilities import CapabilityResult
+
+    class FailThenDeadline(FakeProvider):
+        async def execute(self, request, context):
+            self.calls += 1
+            if self.calls == 1:
+                return CapabilityResult(
+                    success=False,
+                    provider="fake",
+                    error_code="risk_control_blocked",
+                    retryable=True,
+                )
+            # Deadline fires during backoff, so this second attempt never runs.
+            return CapabilityResult(success=True, provider="fake", data={})
+
+    provider = FailThenDeadline()
+    registry = CapabilityRegistry()
+    registry.register(provider)
+    executor = CapabilityExecutor(CapabilityResolver(registry))
+    # The generous backoff gets clamped to the remaining deadline, so the
+    # retry loop wakes up past the workflow deadline with a business failure
+    # already recorded. (deadline is a wall-clock epoch.)
+    runtime = WorkflowRuntime(
+        session_factory=lambda: FakeSession(),
+        capability_executor=executor,
+        workflow_name="smoke",
+        deadline=time.time() + 0.5,
+    )
+
+    result = asyncio.run(
+        runtime.arun(
+            [
+                capability_step(
+                    CapabilityPolicy(max_attempts=2, backoff=10.0)
+                )
+            ]
+        )
+    )
+
+    assert result.success is False
+    step = result.steps[0]
+    assert provider.calls == 1
+    assert step.error is not None
+    assert step.error.code == "risk_control_blocked"

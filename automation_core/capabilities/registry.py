@@ -42,7 +42,10 @@ class CapabilityRegistry:
         and doubles as the health-ledger key. Multiple providers may register
         under the same capability with distinct names (the multi-provider
         gate opens with a real second provider — development.md §11.3); the
-        same name may only be reused with ``replace=True``.
+        same name may only be reused with ``replace=True``. A replacement
+        re-enters resolution at the END of its priority group (insertion
+        order is reassigned), so replacing a provider deterministically
+        demotes it among equal-priority peers.
         """
         manifest = getattr(provider, "manifest", None)
         if not isinstance(manifest, CapabilityManifest):

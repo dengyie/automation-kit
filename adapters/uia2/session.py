@@ -68,6 +68,15 @@ def _normalize_uiautomator_descriptor(
             False,
             "unsupported uiautomator descriptor key(s): " + ", ".join(unknown),
         )
+    if not any(key != "instance" for key in selector):
+        # ``instance`` alone is positional against "everything" — meaningless
+        # as a lookup and silently wrong as a tap target; require at least
+        # one attribute constraint.
+        return None, ActionResult(
+            False,
+            "uiautomator descriptor requires at least one attribute "
+            "constraint besides 'instance'",
+        )
     descriptor: Dict[str, Any] = {}
     for key, value in selector.items():
         if key == "instance":
