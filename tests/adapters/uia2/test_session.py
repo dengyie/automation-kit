@@ -282,7 +282,8 @@ def test_wait_for_element_waits_until_lookup_reports_exists():
     assert result.data == "text=设置"
 
 
-def test_wait_for_element_rejects_unknown_by():
+def test_wait_for_element_rejects_string_selector_with_uiautomator_by():
+    """``uiautomator`` by is reserved for composite dict descriptors."""
     session, _ = make_session()
 
     result = session.execute_action(
@@ -290,7 +291,7 @@ def test_wait_for_element_rejects_unknown_by():
     )
 
     assert result.success is False
-    assert "unsupported by" in result.message
+    assert "descriptor dict" in result.message
 
 
 def test_wait_for_element_rejects_empty_selector():
