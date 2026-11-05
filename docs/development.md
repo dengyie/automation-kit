@@ -927,6 +927,24 @@ workflow 构建、测试、发布，再从包源安装自证。首次建议先 `
 Slidex 顺延正是撞上这一点。此后每次编辑或提交前都重查分支与远端 HEAD，一旦发现不是
 本次任务的在途改动就退出、不提交。
 
+### 10.9 2026-11-06 验证基线（backlog 根因修复 + 双云真机）
+
+- 离线：kit 638 项 / dianping 260 项 / slidex 779 项 / damai 57 项全绿；CI main 全绿
+  （kit `ebbfeed`、dianping `2e50453`、damai `b199eac`）。
+- 真机（云手机 2 `10.144.144.52:5555`，SM-F900F/Redroid）：
+  - `scripts/live_probe_composite.py` 5/5 全绿——composite descriptor 单键查找、
+    instance 语义（live 真值上探 + 越界 fail-closed）、`wait_for_element`、治理
+    failover（恒败 primary → 真实 session `semantic_snapshot` secondary，健康账本
+    断言）、编排器 `--uia2-probe composite --execute` 真机 lane rc=0。
+  - `live_probe_wave2.py` 基线 `PROBE COMPLETE`（scroll 段预期性失败：探针自身
+    press_home 后回到桌面找不到 Settings 文本——观察性设计，非回归）。
+  - **平台发现**：Redroid 云机 `dump_hierarchy` 窗口合并方向不定且与 live
+    UiSelector 的活动窗视野可完全不相交——探针候选发现已改为 semantic_snapshot
+    （与 live 同源），instance 检查只信 live 真值；该发现是本次真机测试的核心产出。
+- 云手机 1（`10.144.144.51:5555`）mesh 层 100% 丢包（Termux EasyTier 守护离线），
+  未参测；恢复后以同脚本复测即可。
+- 不打 tag：publish 无凭据，上架保持可选定级。
+
 ## 11. 当前状态与差距
 
 ### 11.1 已实现
