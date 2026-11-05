@@ -509,3 +509,126 @@ def test_semantic_snapshot_tolerates_bad_device_metadata():
     assert result.success is True
     assert "package_name" not in result.data
     assert "activity_name" not in result.data
+
+
+# --- foreground-coverage guard (cloud-phone dump flap, 2026-11-06) ----------
+
+# Raw fixture: unlike `_node`, the package attribute is com.android.systemui
+# so the dump carries NO foreground (com.example) evidence.
+SYSTEMUI_XML = (
+    "<hierarchy rotation=\"0\">"
+    '<node index="0" text="" resource-id="com.android.systemui:id/navigation_bar_frame" '
+    'class="android.widget.FrameLayout" package="com.android.systemui" '
+    'checkable="false" clickable="false" enabled="true" scrollable="false" '
+    'bounds="[0,2218][1080,2376]" />'
+    "</hierarchy>"
+)
+
+
+class OverlayThenForegroundDevice(FakeDevice):
+    """First dump is overlay-only (the observed Redroid flap), then good."""
+
+    def __init__(self, **kwargs):
+        super().__init__(hierarchy_result=SCREEN_XML, **kwargs)
+        self.dump_count = 0
+
+    def dump_hierarchy(self):
+        self.dump_count += 1
+        if self.dump_count == 1:
+            return SYSTEMUI_XML
+        return self.hierarchy_result
+
+
+class PersistentOverlayDevice(FakeDevice):
+    def __init__(self, **kwargs):
+        super().__init__(hierarchy_result=SYSTEMUI_XML, **kwargs)
+        self.dump_count = 0
+
+    def dump_hierarchy(self):
+        self.dump_count += 1
+        return SYSTEMUI_XML
+
+
+def test_snapshot_retries_until_foreground_dump_arrives(tmp_path):
+    device = OverlayThenForegroundDevice()
+    device.current_result = {"package": "com.example", "activity": ".Home"}
+    session = Uia2Session(device, artifact_root=tmp_path, snapshot_dump_interval=0.0)
+
+    result = session.execute_action("semantic_snapshot", refresh=True)
+
+    assert result.success is True
+    assert device.dump_count == 2, "the overlay-only dump must be retried"
+    # Elements come from the foreground dump (search EditText), not the
+    # systemui navigation bar.
+    assert any(
+        "search_src_text" in (e.get("resource_id") or "")
+        for e in result.data["elements"]
+    )
+
+
+def test_snapshot_degrades_after_exhausted_retries(tmp_path):
+    device = PersistentOverlayDevice()
+    device.current_result = {"package": "com.example", "activity": ".Home"}
+    session = Uia2Session(
+        device,
+        artifact_root=tmp_path,
+        snapshot_dump_attempts=3,
+        snapshot_dump_interval=0.0,
+    )
+
+    result = session.execute_action("semantic_snapshot", refresh=True)
+
+    # Graceful degradation: the overlay-only dump still distills.
+    assert result.success is True
+    assert device.dump_count == 3
+
+
+def test_snapshot_skips_validation_without_app_current(tmp_path):
+    """The app_current tolerance contract: no metadata -> no validation, a
+    single dump is taken even when it would look 'uncovered'."""
+    device = PersistentOverlayDevice()
+    device.current_result = None
+    session = Uia2Session(device, artifact_root=tmp_path, snapshot_dump_interval=0.0)
+
+    result = session.execute_action("semantic_snapshot", refresh=True)
+
+    assert result.success is True
+    assert device.dump_count == 1
+    assert "package_name" not in result.data
+
+
+def test_snapshot_attempts_one_disables_retry(tmp_path):
+    device = PersistentOverlayDevice()
+    device.current_result = {"package": "com.example", "activity": ".Home"}
+    session = Uia2Session(
+        device,
+        artifact_root=tmp_path,
+        snapshot_dump_attempts=1,
+        snapshot_dump_interval=0.0,
+    )
+
+    result = session.execute_action("semantic_snapshot", refresh=True)
+
+    assert result.success is True
+    assert device.dump_count == 1
+
+
+def test_session_factory_threads_dump_guard_params(tmp_path):
+    from adapters.uia2 import Uia2SessionFactory
+
+    device = PersistentOverlayDevice()
+    device.current_result = {"package": "com.example", "activity": ".Home"}
+    factory = Uia2SessionFactory(
+        lambda: device,
+        artifact_root=tmp_path,
+        snapshot_dump_attempts=2,
+        snapshot_dump_interval=0.0,
+    )
+    session = factory.create()
+
+    assert session.snapshot_dump_attempts == 2
+    assert session.snapshot_dump_interval == 0.0
+    result = session.execute_action("semantic_snapshot", refresh=True)
+
+    assert result.success is True
+    assert device.dump_count == 2

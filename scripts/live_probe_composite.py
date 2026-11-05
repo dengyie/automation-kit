@@ -81,6 +81,39 @@ def run_probe(device, serial: str) -> dict:
         {"name": "device.front_app", "ok": True, "detail": front_app}
     )
 
+    def c_foreground_alignment():
+        """Session-level foreground guard verification: the snapshot's
+        ELEMENTS must carry foreground evidence (resource_id prefixed with
+        the live package). Comparing package_name metadata would be
+        tautological — it echoes app_current; element evidence proves the
+        bounded dump retries actually landed a foreground-covered dump."""
+        current = getattr(device, "app_current", None)
+        live_package = None
+        if callable(current):
+            try:
+                info = current()
+                if isinstance(info, dict):
+                    live_package = info.get("package")
+            except Exception:
+                live_package = None
+        if not live_package:
+            return "unverifiable (app_current unavailable)"
+        snapshot = session.execute_action("semantic_snapshot", refresh=True)
+        assert snapshot.success, f"semantic snapshot failed: {snapshot.message}"
+        elements = snapshot.data.get("elements", [])
+        evidence = [
+            e.get("resource_id")
+            for e in elements
+            if (e.get("resource_id") or "").startswith(live_package + ":")
+        ]
+        assert evidence, (
+            f"snapshot lacks foreground evidence for {live_package} "
+            f"({len(elements)} elements) — dump flap survived the retries"
+        )
+        return f"aligned on {live_package} ({evidence[0]})"
+
+    check("foreground.snapshot_alignment", c_foreground_alignment)
+
     def snapshot_elements() -> List[Dict[str, Any]]:
         """Fresh semantic snapshot elements — SAME source as the live
         selector (the accessibility view), so candidate discovery never
