@@ -2,6 +2,24 @@
 
 已发布版本历史。架构与开发规范在 `docs/development.md`，本文件不承担规范职责。
 
+## 0.6.0
+
+重启开发三轨（见 `docs/development.md` §12.16）：publish uia2 对等性、provider
+运行治理、设备农场最小切入。公共 API 变更：
+
+- `adapters.uia2`：`SUPPORTED_BY` 新增 `uiautomator` composite descriptor by
+  （白名单多 kwarg dict，`instance` 位置约束）；快照域操作保持单键 by。
+- `automation_core.capabilities`：registry 支持同 capability 多个具名注册
+  （未命名注册保持单 provider 语义）；`CapabilityManifest` 新增 `priority`；
+  新增 `health.py`（`ProviderHealthBook`/`HealthPolicy`/`HealthSnapshot`，
+  注入时钟确定性状态机）；resolver 新增 `peek`/`supported_candidates`/
+  `resolve_candidate`/`probe`；executor 改为走查式故障转移（探针通过者依次
+  尝试，失败记健康账本，全 open 抛 `CapabilityProviderUnavailableError`）。
+- `automation_runner`：`CapabilityPolicy` 新增 `backoff_multiplier`（默认 1.0
+  保持固定退避）；runtime 将 workflow metadata 的 `platform` 传入能力解析。
+- `scripts/`：新增 `live_parallel_smoke.py`（双设备并行 smoke 编排器，
+  默认干跑）；`live_probe_wave2.py` 的 SERIAL 改 `AUTOMATION_UIA2_UDID` env。
+
 ## Unreleased
 
 发布能力与制品验收（见 `docs/development.md` §10.8）。纯发布工具链与测试，运行时行为、
