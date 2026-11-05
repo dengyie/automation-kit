@@ -317,3 +317,138 @@ def test_primary_recovery_after_cooldown_restores_priority_order():
 
     assert result.data == {"who": "slidex"}
     assert book.snapshot("slidex").state == "closed"
+
+
+# --- review fixes 2026-11: walk abort paths must not brick the breaker -------
+
+
+class CancelledProvider(StubProvider):
+    result_name = "slidex"
+
+    async def execute(self, request, context):
+        self.calls += 1
+        raise asyncio.CancelledError()
+
+
+class ProtocolErrorProvider(StubProvider):
+    result_name = "slidex"
+
+    async def execute(self, request, context):
+        self.calls += 1
+        from automation_core.capabilities import CapabilityProtocolError
+
+        raise CapabilityProtocolError("bad request shape")
+
+    def execution_profile(self, request):
+        return CapabilityExecutionProfile(cancellation="cooperative")
+
+
+class InvalidResultProvider(StubProvider):
+    result_name = "slidex"
+
+    async def execute(self, request, context):
+        self.calls += 1
+        return {"not": "a capability result"}
+
+
+def make_half_open_executor(primary):
+    """Primary breaker opened once, cooldown elapsed -> half_open grant."""
+    from tests.capabilities.test_health import FakeClock
+
+    clock = FakeClock()
+    book = ProviderHealthBook(
+        HealthPolicy(failure_threshold=1, cooldown_seconds=10.0), clock=clock
+    )
+    registry = CapabilityRegistry()
+    registry.register(primary, name="slidex")
+    registry.register(ManualProvider(make_manifest()), name="slidex-manual")
+    executor = CapabilityExecutor(CapabilityResolver(registry, health=book))
+    book.record_failure("slidex")
+    clock.advance(10.0)
+    return executor, book, clock
+
+
+def test_walk_cancelled_during_half_open_does_not_brick_primary():
+    executor, book, clock = make_half_open_executor(
+        CancelledProvider(make_manifest())
+    )
+
+    with pytest.raises(asyncio.CancelledError):
+        asyncio.run(executor.execute(make_request(), make_context()))
+
+    # The grant was released, so the half-open state grants a fresh probe
+    # immediately (no outcome was recorded, no cooldown restart).
+    assert book.probe("slidex") is True
+
+
+def test_walk_protocol_error_during_half_open_does_not_brick_primary():
+    executor, book, clock = make_half_open_executor(
+        ProtocolErrorProvider(make_manifest())
+    )
+
+    with pytest.raises(Exception, match="bad request shape"):
+        asyncio.run(executor.execute(make_request(), make_context()))
+
+    # Released grant: the half-open state hands out a fresh probe right away.
+    assert book.probe("slidex") is True
+
+
+def test_walk_invalid_result_during_half_open_does_not_brick_primary():
+    executor, book, clock = make_half_open_executor(
+        InvalidResultProvider(make_manifest())
+    )
+
+    with pytest.raises(Exception, match="CapabilityResult"):
+        asyncio.run(executor.execute(make_request(), make_context()))
+
+    clock.advance(10.0)
+    assert book.probe("slidex") is True
+
+
+def test_profile_validation_failure_does_not_consume_probe():
+    """Contract validation runs before the probe: no grant to release."""
+    from tests.capabilities.test_health import FakeClock
+
+    class BadProfileProvider(StubProvider):
+        result_name = "slidex"
+
+        def execution_profile(self, request):
+            return "not a profile"
+
+    clock = FakeClock()
+    book = ProviderHealthBook(
+        HealthPolicy(failure_threshold=1, cooldown_seconds=10.0), clock=clock
+    )
+    registry = CapabilityRegistry()
+    registry.register(BadProfileProvider(make_manifest()), name="slidex")
+    executor = CapabilityExecutor(CapabilityResolver(registry, health=book))
+    book.record_failure("slidex")
+    clock.advance(10.0)
+
+    with pytest.raises(Exception, match="execution_profile"):
+        asyncio.run(executor.execute(make_request(), make_context()))
+
+    # The breaker never left "open" (probe was not reached); once the cooldown
+    # elapses the provider is probeable again — nothing was latched.
+    assert book.snapshot("slidex").state == "open"
+    clock.advance(10.0)
+    assert book.probe("slidex") is True
+
+
+def test_peek_does_not_consume_health_probe():
+    from tests.capabilities.test_health import FakeClock
+
+    clock = FakeClock()
+    book = ProviderHealthBook(
+        HealthPolicy(failure_threshold=1, cooldown_seconds=10.0), clock=clock
+    )
+    registry = CapabilityRegistry()
+    registry.register(AutoProvider(make_manifest()), name="slidex")
+    resolver = CapabilityResolver(registry, health=book)
+    book.record_failure("slidex")
+    clock.advance(10.0)
+
+    # Advisory peek works while half-open and must not consume the single
+    # probe grant the actual execution relies on.
+    assert isinstance(resolver.peek(make_request()), AutoProvider)
+    assert resolver.probe("slidex") is True

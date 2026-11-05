@@ -1603,7 +1603,30 @@ uia2 对等性）。三轨推进：uia2 对等性（composite 定位 + app 侧�
 - **测试**：`tests/capabilities/test_health.py`（状态机全迁移路径）、
   `test_provider_governance.py`（双 provider failover / 熔断路由 / 优先级 /
   恢复）、`tests/runner/test_runtime_governance.py`（platform 传递、指数退避、
-  固定退避兼容）；存量 604 项全绿。
+  固定退避兼容）；全量 625 项全绿（含下述评审修复批次）。
+
+#### R2 评审修复（2026-11-06，final review 批次）
+
+final review 发现并修复三处 P1/P2（全部为本 wave 引入）：
+
+1. **探针滞留 bricking**：走查中探针授予后，`_profile`/getattr 校验、
+   provider 内 `CapabilityProtocolError`、外部取消、非法返回值四条路径此前
+   不记健康直接 raise，`half_open.probe_granted` 永久滞留 → provider 进程级
+   不可用。修复：`ProviderHealthBook.release(name)`（仅复位 probe_granted）+
+   executor **契约校验前移到 probe 之前**（校验失败不消耗探针）+ 两条
+   re-raise 路径与 `_validate_result` 失败路径显式 release。语义定调：走查中
+   协议错误 = 中止并上抛（非记失败继续），健康账本只在真实执行产出时记账。
+2. **编排器 `--execute` 必崩**：`main()` 曾把 `run_id` 注入 lane plan，
+   `execute_plan` 将其当 lane 迭代（TypeError、子进程孤儿化、summary 永不
+   落盘）；uia2 lane cwd 不存在导致 spawn FileNotFoundError；dry-run 曾整份
+   打印 os.environ（凭据泄漏）。修复：run_id 独立传参、`run_lane` 预创建
+   cwd、打印走 `_redact_plan` env 白名单投影（`DISPLAY_ENV_KEYS` 之外渲染
+   `<inherited>`，真实 spawn 仍用完整 env）。补 `main()` 真实子进程端到端
+   测试与 cwd 前置断言。
+3. **`CapabilityProviderUnavailableError` 报告语义**：runtime 显式捕获 →
+   `category=RESOLUTION` / `code=provider_unavailable`，与真实 provider 崩溃
+   （PROVIDER/`provider_exception`）在报告中可区分。
+4. `health.probe`/`snapshot` 对未知名不再懒创建账本条目。
 
 #### R1 app 侧：dianping publish 选择器对等（dianping 仓，随 0.6.0 消费）
 

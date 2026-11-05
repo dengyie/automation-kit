@@ -128,6 +128,38 @@ def aggregate(plan: Dict[str, Dict[str, Any]], results: Dict[str, Any]) -> Dict[
     }
 
 
+# Env keys that are safe (and useful) to show in the printed dry-run plan.
+# Everything else inherits the parent environment silently and is rendered as
+# "<inherited>" so wholesale os.environ content (tokens, credentials) never
+# lands in terminal or CI logs.
+DISPLAY_ENV_KEYS = (
+    "AUTOMATION_UIA2_UDID",
+    "AUTOMATION_PHONE_PLAYWRIGHT_UDID",
+    "DIANPING_LIVE_E2E",
+    "DIANPING_DRIVER",
+    "DIANPING_DEVICE_UDID",
+    "PYTHONPATH",
+    "PYTHONUNBUFFERED",
+)
+
+
+def _redact_env(env: Dict[str, str]) -> Dict[str, str]:
+    return {
+        key: (env[key] if key in DISPLAY_ENV_KEYS else "<inherited>")
+        for key in sorted(env)
+    }
+
+
+def _redact_plan(plan: Dict[str, Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+    return {
+        lane: {
+            **spec,
+            "env": _redact_env(spec.get("env", {})),
+        }
+        for lane, spec in plan.items()
+    }
+
+
 async def run_lane(
     lane: str,
     spec: Dict[str, Any],
@@ -135,9 +167,10 @@ async def run_lane(
     spawn: Optional[Callable[..., Any]] = None,
 ) -> Dict[str, Any]:
     """Spawn one lane subprocess, tee output to its log, return the outcome."""
-    import subprocess
-
     log_dir.mkdir(parents=True, exist_ok=True)
+    # The lane cwd doubles as its artifact root and does not exist yet for
+    # fresh run ids; CreateProcess fails hard on a missing cwd.
+    Path(spec["cwd"]).mkdir(parents=True, exist_ok=True)
     log_path = log_dir / f"{lane}.log"
     spec["env"].setdefault("PYTHONUNBUFFERED", "1")
     started = time.monotonic()
@@ -192,11 +225,18 @@ def main(argv=None) -> int:
         dianping_udid=args.dianping_udid,
         uia2_udid=args.uia2_udid,
     )
-    plan["run_id"] = args.run_id
     run_root = KIT_ROOT / "live_artifacts" / args.run_id
 
     if not args.execute:
-        print(json.dumps(plan, ensure_ascii=False, indent=2))
+        # Never print lane env wholesale: it inherits os.environ and would
+        # dump credentials to the terminal / CI log.
+        print(
+            json.dumps(
+                {"run_id": args.run_id, **_redact_plan(plan)},
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
         return 0
 
     summary = asyncio.run(execute_plan(plan, run_root))

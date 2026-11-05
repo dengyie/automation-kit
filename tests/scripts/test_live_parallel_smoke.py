@@ -148,3 +148,114 @@ def test_execute_plan_failure_surfaces_returncode(tmp_path):
 
     assert summary["ok"] is False
     assert summary["lanes"]["uia2"]["returncode"] == 3
+
+
+# --- review fixes 2026-11: main() E2E, cwd creation, env redaction ----------
+
+
+def test_run_lane_creates_missing_cwd(tmp_path):
+    """The uia2 lane cwd (live_artifacts/<run>/uia2) must be created pre-spawn."""
+    import asyncio
+
+    from scripts.live_parallel_smoke import run_lane
+
+    spec = {
+        "argv": ["echo", "hi"],
+        "cwd": str(tmp_path / "fresh" / "uia2"),
+        "env": {"PYTHONUNBUFFERED": "1"},
+    }
+
+    async def fake_spawn(*argv, cwd=None, env=None, stdout=None, stderr=None):
+        from pathlib import Path as _P
+
+        assert _P(cwd).is_dir(), "cwd must exist before spawn"
+        assert env["PYTHONUNBUFFERED"] == "1"
+
+        class Done:
+            returncode = 0
+
+            async def communicate(self):
+                return b"hi", b""
+
+        return Done()
+
+    outcome = asyncio.run(run_lane("uia2", spec, tmp_path / "logs", spawn=fake_spawn))
+
+    assert outcome["returncode"] == 0
+
+
+def test_main_dry_run_redacts_inherited_env(monkeypatch, tmp_path, capsys):
+    """Dry-run plan printing must never leak wholesale os.environ values."""
+    from scripts import live_parallel_smoke as mod
+
+    monkeypatch.setattr(
+        mod,
+        "build_lane_plan",
+        lambda *a, **k: {
+            "uia2": {
+                "argv": ["probe"],
+                "cwd": str(tmp_path / "uia2"),
+                "env": {
+                    "PATH": "c:/secret-path",
+                    "API_TOKEN": "super-secret",
+                    "AUTOMATION_UIA2_UDID": "10.144.144.52:5555",
+                },
+                "artifact_root": str(tmp_path / "uia2"),
+            }
+        },
+    )
+
+    rc = mod.main(["--run-id", "dryredact", "--uia2"])
+
+    assert rc == 0
+    out = capsys.readouterr().out
+    plan = json.loads(out)
+    assert plan["run_id"] == "dryredact"
+    env = plan["uia2"]["env"]
+    assert env["AUTOMATION_UIA2_UDID"] == "10.144.144.52:5555"
+    assert env["API_TOKEN"] == "<inherited>"
+    assert "super-secret" not in out
+    assert env["PATH"] == "<inherited>"
+
+
+def test_main_execute_runs_lanes_and_writes_summary(monkeypatch, tmp_path, capsys):
+    """main() end-to-end: lanes run, summary.json lands, exit code reflects ok."""
+    import sys
+
+    from scripts import live_parallel_smoke as mod
+
+    fake_repo = tmp_path / "dp"
+    fake_repo.mkdir()
+    kit_root = tmp_path / "kit"
+    scripts_dir = kit_root / "scripts"
+    scripts_dir.mkdir(parents=True)
+    # Harmless lane stand-in: main() must spawn the REAL subprocess machinery
+    # (cwd creation, teeing, summary) without touching adb/uiautomator2.
+    (scripts_dir / "live_probe_wave2.py").write_text(
+        "print('lane-ok')", encoding="utf-8"
+    )
+    monkeypatch.setattr(mod, "KIT_ROOT", kit_root)
+    monkeypatch.setattr(mod, "DEFAULT_DIANPING_REPO", fake_repo)
+    assert sys.executable  # real interpreter spawns the stand-in script
+
+    rc = mod.main(
+        [
+            "--run-id",
+            "e2e-run",
+            "--uia2",
+            "--uia2-udid",
+            "10.144.144.52:5555",
+            "--execute",
+        ]
+    )
+
+    assert rc == 0
+    summary = json.loads(capsys.readouterr().out)
+    assert summary["ok"] is True
+    assert set(summary["lanes"]) == {"uia2"}
+    written = json.loads(
+        (tmp_path / "kit" / "live_artifacts" / "e2e-run" / "summary.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert written["ok"] is True

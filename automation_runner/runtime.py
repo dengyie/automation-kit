@@ -11,6 +11,7 @@ from automation_core.capabilities.errors import (
     CapabilityNotFoundError,
     CapabilityOperationNotSupportedError,
     CapabilityRegistrationError,
+    CapabilityProviderUnavailableError,
 )
 from automation_core.drivers import ActionResult, ArtifactHandle, DriverSession
 from automation_core.execution import (
@@ -677,6 +678,21 @@ class WorkflowRuntime:
                 )
             except asyncio.CancelledError:
                 raise
+            except CapabilityProviderUnavailableError as exc:
+                # Every breaker open is a resolution-level condition, not a
+                # provider crash; keep it distinguishable in reports.
+                last_error = ExecutionFailure(
+                    category=FailureCategory.RESOLUTION,
+                    code="provider_unavailable",
+                    message=str(exc),
+                    retryable=False,
+                    source="runtime",
+                )
+                last_result = CapabilityResult(
+                    success=False,
+                    provider="runtime",
+                    error_code="provider_unavailable",
+                )
             except Exception as exc:
                 last_error = ExecutionFailure(
                     category=FailureCategory.PROVIDER,
