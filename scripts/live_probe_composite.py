@@ -81,21 +81,25 @@ def run_probe(device, serial: str) -> dict:
         {"name": "device.front_app", "ok": True, "detail": front_app}
     )
 
+    # Live foreground package (single source for candidate preference and
+    # the alignment check).
+    live_package_holder: Dict[str, Optional[str]] = {"package": None}
+    live_current = getattr(device, "app_current", None)
+    if callable(live_current):
+        try:
+            info = live_current()
+            if isinstance(info, dict):
+                live_package_holder["package"] = info.get("package")
+        except Exception:
+            pass
+
     def c_foreground_alignment():
         """Session-level foreground guard verification: the snapshot's
         ELEMENTS must carry foreground evidence (resource_id prefixed with
         the live package). Comparing package_name metadata would be
         tautological — it echoes app_current; element evidence proves the
         bounded dump retries actually landed a foreground-covered dump."""
-        current = getattr(device, "app_current", None)
-        live_package = None
-        if callable(current):
-            try:
-                info = current()
-                if isinstance(info, dict):
-                    live_package = info.get("package")
-            except Exception:
-                live_package = None
+        live_package = live_package_holder.get("package")
         if not live_package:
             return "unverifiable (app_current unavailable)"
         snapshot = session.execute_action("semantic_snapshot", refresh=True)
@@ -128,8 +132,10 @@ def run_probe(device, serial: str) -> dict:
         return list(outcome.data.get("elements", []))
 
     def pick_target(elements: List[Dict[str, Any]]):
-        """Resource-id with the most snapshot matches, tie-broken by first
-        document order (the snapshot's element order)."""
+        """Resource-id with the most snapshot matches, preferring the
+        foreground app's own ids and excluding systemui overlays — the
+        systemui nav bar flashes on/off at sub-second scale on this ROM, so
+        its nodes cannot carry instance-semantics checks."""
         counts: Dict[str, List[Dict[str, Any]]] = {}
         order: List[str] = []
         for element in elements:
@@ -142,8 +148,21 @@ def run_probe(device, serial: str) -> dict:
             counts[rid].append(element)
         if not counts:
             return None, []
-        rid = max(order, key=lambda key: len(counts[key]))
-        return counts[rid][0], counts[rid]
+        live_package = live_package_holder.get("package")
+        tiers = []
+        if live_package:
+            tiers.append(
+                [rid for rid in order if rid.startswith(live_package + ":")]
+            )
+        tiers.append(
+            [rid for rid in order if not rid.startswith("com.android.systemui")]
+        )
+        tiers.append(order)
+        for tier in tiers:
+            if tier:
+                rid = max(tier, key=lambda key: len(counts[key]))
+                return counts[rid][0], counts[rid]
+        return None, []
 
     # --- 1. composite descriptor ------------------------------------------------
     def c_descriptor_lookup():
@@ -167,9 +186,26 @@ def run_probe(device, serial: str) -> dict:
         instance(0) deterministic, each live instance resolvable, and an
         instance beyond the live count failing closed.
         """
-        target, matches = pick_target(snapshot_elements())
-        assert target is not None, "no resource-id node in current snapshot"
-        rid = target.get("resource_id")
+        rid = None
+        last_miss = "no attempt"
+        for attempt in range(2):
+            target, matches = pick_target(snapshot_elements())
+            if target is None:
+                last_miss = "no resource-id node in current snapshot"
+                continue
+            rid = target.get("resource_id")
+            probe = session.execute_action(
+                "element_bounds",
+                by="uiautomator",
+                selector={"resourceId": rid, "instance": 0},
+            )
+            if probe.success:
+                break
+            # The chosen rid can vanish between snapshot and query (systemui
+            # chrome hides itself); resync from a fresh snapshot once.
+            last_miss = f"instance(0) of {rid} failed: {probe.message}"
+            rid = None
+        assert rid is not None, last_miss
         # The snapshot is only used to PICK a candidate rid; the live side is
         # probed up to a ceiling instead of trusting any static count.
         probe_ceiling = max(len(matches), 32)
