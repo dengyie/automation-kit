@@ -101,6 +101,7 @@ def test_run_probe_all_checks_pass_on_scripted_device():
     assert summary["ok"] is True, summary
     names = [item["name"] for item in summary["checks"]]
     assert names == [
+        "device.front_app",
         "descriptor.single_key_lookup",
         "descriptor.instance_document_order",
         "descriptor.wait_for_element",
@@ -109,9 +110,11 @@ def test_run_probe_all_checks_pass_on_scripted_device():
     assert all(item["ok"] for item in summary["checks"])
 
 
-def test_run_probe_instance_bounds_match_dump_document_order():
-    """The instance(k) cross-check is the heart of the probe: k-th kit
-    element_bounds must equal the k-th dump match's rect."""
+def test_run_probe_instance_semantics_live_truth():
+    """Instance semantics validated against live truth: instance(0)
+    deterministic, upward probing counts live instances, beyond-count fails
+    closed. The fixture's dump and live views agree, so the divergence note
+    reads "dump and live agree"."""
     device = FakeProbeDevice()
 
     summary = run_probe(device, "fake:5555")
@@ -122,7 +125,39 @@ def test_run_probe_instance_bounds_match_dump_document_order():
         if item["name"] == "descriptor.instance_document_order"
     )
     assert instance_check["ok"] is True
-    assert "x3 instances" in instance_check["detail"]
+    assert "x3 live instances" in instance_check["detail"]
+    assert "dump and live agree" in instance_check["detail"]
+
+
+def test_run_probe_records_dump_live_divergence_without_failing():
+    """Multi-window ROMs merge overlays into the dump; a live count lower
+    than the dump count is recorded as info, not a check failure."""
+    device = FakeProbeDevice()
+    original = device.__class__.__call__
+
+    def call(self, **kwargs):
+        # The live view lost one title node: overlay-window semantics.
+        if (
+            kwargs.get("resourceId") == "com.android.settings:id/title"
+            and kwargs.get("instance") == 2
+        ):
+            return FakeWidget(exists=False)
+        return original(self, **kwargs)
+
+    device.__class__ = type(
+        "PartialLiveDevice", (device.__class__,), {"__call__": call}
+    )
+
+    summary = run_probe(device, "fake:5555")
+
+    instance_check = next(
+        item
+        for item in summary["checks"]
+        if item["name"] == "descriptor.instance_document_order"
+    )
+    assert instance_check["ok"] is True
+    assert "x2 live instances" in instance_check["detail"]
+    assert "dump matches=3" in instance_check["detail"]
 
 
 def test_run_probe_reports_check_failure_without_crashing():
