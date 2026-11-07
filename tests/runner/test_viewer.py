@@ -235,3 +235,165 @@ def test_cli_report_view_errors(tmp_path, capsys):
     good_json = tmp_path / "not-report.json"
     good_json.write_text('{"hello": 1}', encoding="utf-8")
     assert cli.main(["report-view", str(good_json)]) == 2
+
+
+# --- round-2 gap tests: OSError resilience + template contract --------------------
+
+
+def test_resolve_skips_unresolvable_candidates(tmp_path, monkeypatch):
+    """_resolve_artifact_path tolerates resolve() OSError on any candidate
+    and falls through to the next candidate."""
+    from automation_runner.viewer import _resolve_artifact_path
+
+    target = tmp_path / "ok.txt"
+    target.write_text("x", encoding="utf-8")
+
+    real_resolve = Path.resolve
+
+    def flaky_resolve(self, *args, **kwargs):
+        if self.name == "bad.txt":
+            raise OSError("permission denied")
+        return real_resolve(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "resolve", flaky_resolve)
+
+    resolved = _resolve_artifact_path("bad.txt", artifact_root=None)
+    assert resolved is None
+
+    resolved = _resolve_artifact_path("ok.txt", artifact_root=tmp_path)
+    assert resolved == target.resolve()
+
+
+def test_within_root_oserror_marks_external(tmp_path, monkeypatch):
+    """An OSError while resolving the artifact root containment check
+    degrades to state=external (fail-closed, no embed)."""
+    from automation_runner.viewer import _artifact_entry
+
+    img = tmp_path / "shot.png"
+    img.write_bytes(PNG_BYTES)
+
+    real_resolve = Path.resolve
+
+    def flaky_resolve(self, *args, **kwargs):
+        # Second resolve call (containment check) fails.
+        if flaky_resolve.calls >= 1:
+            raise OSError("root vanished")
+        flaky_resolve.calls += 1
+        return real_resolve(self, *args, **kwargs)
+
+    flaky_resolve.calls = 0
+    monkeypatch.setattr(Path, "resolve", flaky_resolve)
+
+    prepared = _artifact_entry(
+        {"artifact_type": "screenshot", "path": str(img)}, tmp_path
+    )
+    assert prepared["state"] == "external"
+
+
+def test_artifact_read_oserror_keeps_missing_state(tmp_path, monkeypatch):
+    """A text artifact that exists but raises OSError on read stays in the
+    default missing state (no embed, no crash)."""
+    from automation_runner.viewer import _artifact_entry
+
+    note = tmp_path / "note.md"
+    note.write_text("content", encoding="utf-8")
+
+    def exploding_read_text(self, *args, **kwargs):
+        raise OSError("file locked")
+
+    monkeypatch.setattr(Path, "read_text", exploding_read_text)
+
+    prepared = _artifact_entry(
+        {"artifact_type": "log", "path": str(note)}, tmp_path
+    )
+    assert prepared["embedded"] is False
+    assert prepared["text_content"] is None
+
+
+def test_image_read_oserror_keeps_missing_state(tmp_path, monkeypatch):
+    from automation_runner.viewer import _artifact_entry
+
+    img = tmp_path / "shot.png"
+    img.write_bytes(PNG_BYTES)
+
+    def exploding_read_bytes(self, *args, **kwargs):
+        raise OSError("device gone")
+
+    monkeypatch.setattr(Path, "read_bytes", exploding_read_bytes)
+
+    prepared = _artifact_entry(
+        {"artifact_type": "screenshot", "path": str(img)}, tmp_path
+    )
+    assert prepared["embedded"] is False
+    assert prepared["data_uri"] is None
+
+
+def test_render_missing_template_placeholder_raises():
+    from automation_runner import viewer as viewer_module
+
+    report = {"schema_version": "2", "steps": [], "context": {}}
+
+    real_read_text = viewer_module.resources.read_text
+
+    def template_without_placeholder(*args, **kwargs):
+        return "no placeholder here"
+
+    viewer_module.resources.read_text = template_without_placeholder
+    try:
+        with pytest.raises(ViewerError, match="missing the data placeholder"):
+            viewer_module.render_report_html(report)
+    finally:
+        viewer_module.resources.read_text = real_read_text
+
+
+def test_default_output_path_pairs_with_report():
+    from automation_runner.viewer import default_output_path
+
+    assert default_output_path("reports/run.json").name == "run.viewer.html"
+
+
+def test_load_report_missing_file_and_bad_json(tmp_path):
+    with pytest.raises(ViewerError, match="could not read report file"):
+        load_report(str(tmp_path / "nope.json"))
+
+    bad = tmp_path / "bad.json"
+    bad.write_text("{not json", encoding="utf-8")
+    with pytest.raises(ViewerError, match="not valid JSON"):
+        load_report(str(bad))
+
+
+def test_prepare_report_skips_non_dict_entries():
+    report = {
+        "schema_version": "2",
+        "context": {"run_id": "r"},
+        "steps": ["not-a-dict", {"step_id": "s1", "step_name": "open"}],
+        "artifacts": ["not-a-dict", {"artifact_type": "shot", "path": "x.png"}],
+        "events": [],
+        "providers": [],
+    }
+    prepared = prepare_report(report)
+    assert [s["step_id"] for s in prepared["steps"]] == ["s1"]
+    # Non-dict artifact entries are skipped; the dict entry survives as a
+    # state=missing artifact (file x.png does not exist here).
+    assert [a["state"] for a in prepared["artifacts"]] == ["missing"]
+
+
+def test_render_report_html_missing_template_resource_raises():
+    """Template resource missing (FileNotFoundError branch) → ViewerError."""
+    from automation_runner import viewer as viewer_module
+    from importlib import resources as real_resources
+
+    missing = viewer_module.TEMPLATE_RESOURCE
+
+    def raising_read_text(package, resource, *args, **kwargs):
+        if resource == missing:
+            raise FileNotFoundError(resource)
+        return real_resources.read_text(package, resource, *args, **kwargs)
+
+    original = viewer_module.resources.read_text
+    viewer_module.resources.read_text = raising_read_text
+    try:
+        with pytest.raises(ViewerError, match="template resource is missing"):
+            viewer_module.render_report_html({"steps": []})
+    finally:
+        viewer_module.resources.read_text = original
