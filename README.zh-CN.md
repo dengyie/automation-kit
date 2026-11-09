@@ -10,7 +10,7 @@
 [![Architecture](https://img.shields.io/badge/Architecture-Core_%26_Runner_Decoupled-orange.svg?style=flat-square)](automation_core/)
 [![Drivers](https://img.shields.io/badge/Drivers-Selenium_%7C_Appium_%7C_UIAutomator2-blue.svg?style=flat-square)](adapters/)
 [![Ecosystem](https://img.shields.io/badge/Ecosystem-Slidex_Visual_Integration-purple.svg?style=flat-square)](https://github.com/dengyie/slidex)
-[![Tests](https://img.shields.io/badge/tests-310%20passed-brightgreen.svg?style=flat-square)]()
+[![Tests](https://img.shields.io/badge/tests-932%20passed-brightgreen.svg?style=flat-square)]()
 
 [English](./README.md) · [简体中文](./README.zh-CN.md) · [核心特性](#核心特性) · [系统架构](#系统架构全景) · [能力平台](#能力平台架构) · [工作流编排](#工作流结构与-runner-cli) · [生态拓扑](#生态拓扑与协同项目)
 
