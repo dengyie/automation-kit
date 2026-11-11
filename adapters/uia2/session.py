@@ -37,6 +37,26 @@ SUPPORTED_BY: Dict[str, str] = {
 
 _REF_ALIASES = ("ref", "compact")
 
+
+def _same_ref_target(issued: ScreenElement, target: ScreenElement) -> bool:
+    """Whether two snapshots' elements carrying the same ref are one node.
+
+    A ``resource-id`` is the strongest identity signal (stable across
+    re-dumps of the same screen). When either side carries one, both must
+    carry the same one -- a node that gained or lost its id cannot be
+    verified. Nodes without any id fall back to role/text/bounds
+    equality, which is exact for static chrome but deliberately rejects
+    dynamic content: a clock widget whose text changed between dumps is a
+    different observation, not the same target.
+    """
+    if issued.resource_id or target.resource_id:
+        return bool(issued.resource_id) and issued.resource_id == target.resource_id
+    return (
+        issued.role == target.role
+        and issued.text == target.text
+        and issued.bounds == target.bounds
+    )
+
 # Whitelisted kwargs for the composite ``uiautomator`` descriptor, mirroring
 # the native UiSelector method set a caller may combine
 # (``new UiSelector().resourceId(...).instance(N)``). Keys are the native
@@ -150,6 +170,13 @@ class Uia2Session:
         self.snapshot_dump_interval = max(0.0, float(snapshot_dump_interval))
         self._snapshot: Optional[ScreenSnapshot] = None
         self._snapshot_at: float = -1.0
+        # Refs are positional: "@3" names one specific node of one specific
+        # dump. A later dump may number a DIFFERENT node "@3", so the
+        # snapshot that handed the refs out is remembered. When the warm
+        # cache expires, the ref is re-validated against the fresh dump
+        # (see ``_resolve_ref``) instead of silently rebinding to whatever
+        # now sits at that index.
+        self._issued_snapshot: Optional[ScreenSnapshot] = None
         self._started = False
 
     def start(self) -> None:
@@ -477,7 +504,8 @@ class Uia2Session:
         snapshot, error = self._snapshot_for_refs()
         if error is not None:
             return None, error
-        element = snapshot.element(int(ref_text))
+        ref_number = int(ref_text)
+        element = snapshot.element(ref_number)
         if element is None:
             count = len(snapshot.interactable())
             return None, ActionResult(
@@ -485,6 +513,9 @@ class Uia2Session:
                 f"ref @{ref_text} not in current snapshot "
                 f"({count} interactable elements)",
             )
+        stale = self._stale_ref_error(ref_number, element, snapshot)
+        if stale is not None:
+            return None, stale
         dispatch_click = self._coordinate_dispatcher()
         if dispatch_click is None:
             return None, ActionResult(False, "driver does not support coordinate taps")
@@ -495,6 +526,74 @@ class Uia2Session:
             clear_text=getattr(self.driver, "clear_text", None),
             viewport=(snapshot.viewport_width, snapshot.viewport_height),
         ), None
+
+    def _stale_ref_error(
+        self,
+        ref_number: int,
+        element: ScreenElement,
+        current: ScreenSnapshot,
+    ) -> Optional[ActionResult]:
+        """Fail closed when a ref now denotes a different node.
+
+        Refs are positional within one dump: after the warm cache expires
+        the fresh dump renumbers the screen, so ``@3`` may name an
+        unrelated node. The snapshot that handed the refs out is kept, and
+        the ref is only accepted when the fresh dump still describes the
+        same node. Otherwise the action fails instead of tapping an
+        unrelated target -- a mis-tap on the wrong node is worse than a
+        failed step.
+
+        Identity rules, strongest first:
+
+        1. same ``resource-id`` -- the node is provably the same widget;
+        2. same role + text, and that pair is unique among the current
+           snapshot's interactable elements -- the node is the same widget
+           that merely moved (a scrolled list row keeps its text);
+        3. anything else -- the ref is stale.
+        """
+        issued = self._issued_snapshot
+        if issued is None or issued is current:
+            return None
+        issued_element = issued.element(ref_number)
+        if issued_element is None:
+            return ActionResult(
+                False,
+                f"ref @{ref_number} is stale: it was never issued by the "
+                "current observation",
+            )
+        if (
+            issued.package_name
+            and current.package_name
+            and issued.package_name != current.package_name
+        ):
+            # Another app is in the foreground: the ref cannot still name
+            # the node it was issued for, whatever the numbering says.
+            return ActionResult(
+                False,
+                f"ref @{ref_number} is stale: the foreground app changed "
+                f"({issued.package_name} -> {current.package_name}); "
+                "re-observe with semantic_snapshot",
+            )
+        if _same_ref_target(issued_element, element):
+            return None
+        if not issued_element.resource_id and not element.resource_id:
+            matches = [
+                candidate
+                for candidate in current.interactable()
+                if candidate.role == issued_element.role
+                and candidate.text == issued_element.text
+            ]
+            if len(matches) == 1:
+                # Same role + text, unique in the current snapshot: the
+                # node moved (scrolled) but is still the same target.
+                return None
+        return ActionResult(
+            False,
+            f"ref @{ref_number} is stale: the screen changed since it was "
+            f"issued (was {issued_element.role!r} "
+            f"{issued_element.text[:32]!r}, now {element.role!r} "
+            f"{element.text[:32]!r}); re-observe with semantic_snapshot",
+        )
 
     def _coordinate_dispatcher(self) -> Optional[Callable[[int, int], Any]]:
         click = getattr(self.driver, "click", None) or getattr(self.driver, "tap", None)
@@ -598,6 +697,9 @@ class Uia2Session:
         if error is not None:
             return error
         assert snapshot is not None
+        # This snapshot's refs are handed to the caller, so it becomes the
+        # issuer every later ref is validated against.
+        self._issued_snapshot = snapshot
         data = snapshot.to_dict()
         data["markdown"] = snapshot.to_markdown()
         return ActionResult(success=True, message="semantic_snapshot", data=data)
@@ -645,6 +747,11 @@ class Uia2Session:
             assert snapshot is not None
             match = self._match_in_snapshot(snapshot, selector, resolved_by)
             if match is not None:
+                # The ref in the result is handed to the caller, so this
+                # snapshot becomes the issuer its staleness is judged
+                # against (the scroll replaced the screen the previous
+                # observation described).
+                self._issued_snapshot = snapshot
                 return ActionResult(
                     success=True,
                     message="scroll_into_view",

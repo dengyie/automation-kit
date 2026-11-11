@@ -34,6 +34,17 @@
 - `scripts/live_probe_composite.py`：新增 `foreground.snapshot_alignment` 硬断言
   （快照元素必须携带前台包 evidence，meta 对比是同义反复）。
 
+真机迭代（2026-11-11 云机复验发现，见总纲 §10.10）：`@N` ref 是**位置**引用——
+一份 dump 里发出的 `@3` 在下一份 dump 里可能指向完全不同的节点。
+
+- `adapters.uia2`：ref 陈旧守卫。发出 ref 的快照被记为该 ref 的「签发方」
+  （`_issued_snapshot`）；温缓存过期后重解析 ref 时，新 dump 必须仍描述同一个
+  节点才放行，否则动作**确定性失败**（`ref @N is stale: ...`），不再静默改指他物。
+  同一节点判定：相同 `resource-id` > 相同 role+text 且当前快照内唯一（滚动位移）；
+  前台包已变则直接判陈旧（跨应用必然换了节点）。`semantic_snapshot` 与
+  `scroll_into_view` 返回的 ref 会把自己设为签发方，observation→action 与
+  scroll→tap 流程不受影响。
+
 发布能力与制品验收（见 `docs/development.md` §10.8）。纯发布工具链与测试，运行时行为、
 公共接口、report schema v2 与 flow schema v1 均无变化。
 

@@ -959,6 +959,23 @@ Slidex 顺延正是撞上这一点。此后每次编辑或提交前都重查分�
   启动，启动失败显式归因跳过）。
 - 云手机 1 仍离线（mesh 100% 丢包）。
 
+### 10.11 2026-11-11 复验基线（ref 陈旧守卫迭代，§12.16 第四批）
+
+- 设备面：**两台云机均已在线**（`.51` cloudphone-1 / `.52` cloudphone-2，serial
+  认机口径见 vault 设备池注册表）；OnePlus 7T（`.53`）本轮不可达（adb 10060），
+  点评真机腿顺延。
+- 复验（**云机 1 与 2 双跑**）：composite 探针 **6/6 全绿**（含
+  `foreground.snapshot_alignment` 以元素级前台 evidence 断言）；wave2 探针两机均
+  `scroll success: True`（`.51` 1 次 swipe 命中「电池」，`.52` 0 次 swipe 直达
+  可见区），**scroll 段自愈** 复现。
+- 复验同时暴露平台级隐患（**P1，已修复**）：`@N` ref 是位置引用，一份 dump 发出的
+  `@1` 在下一份 dump 可能指向完全不同的节点。真机证据：Settings 搜索框 `@1` →
+  回桌面后 `element_bounds @1` 报成功却返回桌面时钟挂件矩形（827x1792），
+  **动作静默打到别的节点**。修复见 §12.16 第四批（`_issued_snapshot` 签发方 +
+  `_stale_ref_error` fail-closed）；真机复验：同一场景 `tap`/`element_bounds` 均
+  报 `ref @1 is stale: the screen changed since it was issued ...`。
+- 离线：kit 全量 **941 passed**、覆盖率 97.92%（门禁 ≥80%）。
+
 ## 11. 当前状态与差距
 
 ### 11.1 已实现
@@ -1690,6 +1707,26 @@ final review 发现并修复三处 P1/P2（全部为本 wave 引入）：
   成功才写缓存、ref 编号绑定单次 (dump, snapshot) 对的不变式保持。
 - composite 探针新增 `foreground.snapshot_alignment` 硬断言：快照元素必须携带
   前台包 evidence（meta 对比是同义反复）。
+
+#### R2 真机迭代批次（2026-11-11 第四批：ref 陈旧守卫）
+
+云机复验（§10.10）暴露平台级隐患：`@N` ref 是**位置**引用，一份 dump 里发出的
+`@3` 在下一份 dump 里可能指向完全不同的节点。真机证据（云手机 2，SM-F900F）：
+Settings 搜索框 `@1` → 回桌面后 `element_bounds @1` 报成功，返回的是桌面时钟挂件
+的矩形（`{'x': 0, 'y': 0, 'width': 827, 'height': 1792}`）——**动作静默打到了另一个
+节点**。误点击另一个节点比动作失败更危险（点评链路上可能落到相册私图格）。
+
+平台层根因修复（不是探针绕行）：
+
+- `_issued_snapshot`：发出 ref 的快照被记为该 ref 的「签发方」。
+- `_stale_ref_error`：温缓存过期后重解析 ref 时，新 dump 必须仍描述同一节点才
+  放行，否则动作**确定性失败**（`ref @N is stale: ...; re-observe with
+  semantic_snapshot`）。同一节点判定优先级：相同 `resource-id` > 相同 role+text
+  且在当前快照内唯一（滚动位移的列表行仍算同一节点）；前台包已变则直接判陈旧
+  （跨应用必然换了节点）。
+- 签发方随 `semantic_snapshot` / `scroll_into_view` 返回的 ref 更新，故
+  observation→action 与 scroll→tap 两条既有流程不受影响；从未被观察发出过的
+  ref 仍按「当前 dump 的第 N 个」解释（`find_element` 契约依赖）。
 
 #### R1 app 侧：dianping publish 选择器对等（dianping 仓，随 0.6.0 消费）
 
