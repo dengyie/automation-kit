@@ -1783,9 +1783,15 @@ shell 报文有概率性 ~60s 卡顿。适配器两条热路径裸调用直接�
 - 双构造器新参数 `foreground_shell_query: bool = True`。`_foreground_app` 在
   `app_current` 之前优先走 shell 快路径（仅当 driver 暴露 callable `shell`；
   离线 fake 均无 `shell`，既有测试零影响）：①
-  `dumpsys window windows | grep mCurrentFocus` → ②
-  `dumpsys activity activities | grep mResumedActivity`，响应 <1KB。正则
+  `dumpsys window | grep mCurrentFocus` → ②
+  `dumpsys activity activities | grep ResumedActivity`，响应 <1KB。正则
   口径镜像 adbutils `shell.py` 的 `mCurrentFocus`/`mResumedActivity` 解析。
+  **真机形状勘误（复验首跑发现）**：该 Redroid ROM 的 `dumpsys window
+  windows` 里根本没有 `mCurrentFocus`（adbutils 第一步恒落空——这正是它总
+  落到 140KB `activity top` 的机制），真值在裸 `dumpsys window`；activity
+  侧字段拼法是 `ResumedActivity:`（无 `m` 前缀），adbutils 的
+  `mResumedActivity:` 正则同样落空。故命令选裸 `dumpsys window`、正则兼容
+  两种拼法（双机实测 grep 后 86/106B + 170/248B）。
 - 返回形状容忍两种：u2 `ShellResponse(output, returncode)`（取 `.output`）与
   adbutils 裸 `str`（`_shell_output` 归一）。
 - 兜底语义二分：**守卫超时** → 记 `_stall_events`（`op="app_current_shell"`）并

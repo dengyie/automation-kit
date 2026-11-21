@@ -172,12 +172,16 @@ def _call_with_timeout(
 
 # Foreground parsing mirrors the regexes adbutils ``app_current`` uses
 # (adbutils/shell.py), applied to the device-side grep output instead of
-# the full dumpsys payload.
+# the full dumpsys payload. ``_RESUMED_ACTIVITY_RE`` accepts both the
+# ``mResumedActivity:`` spelling (stock Android) and the bare
+# ``ResumedActivity:`` one observed on the Redroid cloud-phone ROM
+# (2026-11-21: adbutils' own first two steps come up empty there, which
+# is why it always reaches the 140KB ``activity top`` fallback).
 _CURRENT_FOCUS_RE = re.compile(
     r"mCurrentFocus=Window\{.*\s+(?P<package>[^\s]+)/(?P<activity>[^\s}]+)\}"
 )
 _RESUMED_ACTIVITY_RE = re.compile(
-    r"mResumedActivity: ActivityRecord\{.*?\s+(?P<package>[^\s]+)/(?P<activity>[^\s}]+)"
+    r"[m]?ResumedActivity: ActivityRecord\{.*?\s+(?P<package>[^\s]+)/(?P<activity>[^\s}]+)"
 )
 
 
@@ -813,7 +817,7 @@ class Uia2Session:
         worth the retry.
         """
         focused, error = _call_with_timeout(
-            lambda: _shell_output(shell("dumpsys window windows | grep mCurrentFocus")),
+            lambda: _shell_output(shell("dumpsys window | grep mCurrentFocus")),
             self.driver_call_timeout,
         )
         if error is not None:
@@ -829,7 +833,7 @@ class Uia2Session:
             if match:
                 return match.group("package"), match.group("activity"), False
         resumed, error = _call_with_timeout(
-            lambda: _shell_output(shell("dumpsys activity activities | grep mResumedActivity")),
+            lambda: _shell_output(shell("dumpsys activity activities | grep ResumedActivity")),
             self.driver_call_timeout,
         )
         if error is not None:

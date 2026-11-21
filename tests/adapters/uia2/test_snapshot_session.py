@@ -808,7 +808,7 @@ def test_shell_fast_path_resolves_foreground_without_app_current(tmp_path):
     result = session.execute_action("semantic_snapshot", refresh=True)
 
     assert result.success is True
-    assert device.shell_commands == ["dumpsys window windows | grep mCurrentFocus"]
+    assert device.shell_commands == ["dumpsys window | grep mCurrentFocus"]
     assert device.app_current_calls == 0
     assert result.data.get("package_name") == "com.example"
     assert session._stall_events == []
@@ -816,7 +816,7 @@ def test_shell_fast_path_resolves_foreground_without_app_current(tmp_path):
 
 def test_shell_fast_path_falls_back_to_resumed_activity(tmp_path):
     device = ShellFastPathDevice(
-        responses={"mResumedActivity": ShellOutput(RESUMED_LINE)}
+        responses={"ResumedActivity": ShellOutput(RESUMED_LINE)}
     )
     session = Uia2Session(device, artifact_root=tmp_path)
 
@@ -825,7 +825,7 @@ def test_shell_fast_path_falls_back_to_resumed_activity(tmp_path):
     assert result.success is True
     assert len(device.shell_commands) == 2
     assert device.shell_commands[1] == (
-        "dumpsys activity activities | grep mResumedActivity"
+        "dumpsys activity activities | grep ResumedActivity"
     )
     assert device.app_current_calls == 0
     assert result.data.get("package_name") == "com.example"
