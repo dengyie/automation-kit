@@ -22,6 +22,15 @@
 
 ## Unreleased
 
+真机迭代（2026-11-22 第八批，见总纲 §12.16）：第七批合入后的 review 收尾。
+
+- `adapters.uia2`：`_write_hierarchy` 守卫超时现在记 `_stall_events`
+  （`op="dump_artifact"`）——与 `_capture_snapshot` 的 dump stall 观测面
+  对齐，`transport.stall_health` 可见 artifact 捕获中的传输卡顿。
+- 纯测试/文档收尾：`_dump_kwargs` docstring 精确化（探测点事实）、factory
+  穿透测试升级为行为断言、+1 stall 记录回归测试。RPC 隧道卡顿特征化结论
+  （延迟非丢数据、拒连=u2 server 冷态自愈）记入总纲，深挖项关闭。
+
 真机迭代（2026-11-22 第七批，见总纲 §12.16）：第六批后最后一条大报文热路径是
 `dump_hierarchy`（Settings 页固定 74KB，1/12 概率 >60s 卡顿）。真机实验表明
 本 ROM u2.jar 的服务端压缩参数是 no-op、60s 卡顿在 adb transport 层（JSON-RPC
