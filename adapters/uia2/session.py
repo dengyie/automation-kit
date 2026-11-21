@@ -1,5 +1,7 @@
+import threading
 import time
 from pathlib import Path
+from queue import Empty, Queue
 from typing import Any, Callable, Dict, Optional, Tuple
 
 from adapters.errors import AdapterArtifactError, AdapterStartupError
@@ -119,6 +121,53 @@ _SNAPSHOT_MATCH_ALIASES = ("text", "description", "text-contains", "description-
 
 DEFAULT_SNAPSHOT_TTL = 1.0
 
+# Wall-clock cap for a single driver call (``dump_hierarchy`` /
+# ``app_current``). Samsung cloud phones over adb TCP randomly stall
+# responses larger than ~30KB for exactly a socket-read-timeout (~60s):
+# a Settings page dump is a fixed 74KB and measured 1-in-12 snapshots
+# exceeded 60s. A timed-out adb call is idempotent and will resolve on
+# its own, so the abandoned worker thread is left alone (Python cannot
+# safely kill threads) and the caller retries.
+DEFAULT_DRIVER_CALL_TIMEOUT = 12.0
+
+
+def _call_with_timeout(
+    fn: Callable[[], Any],
+    timeout_seconds: float,
+) -> Tuple[Any, Optional[str]]:
+    """Run one driver call under a wall-clock cap.
+
+    Returns ``(value, None)`` on success, ``(None, error_message)`` when
+    the call raised or exceeded ``timeout_seconds``. Raised exceptions
+    keep their original ``str(exc)`` text (call sites already prefix
+    context); timeouts report "timed out after {t}s". A non-positive
+    timeout disables the cap and calls ``fn`` synchronously (the legacy
+    behavior, kept as an escape hatch). The worker is a daemon thread:
+    a timed-out adb call keeps running there (idempotent, will resolve
+    or die on its own) and cannot block interpreter exit, unlike a
+    ``ThreadPoolExecutor`` whose non-daemon workers are joined at exit.
+    """
+    if timeout_seconds is None or timeout_seconds <= 0:
+        try:
+            return fn(), None
+        except Exception as exc:
+            return None, str(exc)
+
+    result: Queue = Queue(maxsize=1)
+
+    def _worker() -> None:
+        try:
+            result.put((fn(), None))
+        except BaseException as exc:  # noqa: BLE001 - reported, never raised
+            result.put((None, str(exc)))
+
+    thread = threading.Thread(target=_worker, daemon=True)
+    thread.start()
+    try:
+        return result.get(timeout=timeout_seconds)
+    except Empty:
+        return None, f"driver call timed out after {timeout_seconds}s"
+
 
 def _normalize_by(by: Optional[str]) -> Tuple[str, Optional[ActionResult]]:
     if by is None:
@@ -150,6 +199,7 @@ class Uia2Session:
         snapshot_ttl: float = DEFAULT_SNAPSHOT_TTL,
         snapshot_dump_attempts: int = 3,
         snapshot_dump_interval: float = 0.4,
+        driver_call_timeout: float = DEFAULT_DRIVER_CALL_TIMEOUT,
     ):
         self.driver = driver
         self.info = SessionInfo(
@@ -168,6 +218,11 @@ class Uia2Session:
         # degrades gracefully to the last dump.
         self.snapshot_dump_attempts = max(1, int(snapshot_dump_attempts))
         self.snapshot_dump_interval = max(0.0, float(snapshot_dump_interval))
+        # adb TCP to Samsung cloud phones randomly stalls large responses
+        # (~60s socket-read timeout); a wall-clock cap per driver call
+        # turns that stall into a fast, retryable error instead.
+        self.driver_call_timeout = max(0.0, float(driver_call_timeout))
+        self._stall_events: list = []
         self._snapshot: Optional[ScreenSnapshot] = None
         self._snapshot_at: float = -1.0
         # Refs are positional: "@3" names one specific node of one specific
@@ -634,11 +689,15 @@ class Uia2Session:
         hierarchy: Optional[str] = None
         last_error = "hierarchy dump failed"
         for attempt in range(self.snapshot_dump_attempts):
-            try:
-                candidate = dump()
-            except Exception as exc:
+            candidate, dump_error = _call_with_timeout(dump, self.driver_call_timeout)
+            if dump_error is not None:
                 hierarchy = None
-                last_error = f"hierarchy dump failed: {exc}"
+                last_error = f"hierarchy dump failed: {dump_error}"
+                if "timed out" in dump_error:
+                    self._stall_events.append(
+                        {"op": "dump", "timeout_s": self.driver_call_timeout,
+                         "at": time.monotonic()}
+                    )
             else:
                 if not isinstance(candidate, str):
                     # A type error will not heal across retries.
@@ -674,9 +733,18 @@ class Uia2Session:
         app_current = getattr(self.driver, "app_current", None)
         if not callable(app_current):
             return None, None
-        try:
-            current = app_current()
-        except Exception:
+        current, error = _call_with_timeout(app_current, self.driver_call_timeout)
+        if error is not None:
+            # adbutils' fallback chain ends in a 140KB ``dumpsys activity
+            # top`` — a measured stall trigger. A timed-out or failed
+            # app_current keeps the tolerance contract: skip the
+            # foreground-coverage check (the stall is recorded for
+            # observability instead of failing the snapshot).
+            if "timed out" in error:
+                self._stall_events.append(
+                    {"op": "app_current", "timeout_s": self.driver_call_timeout,
+                     "at": time.monotonic()}
+                )
             return None, None
         if not isinstance(current, dict):
             return None, None
@@ -938,6 +1006,7 @@ class Uia2SessionFactory:
         snapshot_ttl: float = DEFAULT_SNAPSHOT_TTL,
         snapshot_dump_attempts: int = 3,
         snapshot_dump_interval: float = 0.4,
+        driver_call_timeout: float = DEFAULT_DRIVER_CALL_TIMEOUT,
     ):
         self.driver_factory = driver_factory
         self.identifier = identifier
@@ -945,6 +1014,7 @@ class Uia2SessionFactory:
         self.snapshot_ttl = snapshot_ttl
         self.snapshot_dump_attempts = snapshot_dump_attempts
         self.snapshot_dump_interval = snapshot_dump_interval
+        self.driver_call_timeout = driver_call_timeout
 
     def create(self) -> Uia2Session:
         try:
@@ -958,6 +1028,7 @@ class Uia2SessionFactory:
             snapshot_ttl=self.snapshot_ttl,
             snapshot_dump_attempts=self.snapshot_dump_attempts,
             snapshot_dump_interval=self.snapshot_dump_interval,
+            driver_call_timeout=self.driver_call_timeout,
         )
 
 

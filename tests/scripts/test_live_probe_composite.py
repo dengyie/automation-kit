@@ -111,6 +111,7 @@ def test_run_probe_all_checks_pass_on_scripted_device():
         "descriptor.instance_document_order",
         "descriptor.wait_for_element",
         "governance.failover_real_session",
+        "transport.stall_health",
     ]
     alignment = next(
         item
@@ -122,6 +123,13 @@ def test_run_probe_all_checks_pass_on_scripted_device():
     assert alignment["ok"] is True
     assert "aligned on com.android.settings" in alignment["detail"]
     assert all(item["ok"] for item in summary["checks"])
+    # Every check carries a wall-clock measurement for stall diagnosis.
+    assert all(isinstance(item.get("elapsed_s"), float) for item in summary["checks"])
+    stall = next(
+        item for item in summary["checks"] if item["name"] == "transport.stall_health"
+    )
+    assert stall["ok"] is True
+    assert "no transport stalls" in stall["detail"]
 
 
 def test_run_probe_instance_semantics_live_truth():
@@ -244,3 +252,39 @@ def test_run_probe_governance_fails_when_device_cannot_snapshot():
     # check records the overall failover outcome (primary failure first).
     assert governance["ok"] is False
     assert "snapshot_failed" in governance["detail"] or "did not succeed" in governance["detail"]
+
+
+def test_stall_health_warns_without_failing_when_stalls_absorbed():
+    """Absorbed stalls are evidence of transport flapping: reported in the
+    detail with per-op counts, but the check stays green (fail-warn)."""
+
+    class StallingDevice(FakeProbeDevice):
+        def dump_hierarchy(self):
+            self.dumps += 1
+            if self.dumps == 1:
+                # Simulate a stall that outlives driver_call_timeout: the
+                # session's daemon worker abandons it and retries.
+                import threading
+                import time as _time
+
+                _time.sleep(0.5)
+                threading.Event().wait()
+            return self.HIERARCHY
+
+    # A tiny timeout keeps the offline test fast while still exercising
+    # the abandon-and-retry path inside the probe's session.
+    import adapters.uia2.session as session_mod
+
+    original_default = session_mod.DEFAULT_DRIVER_CALL_TIMEOUT
+    session_mod.DEFAULT_DRIVER_CALL_TIMEOUT = 0.2
+    try:
+        summary = run_probe(StallingDevice(), "fake:5555")
+    finally:
+        session_mod.DEFAULT_DRIVER_CALL_TIMEOUT = original_default
+
+    stall = next(
+        item for item in summary["checks"] if item["name"] == "transport.stall_health"
+    )
+    assert stall["ok"] is True, "stall evidence must not fail the probe"
+    assert "WARN" in stall["detail"]
+    assert "dump x1" in stall["detail"]
