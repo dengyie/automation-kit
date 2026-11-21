@@ -990,6 +990,22 @@ Slidex 顺延正是撞上这一点。此后每次编辑或提交前都重查分�
   <15s；stall 事件出现时探针 WARN 报告但保持绿。
 - 离线：kit 全量 **948 passed**、覆盖率 97.92%（门禁 ≥80%）。
 
+### 10.13 2026-11-21 复验基线（app_current 小报文快路径，§12.16 第六批）
+
+- 动机：第五批的墙钟守卫把卡顿变成"快速失败+重试"，但 `app_current` 仍是暴露
+  面——adbutils 每次最多 3 条 dumpsys（40KB+40KB+140KB）且失败整链重试。受控
+  实验结论（≤20KB 零卡顿）指向源头修复：设备侧 grep 把响应压到 <1KB。
+- **真机形状勘误（复验首跑发现，已修）**：该 Redroid ROM 的 `dumpsys window
+  windows` 没有 `mCurrentFocus` 行（adbutils 第一步恒落空——这正是它总落到
+  140KB `activity top` 的机制），真值在裸 `dumpsys window`；activity 侧字段
+  拼法 `ResumedActivity:`（无 `m` 前缀），adbutils `mResumedActivity:` 正则
+  同样落空。快路径命令/正则按真机形状校正（`49408cc`）。
+- 真机复验（`.51`/`.52` 双机，红线零重启）：composite 探针双机各 3 轮 7/7
+  全绿、零 stall；`foreground.snapshot_alignment` elapsed 0.23–0.47s（第五批
+  基线 ~1.5-2s 级）；编排器 composite lane 双机 rc=0（run
+  `fastpath-194428` / `fastpath51-194505`）；wave2 双机 PROBE COMPLETE。
+- 离线：kit 全量 **957 passed**、覆盖率 97.92%（门禁 ≥80%）。
+
 ## 11. 当前状态与差距
 
 ### 11.1 已实现
