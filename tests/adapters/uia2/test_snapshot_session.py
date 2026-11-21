@@ -1045,10 +1045,35 @@ def test_capture_artifact_hierarchy_exception_message_unchanged(tmp_path):
 
 
 def test_session_factory_threads_snapshot_dump_compressed(tmp_path):
+    """Factory-threaded False must reach behavior (bare dump call), not
+    just the attribute — a wiring typo would otherwise pass silently."""
     from adapters.uia2 import Uia2SessionFactory
 
-    device = SnapshotDevice()
+    device = CompressedDumpDevice()
     factory = Uia2SessionFactory(lambda: device, snapshot_dump_compressed=False)
     session = factory.create()
 
     assert session.snapshot_dump_compressed is False
+    result = session.execute_action("semantic_snapshot", refresh=True)
+
+    assert result.success is True
+    assert device.dump_kwargs_seen == [{"compressed": False}]
+
+
+def test_capture_artifact_hierarchy_timeout_records_stall(tmp_path):
+    """An artifact dump abandoned at the wall-clock guard is recorded in
+    _stall_events so transport.stall_health sees it (parity with
+    _capture_snapshot's dump stalls)."""
+    device = AlwaysStallingDevice()
+    session = Uia2Session(
+        device,
+        artifact_root=tmp_path,
+        driver_call_timeout=0.2,
+    )
+
+    with pytest.raises(AdapterArtifactError, match="timed out"):
+        session.capture_artifact("page_source", "dump.xml")
+
+    assert len(session._stall_events) == 1
+    assert session._stall_events[0]["op"] == "dump_artifact"
+    assert session._stall_events[0]["timeout_s"] == 0.2

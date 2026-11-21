@@ -737,8 +737,9 @@ class Uia2Session:
         """Keyword arguments the dump callable actually accepts.
 
         Real uiautomator2 drivers take ``compressed``; duck-typed fakes
-        (and any custom driver) may take none. Probing the signature per
-        call keeps every existing fake working unchanged.
+        (and any custom driver) may take none. ``_capture_snapshot`` probes
+        once and hoists the result out of its retry loop; ``_write_hierarchy``
+        probes per call (it has no retry loop).
         """
         if not self.snapshot_dump_compressed:
             return {}
@@ -1111,6 +1112,14 @@ class Uia2Session:
             lambda: dump(**self._dump_kwargs(dump)), self.driver_call_timeout
         )
         if error is not None:
+            if "timed out" in error:
+                # Same observability as _capture_snapshot: stall_health
+                # reads _stall_events, and an artifact capture hitting the
+                # ~60s transport stall must be visible there too.
+                self._stall_events.append(
+                    {"op": "dump_artifact", "timeout_s": self.driver_call_timeout,
+                     "at": time.monotonic()}
+                )
             raise AdapterArtifactError(f"driver reported hierarchy dump failed: {error}")
         if not isinstance(hierarchy, str):
             raise AdapterArtifactError("driver hierarchy dump is not a string")
