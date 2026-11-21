@@ -755,6 +755,175 @@ def test_session_factory_threads_driver_call_timeout(tmp_path):
     assert session.driver_call_timeout == 5.0
 
 
+# --- foreground shell fast path (small-payload app_current) ----------------
+
+
+FOCUS_LINE = (
+    "  mCurrentFocus=Window{5b8e2a1 u0 com.example/com.example.HomeActivity}\n"
+)
+RESUMED_LINE = (
+    "  mResumedActivity: ActivityRecord{9a1b2c3 u0 com.example/"
+    ".OtherActivity t42}\n"
+)
+
+
+class ShellOutput:
+    """uiautomator2 ShellResponse-shaped double (output + returncode)."""
+
+    def __init__(self, output, returncode=0):
+        self.output = output
+        self.returncode = returncode
+
+
+class ShellFastPathDevice(SnapshotDevice):
+    """Answers device-side grep with a mCurrentFocus line; counts calls."""
+
+    def __init__(self, responses=None, shell_raises=False, **kwargs):
+        super().__init__(**kwargs)
+        self.shell_commands = []
+        self.shell_responses = responses or {}
+        self.shell_raises = shell_raises
+        self.app_current_calls = 0
+
+    def shell(self, cmdargs, timeout=60):
+        self.shell_commands.append(cmdargs)
+        if self.shell_raises:
+            raise RuntimeError("shell died")
+        for needle, response in self.shell_responses.items():
+            if needle in cmdargs:
+                return response
+        return ShellOutput("", returncode=1)
+
+    def app_current(self):
+        self.app_current_calls += 1
+        return {"package": "com.example", "activity": ".Home"}
+
+
+def test_shell_fast_path_resolves_foreground_without_app_current(tmp_path):
+    device = ShellFastPathDevice(
+        responses={"mCurrentFocus": ShellOutput(FOCUS_LINE)}
+    )
+    session = Uia2Session(device, artifact_root=tmp_path)
+
+    result = session.execute_action("semantic_snapshot", refresh=True)
+
+    assert result.success is True
+    assert device.shell_commands == ["dumpsys window | grep mCurrentFocus"]
+    assert device.app_current_calls == 0
+    assert result.data.get("package_name") == "com.example"
+    assert session._stall_events == []
+
+
+def test_shell_fast_path_falls_back_to_resumed_activity(tmp_path):
+    device = ShellFastPathDevice(
+        responses={"ResumedActivity": ShellOutput(RESUMED_LINE)}
+    )
+    session = Uia2Session(device, artifact_root=tmp_path)
+
+    result = session.execute_action("semantic_snapshot", refresh=True)
+
+    assert result.success is True
+    assert len(device.shell_commands) == 2
+    assert device.shell_commands[1] == (
+        "dumpsys activity activities | grep ResumedActivity"
+    )
+    assert device.app_current_calls == 0
+    assert result.data.get("package_name") == "com.example"
+
+
+def test_shell_fast_path_falls_back_to_app_current_on_grep_miss(tmp_path):
+    """No grep match (empty output) -> the legacy app_current path runs."""
+    device = ShellFastPathDevice()
+    session = Uia2Session(device, artifact_root=tmp_path)
+
+    result = session.execute_action("semantic_snapshot", refresh=True)
+
+    assert result.success is True
+    assert device.app_current_calls == 1
+    assert result.data.get("package_name") == "com.example"
+    assert session._stall_events == []
+
+
+def test_shell_fast_path_falls_back_to_app_current_on_exception(tmp_path):
+    device = ShellFastPathDevice(shell_raises=True)
+    session = Uia2Session(device, artifact_root=tmp_path)
+
+    result = session.execute_action("semantic_snapshot", refresh=True)
+
+    assert result.success is True
+    assert device.app_current_calls == 1
+    assert result.data.get("package_name") == "com.example"
+    assert session._stall_events == []
+
+
+def test_shell_fast_path_accepts_plain_string_shell(tmp_path):
+    """adbutils shell() returns a bare str; both shapes must parse."""
+    device = ShellFastPathDevice(responses={"mCurrentFocus": FOCUS_LINE})
+    session = Uia2Session(device, artifact_root=tmp_path)
+
+    result = session.execute_action("semantic_snapshot", refresh=True)
+
+    assert result.success is True
+    assert device.app_current_calls == 0
+    assert result.data.get("package_name") == "com.example"
+
+
+def test_shell_fast_path_never_used_when_disabled(tmp_path):
+    device = ShellFastPathDevice(
+        responses={"mCurrentFocus": ShellOutput(FOCUS_LINE)}
+    )
+    session = Uia2Session(device, artifact_root=tmp_path, foreground_shell_query=False)
+
+    result = session.execute_action("semantic_snapshot", refresh=True)
+
+    assert result.success is True
+    assert device.shell_commands == []
+    assert device.app_current_calls == 1
+
+
+class StallingShellDevice(ShellFastPathDevice):
+    def shell(self, cmdargs, timeout=60):
+        import threading
+
+        self.shell_commands.append(cmdargs)
+        threading.Event().wait()  # blocks until process exit
+        return ShellOutput(FOCUS_LINE)  # unreachable
+
+
+def test_stalled_shell_query_records_stall_and_skips_app_current(tmp_path):
+    """A shell query stuck on the transport records the stall and returns
+    (None, None) WITHOUT falling back to the 40-140KB app_current payloads:
+    the transport is flapping right now, so large payloads would just
+    extend the stall."""
+    device = StallingShellDevice()
+    session = Uia2Session(
+        device,
+        artifact_root=tmp_path,
+        snapshot_dump_interval=0.0,
+        driver_call_timeout=0.2,
+    )
+
+    result = session.execute_action("semantic_snapshot", refresh=True)
+
+    assert result.success is True
+    assert device.dump_count == 1
+    assert device.app_current_calls == 0
+    assert len(session._stall_events) == 1
+    assert session._stall_events[0]["op"] == "app_current_shell"
+    assert session._stall_events[0]["timeout_s"] == 0.2
+    assert result.data.get("package_name") is None
+
+
+def test_session_factory_threads_foreground_shell_query(tmp_path):
+    from adapters.uia2 import Uia2SessionFactory
+
+    device = SnapshotDevice()
+    factory = Uia2SessionFactory(lambda: device, foreground_shell_query=False)
+    session = factory.create()
+
+    assert session.foreground_shell_query is False
+
+
 def test_call_with_timeout_passthrough_and_errors():
     from adapters.uia2.session import _call_with_timeout
 

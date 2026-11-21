@@ -1,3 +1,4 @@
+import re
 import threading
 import time
 from pathlib import Path
@@ -169,6 +170,36 @@ def _call_with_timeout(
         return None, f"driver call timed out after {timeout_seconds}s"
 
 
+# Foreground parsing mirrors the regexes adbutils ``app_current`` uses
+# (adbutils/shell.py), applied to the device-side grep output instead of
+# the full dumpsys payload. ``_RESUMED_ACTIVITY_RE`` accepts both the
+# ``mResumedActivity:`` spelling (stock Android) and the bare
+# ``ResumedActivity:`` one observed on the Redroid cloud-phone ROM
+# (2026-11-21: adbutils' own first two steps come up empty there, which
+# is why it always reaches the 140KB ``activity top`` fallback).
+_CURRENT_FOCUS_RE = re.compile(
+    r"mCurrentFocus=Window\{.*\s+(?P<package>[^\s]+)/(?P<activity>[^\s}]+)\}"
+)
+_RESUMED_ACTIVITY_RE = re.compile(
+    r"[m]?ResumedActivity: ActivityRecord\{.*?\s+(?P<package>[^\s]+)/(?P<activity>[^\s}]+)"
+)
+
+
+def _shell_output(result: Any) -> Any:
+    """Extract the text payload from a shell return value.
+
+    uiautomator2 returns a ``ShellResponse(output, returncode)``;
+    adbutils ``shell()`` returns a plain ``str``. Both are accepted; an
+    empty grep (rc=1) surfaces as an empty string here.
+    """
+    if isinstance(result, str):
+        return result
+    output = getattr(result, "output", None)
+    if isinstance(output, str):
+        return output
+    return result
+
+
 def _normalize_by(by: Optional[str]) -> Tuple[str, Optional[ActionResult]]:
     if by is None:
         return "text", None
@@ -200,6 +231,7 @@ class Uia2Session:
         snapshot_dump_attempts: int = 3,
         snapshot_dump_interval: float = 0.4,
         driver_call_timeout: float = DEFAULT_DRIVER_CALL_TIMEOUT,
+        foreground_shell_query: bool = True,
     ):
         self.driver = driver
         self.info = SessionInfo(
@@ -222,6 +254,12 @@ class Uia2Session:
         # (~60s socket-read timeout); a wall-clock cap per driver call
         # turns that stall into a fast, retryable error instead.
         self.driver_call_timeout = max(0.0, float(driver_call_timeout))
+        # adbutils' app_current fallback chain ends in a ~140KB ``dumpsys
+        # activity top`` -- a measured stall trigger. When the driver
+        # exposes a shell, the foreground app is queried with two
+        # device-side greps (responses under 1KB) before falling back to
+        # app_current; disable to always use the legacy path.
+        self.foreground_shell_query = bool(foreground_shell_query)
         self._stall_events: list = []
         self._snapshot: Optional[ScreenSnapshot] = None
         self._snapshot_at: float = -1.0
@@ -730,6 +768,12 @@ class Uia2Session:
         return snapshot, None
 
     def _foreground_app(self) -> Tuple[Optional[str], Optional[str]]:
+        if self.foreground_shell_query:
+            shell = getattr(self.driver, "shell", None)
+            if callable(shell):
+                package, activity, stalled = self._foreground_via_shell(shell)
+                if stalled or package is not None:
+                    return package, activity
         app_current = getattr(self.driver, "app_current", None)
         if not callable(app_current):
             return None, None
@@ -754,6 +798,57 @@ class Uia2Session:
             package if isinstance(package, str) and package else None,
             activity if isinstance(activity, str) and activity else None,
         )
+
+    def _foreground_via_shell(
+        self,
+        shell: Callable[..., Any],
+    ) -> Tuple[Optional[str], Optional[str], bool]:
+        """Foreground app via device-side grep (small payloads).
+
+        adbutils' ``app_current`` runs up to three full dumpsys rounds
+        (40KB ``window windows`` → 40KB ``activity activities`` → 140KB
+        ``activity top``, re-run up to 3x on error). Grepping on the
+        device keeps each response under 1KB, below the ~30KB threshold
+        where the adb transport stalls. The third return value marks a
+        timed-out call: the transport is flapping right now, so the
+        caller must NOT fall back to the 40–140KB app_current payloads.
+        Any other failure (no grep match, exception, unrecognized return
+        shape) falls back to the legacy path -- a healthy transport is
+        worth the retry.
+        """
+        focused, error = _call_with_timeout(
+            lambda: _shell_output(shell("dumpsys window | grep mCurrentFocus")),
+            self.driver_call_timeout,
+        )
+        if error is not None:
+            if "timed out" in error:
+                self._stall_events.append(
+                    {"op": "app_current_shell", "timeout_s": self.driver_call_timeout,
+                     "at": time.monotonic()}
+                )
+                return None, None, True
+            focused = None
+        if isinstance(focused, str):
+            match = _CURRENT_FOCUS_RE.search(focused)
+            if match:
+                return match.group("package"), match.group("activity"), False
+        resumed, error = _call_with_timeout(
+            lambda: _shell_output(shell("dumpsys activity activities | grep ResumedActivity")),
+            self.driver_call_timeout,
+        )
+        if error is not None:
+            if "timed out" in error:
+                self._stall_events.append(
+                    {"op": "app_current_shell", "timeout_s": self.driver_call_timeout,
+                     "at": time.monotonic()}
+                )
+                return None, None, True
+            resumed = None
+        if isinstance(resumed, str):
+            match = _RESUMED_ACTIVITY_RE.search(resumed)
+            if match:
+                return match.group("package"), match.group("activity"), False
+        return None, None, False
 
     def _semantic_snapshot(self, **kwargs: Any) -> ActionResult:
         # ``refresh`` forces a new dump; the default honors the warm-cache
@@ -1007,6 +1102,7 @@ class Uia2SessionFactory:
         snapshot_dump_attempts: int = 3,
         snapshot_dump_interval: float = 0.4,
         driver_call_timeout: float = DEFAULT_DRIVER_CALL_TIMEOUT,
+        foreground_shell_query: bool = True,
     ):
         self.driver_factory = driver_factory
         self.identifier = identifier
@@ -1015,6 +1111,7 @@ class Uia2SessionFactory:
         self.snapshot_dump_attempts = snapshot_dump_attempts
         self.snapshot_dump_interval = snapshot_dump_interval
         self.driver_call_timeout = driver_call_timeout
+        self.foreground_shell_query = foreground_shell_query
 
     def create(self) -> Uia2Session:
         try:
@@ -1029,6 +1126,7 @@ class Uia2SessionFactory:
             snapshot_dump_attempts=self.snapshot_dump_attempts,
             snapshot_dump_interval=self.snapshot_dump_interval,
             driver_call_timeout=self.driver_call_timeout,
+            foreground_shell_query=self.foreground_shell_query,
         )
 
 

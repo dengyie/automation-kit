@@ -288,3 +288,32 @@ def test_stall_health_warns_without_failing_when_stalls_absorbed():
     assert stall["ok"] is True, "stall evidence must not fail the probe"
     assert "WARN" in stall["detail"]
     assert "dump x1" in stall["detail"]
+
+
+def test_alignment_degrades_and_warns_when_shell_query_stalls():
+    """The probe's foreground ground truth goes through the session's
+    _foreground_app: a stalled shell query is absorbed (fail-warn in
+    transport.stall_health) and the alignment check degrades to
+    'unverifiable' instead of crashing the run."""
+
+    class StallingShellProbeDevice(FakeProbeDevice):
+        def shell(self, cmdargs, timeout=60):
+            import threading
+
+            threading.Event().wait()  # blocks until process exit
+            return ""  # unreachable
+
+    summary = run_probe(StallingShellProbeDevice(), "fake:5555", driver_call_timeout=0.2)
+
+    alignment = next(
+        item
+        for item in summary["checks"]
+        if item["name"] == "foreground.snapshot_alignment"
+    )
+    assert alignment["ok"] is True
+    assert "unverifiable" in alignment["detail"]
+    stall = next(
+        item for item in summary["checks"] if item["name"] == "transport.stall_health"
+    )
+    assert stall["ok"] is True
+    assert "app_current_shell x" in stall["detail"]

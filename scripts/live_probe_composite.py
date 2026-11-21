@@ -33,7 +33,7 @@ from typing import Any, Dict, List, Optional
 SERIAL = os.environ.get("AUTOMATION_UIA2_UDID", "10.144.144.52:5555")
 
 
-def run_probe(device, serial: str) -> dict:
+def run_probe(device, serial: str, driver_call_timeout: float = 12.0) -> dict:
     """Execute all checks against an injected uiautomator2-like device.
 
     Returns ``{"device", "checks": [{"name", "ok", "detail"}], "ok"}``;
@@ -73,7 +73,7 @@ def run_probe(device, serial: str) -> dict:
     session = Uia2Session(
         device,
         identifier=f"composite-probe-{serial}",
-        driver_call_timeout=12.0,
+        driver_call_timeout=driver_call_timeout,
     )
     session.start()
 
@@ -96,16 +96,13 @@ def run_probe(device, serial: str) -> dict:
     )
 
     # Live foreground package (single source for candidate preference and
-    # the alignment check).
+    # the alignment check). Routed through the session's _foreground_app
+    # so the shell fast path, wall-clock guard, degradation and
+    # _stall_events accounting all apply to the probe's ground truth too.
     live_package_holder: Dict[str, Optional[str]] = {"package": None}
-    live_current = getattr(device, "app_current", None)
-    if callable(live_current):
-        try:
-            info = live_current()
-            if isinstance(info, dict):
-                live_package_holder["package"] = info.get("package")
-        except Exception:
-            pass
+    live_package, _live_activity = session._foreground_app()
+    if live_package:
+        live_package_holder["package"] = live_package
 
     def c_foreground_alignment():
         """Session-level foreground guard verification: the snapshot's
@@ -115,7 +112,7 @@ def run_probe(device, serial: str) -> dict:
         bounded dump retries actually landed a foreground-covered dump."""
         live_package = live_package_holder.get("package")
         if not live_package:
-            return "unverifiable (app_current unavailable)"
+            return "unverifiable (foreground unavailable)"
         snapshot = session.execute_action("semantic_snapshot", refresh=True)
         assert snapshot.success, f"semantic snapshot failed: {snapshot.message}"
         elements = snapshot.data.get("elements", [])

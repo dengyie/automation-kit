@@ -990,6 +990,22 @@ Slidex 顺延正是撞上这一点。此后每次编辑或提交前都重查分�
   <15s；stall 事件出现时探针 WARN 报告但保持绿。
 - 离线：kit 全量 **948 passed**、覆盖率 97.92%（门禁 ≥80%）。
 
+### 10.13 2026-11-21 复验基线（app_current 小报文快路径，§12.16 第六批）
+
+- 动机：第五批的墙钟守卫把卡顿变成"快速失败+重试"，但 `app_current` 仍是暴露
+  面——adbutils 每次最多 3 条 dumpsys（40KB+40KB+140KB）且失败整链重试。受控
+  实验结论（≤20KB 零卡顿）指向源头修复：设备侧 grep 把响应压到 <1KB。
+- **真机形状勘误（复验首跑发现，已修）**：该 Redroid ROM 的 `dumpsys window
+  windows` 没有 `mCurrentFocus` 行（adbutils 第一步恒落空——这正是它总落到
+  140KB `activity top` 的机制），真值在裸 `dumpsys window`；activity 侧字段
+  拼法 `ResumedActivity:`（无 `m` 前缀），adbutils `mResumedActivity:` 正则
+  同样落空。快路径命令/正则按真机形状校正（`49408cc`）。
+- 真机复验（`.51`/`.52` 双机，红线零重启）：composite 探针双机各 3 轮 7/7
+  全绿、零 stall；`foreground.snapshot_alignment` elapsed 0.23–0.47s（第五批
+  基线 ~1.5-2s 级）；编排器 composite lane 双机 rc=0（run
+  `fastpath-194428` / `fastpath51-194505`）；wave2 双机 PROBE COMPLETE。
+- 离线：kit 全量 **957 passed**、覆盖率 97.92%（门禁 ≥80%）。
+
 ## 11. 当前状态与差距
 
 ### 11.1 已实现
@@ -1769,6 +1785,43 @@ shell 报文有概率性 ~60s 卡顿。适配器两条热路径裸调用直接�
   fail-red（吸收成功恰证明守卫生效，但 transport 在抖动需运维知晓）。
 - 明知不做：不改 `ScreenSnapshot`/`ActionResult` 公共契约；不 patch adbutils
   `app_current` 实现（第三方库面）；不做线程杀灭（Python 无法安全杀线程）。
+
+#### R2 真机迭代批次（2026-11-21 第六批：app_current 小报文快路径）
+
+第五批把卡顿变成"快速失败+重试"，但 `app_current` 仍是暴露面：uiautomator2 3.7.0
+委托 adbutils 2.12.0，`app_current` 每次跑**最多 3 条 dumpsys**（40KB
+`window windows` → 40KB `activity activities` → 140KB `activity top`），且
+`@retry(tries=3)` 失败整链重来（最坏 ~9 轮）；`_capture_snapshot` 每次都调
+`_foreground_app`。受控实验（§10.12）结论是卡顿取决于过线报文大小（≤20KB 零卡顿）。
+
+平台层根因修复（从源头缩小报文，不是只靠重试掩盖）：
+
+- 双构造器新参数 `foreground_shell_query: bool = True`。`_foreground_app` 在
+  `app_current` 之前优先走 shell 快路径（仅当 driver 暴露 callable `shell`；
+  离线 fake 均无 `shell`，既有测试零影响）：①
+  `dumpsys window | grep mCurrentFocus` → ②
+  `dumpsys activity activities | grep ResumedActivity`，响应 <1KB。正则
+  口径镜像 adbutils `shell.py` 的 `mCurrentFocus`/`mResumedActivity` 解析。
+  **真机形状勘误（复验首跑发现）**：该 Redroid ROM 的 `dumpsys window
+  windows` 里根本没有 `mCurrentFocus`（adbutils 第一步恒落空——这正是它总
+  落到 140KB `activity top` 的机制），真值在裸 `dumpsys window`；activity
+  侧字段拼法是 `ResumedActivity:`（无 `m` 前缀），adbutils 的
+  `mResumedActivity:` 正则同样落空。故命令选裸 `dumpsys window`、正则兼容
+  两种拼法（双机实测 grep 后 86/106B + 170/248B）。
+- 返回形状容忍两种：u2 `ShellResponse(output, returncode)`（取 `.output`）与
+  adbutils 裸 `str`（`_shell_output` 归一）。
+- 兜底语义二分：**守卫超时** → 记 `_stall_events`（`op="app_current_shell"`）并
+  直接返回 `(None, None)`——传输正在抖动，不向其投 40–140KB 大报文；**快速失败**
+  （grep 无命中 rc=1、异常、形状不认识）→ 落回既有 `app_current` 路径（传输
+  大概率健康，值得再试）。容忍契约（跳过前台覆盖校验）不回归。
+- composite 探针 `foreground.snapshot_alignment` 的 live 真值从裸
+  `device.app_current()` 改为 `session._foreground_app()`——守卫/降级/
+  `_stall_events` 统计全部复用，真值来源（window manager 状态 vs dump 元素
+  证据）仍非同义反复；`run_probe` 新增可选 `driver_call_timeout` 参数供离线
+  测试注入快速超时（默认 12.0 不变）。
+- 明知不做：不动 `dump_hierarchy` 74KB 暴露面（adb forward + 本地 socket /
+  u2 压缩 dump 属独立批次）；不 patch adbutils、不升级依赖；不改公共契约；
+  编排器不加 per-op stall 检测（探针 elapsed_s + stall_health 已够用）。
 
 #### R1 app 侧：dianping publish 选择器对等（dianping 仓，随 0.6.0 消费）
 

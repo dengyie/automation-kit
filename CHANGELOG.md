@@ -22,6 +22,23 @@
 
 ## Unreleased
 
+真机迭代（2026-11-21 第六批，见总纲 §12.16）：`app_current` 的 adbutils 内部
+fallback 链最多跑 3 条 dumpsys（40KB + 40KB + 140KB）且失败整链重试——140KB
+`dumpsys activity top` 是实测卡顿触发器，而受控实验表明 ≤20KB 报文零卡顿。
+
+- `adapters.uia2`：`Uia2Session`/`Uia2SessionFactory` 新增可选参数
+  `foreground_shell_query`（默认 True）——`_foreground_app` 优先用设备侧
+  `grep` 查前台（`dumpsys window | grep mCurrentFocus`，未命中再
+  `dumpsys activity activities | grep ResumedActivity`），响应 <1KB；解析
+  口径镜像 adbutils（`ResumedActivity:` 兼容有无 `m` 前缀两种拼法——Redroid
+  云机 ROM 上 adbutils 自己的前两步查询恰好都落空，这才是它总是落到 140KB
+  `activity top` 的原因）；shell 守卫超时直接降级（不向抖动中的传输投大报文，
+  stall 记入 `_stall_events`，`op="app_current_shell"`），其余失败落回既有
+  `app_current` 路径。容忍契约不变。
+- `scripts/live_probe_composite.py`：`foreground.snapshot_alignment` 的
+  live 真值改走 session `_foreground_app`（复用守卫与 stall 统计）；
+  `run_probe` 新增可选 `driver_call_timeout` 参数（默认 12.0 不变）。
+
 真机迭代（2026-11-21 三星云机压力深测发现，见总纲 §10.12）：两台三星云机的 adb
 TCP 传输对 ≈30KB 以上的 shell 报文有**概率性 ~60s 卡顿**（socket 读超时常量；
 Settings 页 dump 固定 74KB，实测 semantic_snapshot 1/12 概率 >60s、app_current
