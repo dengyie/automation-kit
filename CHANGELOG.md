@@ -22,6 +22,21 @@
 
 ## Unreleased
 
+真机迭代（2026-11-21 三星云机压力深测发现，见总纲 §10.12）：两台三星云机的 adb
+TCP 传输对 ≈30KB 以上的 shell 报文有**概率性 ~60s 卡顿**（socket 读超时常量；
+Settings 页 dump 固定 74KB，实测 semantic_snapshot 1/12 概率 >60s、app_current
+1/8 概率卡 32–60s）。
+
+- `adapters.uia2`：`Uia2Session`/`Uia2SessionFactory` 新增可选参数
+  `driver_call_timeout`（默认 12.0s，0 = 禁用保持旧行为）——`_capture_snapshot`
+  的每次 dump 与 `_foreground_app` 的 app_current 改走守护线程墙钟上限；卡顿
+  调用被放弃后按既有重试预算重试（实测重试一次即恢复），app_current 超时沿用
+  容忍契约（跳过前台覆盖校验）。超时事实记入 session `_stall_events`（实例
+  属性，公共契约不变）。
+- `scripts/live_probe_composite.py`：每项 check 产出 `elapsed_s` 墙钟耗时；
+  新增 `transport.stall_health` check（读 `_stall_events`，stall 证据 fail-warn
+  不 fail-red）。
+
 真机迭代（2026-11-06 双云测试发现，见总纲 §10.9）：Redroid 云机 `dump_hierarchy`
 窗口合并方向不定，overlay-only dump 会蒸馏出"合法但错误窗口"的语义快照。
 

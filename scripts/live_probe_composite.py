@@ -56,18 +56,31 @@ def run_probe(device, serial: str) -> dict:
     checks: List[Dict[str, Any]] = []
 
     def check(name, fn):
+        started = time.monotonic()
         try:
             detail = fn()
-            checks.append({"name": name, "ok": True, "detail": detail or "ok"})
+            checks.append({
+                "name": name, "ok": True, "detail": detail or "ok",
+                "elapsed_s": round(time.monotonic() - started, 2),
+            })
         except Exception as exc:  # noqa: BLE001 - probe records, never crashes
-            checks.append({"name": name, "ok": False, "detail": f"{type(exc).__name__}: {exc}"})
+            checks.append({
+                "name": name, "ok": False,
+                "detail": f"{type(exc).__name__}: {exc}",
+                "elapsed_s": round(time.monotonic() - started, 2),
+            })
 
-    session = Uia2Session(device, identifier=f"composite-probe-{serial}")
+    session = Uia2Session(
+        device,
+        identifier=f"composite-probe-{serial}",
+        driver_call_timeout=12.0,
+    )
     session.start()
 
     # Descriptor-vs-dump comparisons need a STATIC screen: launch Settings
     # (present on every Android build, static list UI) and fall back to the
     # current front app when unavailable.
+    front_started = time.monotonic()
     front_app = "current"
     app_start = getattr(device, "app_start", None)
     if callable(app_start):
@@ -78,7 +91,8 @@ def run_probe(device, serial: str) -> dict:
         except Exception:
             front_app = "current"
     checks.append(
-        {"name": "device.front_app", "ok": True, "detail": front_app}
+        {"name": "device.front_app", "ok": True, "detail": front_app,
+         "elapsed_s": round(time.monotonic() - front_started, 2)}
     )
 
     # Live foreground package (single source for candidate preference and
@@ -341,6 +355,31 @@ def run_probe(device, serial: str) -> dict:
         return f"failover ok, viewport view: {markdown[:40]!r}"
 
     check("governance.failover_real_session", c_governance_failover)
+
+    # --- 3. transport stall health (2026-11-21 cloud-phone finding) ------------
+    def c_stall_health():
+        """Report adb transport stalls the session absorbed during this run.
+
+        Samsung cloud phones over adb TCP randomly stall responses >~30KB
+        for a socket-read timeout (~60s); the session's
+        ``driver_call_timeout`` abandons those calls and retries instead of
+        blocking forever. A stalled-then-recovered run still proves the
+        transport is flapping, so stalls are REPORTED here (fail-warn, not
+        fail-red) — the ok flag stays True and the detail carries evidence.
+        """
+        events = list(getattr(session, "_stall_events", []))
+        if not events:
+            return "no transport stalls observed"
+        ops = {}
+        for event in events:
+            ops[event["op"]] = ops.get(event["op"], 0) + 1
+        breakdown = ", ".join(f"{op} x{n}" for op, n in sorted(ops.items()))
+        return (
+            f"WARN: {len(events)} stall(s) absorbed by driver_call_timeout "
+            f"({breakdown}) — transport flapping"
+        )
+
+    check("transport.stall_health", c_stall_health)
 
     session.stop()
     return {

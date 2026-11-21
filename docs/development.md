@@ -976,6 +976,20 @@ Slidex 顺延正是撞上这一点。此后每次编辑或提交前都重查分�
   报 `ref @1 is stale: the screen changed since it was issued ...`。
 - 离线：kit 全量 **941 passed**、覆盖率 97.92%（门禁 ≥80%）。
 
+### 10.12 2026-11-21 复验基线（adb 传输卡顿加固迭代，§12.16 第五批）
+
+- 压力深测定位平台级根因（两台三星云机 `.51`/`.52` 同现，SM-F900F，Windows adb
+  36.0.0）：adb TCP 传输对 **≈30KB 以上的 shell 报文有概率性 ~60s 卡顿**（恰为
+  socket 读超时常量）。受控实验（`dd|base64` 逐档）：≤20KB 零卡顿、30–80KB 区间
+  随机 8–120s、卡顿时 rc=255 + **部分报文**；卡顿期间 mesh ICMP 正常（排除组网层）。
+  后果链：Settings 页 dump 固定 74KB → `semantic_snapshot` 实测 **1/12 概率 >60s**
+  （p50 ≈1.5s）；`app_current`（adbutils fallback 到 `dumpsys activity top`，
+  140KB）**1/8 概率卡 32–60s**。此前各批次的「偶发慢」首次有定量根因。
+- 修复见 §12.16 第五批（`_call_with_timeout` 守护线程墙钟上限 + 重试）；真机
+  复验：composite 探针 7/7（含新 `transport.stall_health`），单操作 elapsed 全部
+  <15s；stall 事件出现时探针 WARN 报告但保持绿。
+- 离线：kit 全量 **948 passed**、覆盖率 97.92%（门禁 ≥80%）。
+
 ## 11. 当前状态与差距
 
 ### 11.1 已实现
@@ -1727,6 +1741,34 @@ Settings 搜索框 `@1` → 回桌面后 `element_bounds @1` 报成功，返回�
 - 签发方随 `semantic_snapshot` / `scroll_into_view` 返回的 ref 更新，故
   observation→action 与 scroll→tap 两条既有流程不受影响；从未被观察发出过的
   ref 仍按「当前 dump 的第 N 个」解释（`find_element` 契约依赖）。
+
+#### R2 真机迭代批次（2026-11-21 第五批：adb 传输卡顿加固）
+
+压力深测（§10.12）定位平台级根因：两台三星云机的 adb TCP 传输对 ≈30KB 以上的
+shell 报文有概率性 ~60s 卡顿。适配器两条热路径裸调用直接暴露：`_capture_snapshot`
+的 `dump()`（Settings 页固定 74KB，1/12 概率 >60s）与 `_foreground_app` 的
+`app_current()`（adbutils 内部 fallback 到 140KB `dumpsys activity top`，1/8
+概率卡 32–60s）。适配器此前无任何墙钟超时机制（win32 排除 signal）。
+
+平台层根因修复（不是探针绕行）：
+
+- `_call_with_timeout(fn, timeout_seconds)`：模块级私有原语，守护线程 + Queue
+  单次调用墙钟上限。超时返回 `(None, "driver call timed out after {t}s")`；
+  异常透传原始 `str(exc)`（既有错误文案契约不回归）；`timeout<=0` 同步直调
+  （禁用语义，向后兼容）。**不杀线程**——卡顿的 adb 调用幂等只读、自行结束；
+  守护线程不能阻塞解释器退出（`ThreadPoolExecutor` 的非 daemon worker 会在
+  退出时 join，曾把离线测试卡死，已弃用）。
+- 双构造器新参数 `driver_call_timeout: float = 12.0`（>60s 卡顿 p95 留足余量；
+  0 = 禁用）。重试预算沿用既有 `snapshot_dump_attempts`：卡顿概率性、实测重试
+  一次即恢复（p50 0.2s），超时计入 `last_error` 后走同一重试/优雅降级路径。
+- `_foreground_app` 超时沿用容忍契约返回 `(None, None)`（跳过前台覆盖校验），
+  超时事实记入 `session._stall_events`（`{op, timeout_s, at}` 实例属性列表，
+  公共契约不变）。
+- composite 探针：每项 check 产出 `elapsed_s`；新 check
+  `transport.stall_health` 读 `_stall_events`——stall 证据 fail-warn 不
+  fail-red（吸收成功恰证明守卫生效，但 transport 在抖动需运维知晓）。
+- 明知不做：不改 `ScreenSnapshot`/`ActionResult` 公共契约；不 patch adbutils
+  `app_current` 实现（第三方库面）；不做线程杀灭（Python 无法安全杀线程）。
 
 #### R1 app 侧：dianping publish 选择器对等（dianping 仓，随 0.6.0 消费）
 

@@ -632,3 +632,149 @@ def test_session_factory_threads_dump_guard_params(tmp_path):
 
     assert result.success is True
     assert device.dump_count == 2
+
+
+# --- adb transport stall guard (driver_call_timeout) ----------------------
+
+
+class StallingOnceDevice(SnapshotDevice):
+    """First dump blocks forever (the measured ~60s adb TCP stall)."""
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.stall_started = False
+
+    def dump_hierarchy(self):
+        self.dump_count += 1
+        if self.dump_count == 1:
+            self.stall_started = True
+            import threading
+
+            threading.Event().wait()  # blocks until process exit
+        return FakeDevice.dump_hierarchy(self)
+
+
+class AlwaysStallingDevice(SnapshotDevice):
+    def dump_hierarchy(self):
+        self.dump_count += 1
+        import threading
+
+        threading.Event().wait()
+        return FakeDevice.dump_hierarchy(self)  # unreachable
+
+
+class StallingAppCurrentDevice(SnapshotDevice):
+    def app_current(self):
+        import threading
+
+        threading.Event().wait()
+        return {"package": "com.example", "activity": ".Home"}  # unreachable
+
+
+def test_stalled_dump_is_abandoned_and_retried(tmp_path):
+    """A blocked dump() is abandoned at the timeout and the retry succeeds."""
+    device = StallingOnceDevice()
+    session = Uia2Session(
+        device,
+        artifact_root=tmp_path,
+        snapshot_dump_attempts=3,
+        snapshot_dump_interval=0.0,
+        driver_call_timeout=0.3,
+    )
+
+    result = session.execute_action("semantic_snapshot", refresh=True)
+
+    assert result.success is True
+    assert device.dump_count == 2, "the stalled dump must be retried"
+    assert len(session._stall_events) == 1
+    assert session._stall_events[0]["op"] == "dump"
+    assert session._stall_events[0]["timeout_s"] == 0.3
+    assert any(
+        "search_src_text" in (e.get("resource_id") or "")
+        for e in result.data.get("elements", [])
+    )
+
+
+def test_persistent_stall_degrades_after_exhausted_retries(tmp_path):
+    device = AlwaysStallingDevice()
+    session = Uia2Session(
+        device,
+        artifact_root=tmp_path,
+        snapshot_dump_attempts=2,
+        snapshot_dump_interval=0.0,
+        driver_call_timeout=0.2,
+    )
+
+    result = session.execute_action("semantic_snapshot", refresh=True)
+
+    assert result.success is False
+    assert "timed out" in result.message
+    assert device.dump_count == 2
+    assert len(session._stall_events) == 2
+    assert all(e["op"] == "dump" for e in session._stall_events)
+
+
+def test_stalled_app_current_keeps_tolerance_contract(tmp_path):
+    """A blocked app_current() degrades to (None, None): check skipped,
+    single dump succeeds, stall recorded for observability."""
+    device = StallingAppCurrentDevice()
+    session = Uia2Session(
+        device,
+        artifact_root=tmp_path,
+        snapshot_dump_interval=0.0,
+        driver_call_timeout=0.2,
+    )
+
+    result = session.execute_action("semantic_snapshot", refresh=True)
+
+    assert result.success is True
+    assert device.dump_count == 1
+    assert len(session._stall_events) == 1
+    assert session._stall_events[0]["op"] == "app_current"
+    assert result.data.get("package_name") is None
+
+
+def test_driver_call_timeout_zero_disables_guard(tmp_path):
+    """timeout=0 restores the legacy synchronous call path."""
+    device = SnapshotDevice()
+    session = Uia2Session(device, artifact_root=tmp_path, driver_call_timeout=0.0)
+
+    result = session.execute_action("semantic_snapshot", refresh=True)
+
+    assert result.success is True
+    assert session._stall_events == []
+
+
+def test_session_factory_threads_driver_call_timeout(tmp_path):
+    from adapters.uia2 import Uia2SessionFactory
+
+    device = SnapshotDevice()
+    factory = Uia2SessionFactory(lambda: device, driver_call_timeout=5.0)
+    session = factory.create()
+
+    assert session.driver_call_timeout == 5.0
+
+
+def test_call_with_timeout_passthrough_and_errors():
+    from adapters.uia2.session import _call_with_timeout
+
+    value, error = _call_with_timeout(lambda: 42, 1.0)
+    assert value == 42 and error is None
+
+    def boom():
+        raise RuntimeError("nope")
+
+    value, error = _call_with_timeout(boom, 1.0)
+    assert value is None and "nope" in error
+    # Non-positive timeout: synchronous, disabled cap.
+    value, error = _call_with_timeout(lambda: 7, 0)
+    assert value == 7 and error is None
+
+    def slow_boom():
+        import threading
+
+        threading.Event().wait()
+        raise RuntimeError("unreachable")
+
+    value, error = _call_with_timeout(slow_boom, 0.1)
+    assert value is None and "timed out" in error
