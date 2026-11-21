@@ -22,6 +22,22 @@
 
 ## Unreleased
 
+真机迭代（2026-11-22 第七批，见总纲 §12.16）：第六批后最后一条大报文热路径是
+`dump_hierarchy`（Settings 页固定 74KB，1/12 概率 >60s 卡顿）。真机实验表明
+本 ROM u2.jar 的服务端压缩参数是 no-op、60s 卡顿在 adb transport 层（JSON-RPC
+HTTP 隧道同样中招），故本批交付两件低成本接线而非字节削减。
+
+- `adapters.uia2`：`Uia2Session`/`Uia2SessionFactory` 新增可选参数
+  `snapshot_dump_compressed`（默认 True）——`_dump_kwargs` 按
+  `inspect.signature` 对 dump 做鸭子能力探测，真 u2 `dump_hierarchy` 收到
+  `compressed=True`（服务端压缩在支持的 jar 版本上剥冗余属性；本 ROM 上实测
+  字节级 no-op、零成本），零 kwarg fake 与 C builtin 保持原调用（既有测试
+  零改动）。
+- `adapters.uia2`：`_write_hierarchy`（page_source/ui_tree artifact）接入
+  `driver_call_timeout` 墙钟守卫（与 `_capture_snapshot` 同款）——卡在传输
+  卡顿上的 dump 快速抛 `AdapterArtifactError`，不再死等 ~60s；异常消息契约
+  不变，不加重试。
+
 真机迭代（2026-11-21 第六批，见总纲 §12.16）：`app_current` 的 adbutils 内部
 fallback 链最多跑 3 条 dumpsys（40KB + 40KB + 140KB）且失败整链重试——140KB
 `dumpsys activity top` 是实测卡顿触发器，而受控实验表明 ≤20KB 报文零卡顿。

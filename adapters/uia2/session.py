@@ -1,3 +1,4 @@
+import inspect
 import re
 import threading
 import time
@@ -131,6 +132,13 @@ DEFAULT_SNAPSHOT_TTL = 1.0
 # safely kill threads) and the caller retries.
 DEFAULT_DRIVER_CALL_TIMEOUT = 12.0
 
+# Request server-side compressed XML when the driver's dump supports it.
+# On the current cloud-phone u2.jar this is a measured no-op (2026-11-22:
+# byte-identical output on both devices), but it costs nothing when the
+# server ignores it and pays off on jar versions that strip redundant
+# attributes/empty nodes server-side.
+DEFAULT_SNAPSHOT_DUMP_COMPRESSED = True
+
 
 def _call_with_timeout(
     fn: Callable[[], Any],
@@ -232,6 +240,7 @@ class Uia2Session:
         snapshot_dump_interval: float = 0.4,
         driver_call_timeout: float = DEFAULT_DRIVER_CALL_TIMEOUT,
         foreground_shell_query: bool = True,
+        snapshot_dump_compressed: bool = DEFAULT_SNAPSHOT_DUMP_COMPRESSED,
     ):
         self.driver = driver
         self.info = SessionInfo(
@@ -260,6 +269,12 @@ class Uia2Session:
         # device-side greps (responses under 1KB) before falling back to
         # app_current; disable to always use the legacy path.
         self.foreground_shell_query = bool(foreground_shell_query)
+        # Server-side compressed XML when the dump signature supports it
+        # (no-op on jars that ignore the flag -- see
+        # DEFAULT_SNAPSHOT_DUMP_COMPRESSED). Drivers whose
+        # ``dump_hierarchy`` takes no ``compressed`` kwarg are detected
+        # per call and invoked bare.
+        self.snapshot_dump_compressed = bool(snapshot_dump_compressed)
         self._stall_events: list = []
         self._snapshot: Optional[ScreenSnapshot] = None
         self._snapshot_at: float = -1.0
@@ -718,6 +733,21 @@ class Uia2Session:
             or f'resource-id="{package_name}:' in hierarchy
         )
 
+    def _dump_kwargs(self, dump: Callable[..., Any]) -> Dict[str, Any]:
+        """Keyword arguments the dump callable actually accepts.
+
+        Real uiautomator2 drivers take ``compressed``; duck-typed fakes
+        (and any custom driver) may take none. Probing the signature per
+        call keeps every existing fake working unchanged.
+        """
+        if not self.snapshot_dump_compressed:
+            return {}
+        try:
+            params = inspect.signature(dump).parameters
+        except (TypeError, ValueError):  # C builtins etc.
+            return {}
+        return {"compressed": True} if "compressed" in params else {}
+
     def _capture_snapshot(self) -> Tuple[Optional[ScreenSnapshot], Optional[ActionResult]]:
         dump = getattr(self.driver, "dump_hierarchy", None)
         if not callable(dump):
@@ -726,8 +756,11 @@ class Uia2Session:
 
         hierarchy: Optional[str] = None
         last_error = "hierarchy dump failed"
+        dump_kwargs = self._dump_kwargs(dump)
         for attempt in range(self.snapshot_dump_attempts):
-            candidate, dump_error = _call_with_timeout(dump, self.driver_call_timeout)
+            candidate, dump_error = _call_with_timeout(
+                lambda: dump(**dump_kwargs), self.driver_call_timeout
+            )
             if dump_error is not None:
                 hierarchy = None
                 last_error = f"hierarchy dump failed: {dump_error}"
@@ -1071,12 +1104,14 @@ class Uia2Session:
         dump = getattr(self.driver, "dump_hierarchy", None)
         if not callable(dump):
             raise AdapterArtifactError("driver does not provide a UI hierarchy")
-        try:
-            hierarchy = dump()
-        except Exception as exc:
-            raise AdapterArtifactError(
-                "driver reported hierarchy dump failed"
-            ) from exc
+        # Same wall-clock guard as _capture_snapshot: an artifact capture
+        # is a one-shot read-only call, but without the cap it died-waited
+        # the full ~60s transport stall before failing.
+        hierarchy, error = _call_with_timeout(
+            lambda: dump(**self._dump_kwargs(dump)), self.driver_call_timeout
+        )
+        if error is not None:
+            raise AdapterArtifactError(f"driver reported hierarchy dump failed: {error}")
         if not isinstance(hierarchy, str):
             raise AdapterArtifactError("driver hierarchy dump is not a string")
         path.write_text(hierarchy, encoding="utf-8")
@@ -1103,6 +1138,7 @@ class Uia2SessionFactory:
         snapshot_dump_interval: float = 0.4,
         driver_call_timeout: float = DEFAULT_DRIVER_CALL_TIMEOUT,
         foreground_shell_query: bool = True,
+        snapshot_dump_compressed: bool = DEFAULT_SNAPSHOT_DUMP_COMPRESSED,
     ):
         self.driver_factory = driver_factory
         self.identifier = identifier
@@ -1112,6 +1148,7 @@ class Uia2SessionFactory:
         self.snapshot_dump_interval = snapshot_dump_interval
         self.driver_call_timeout = driver_call_timeout
         self.foreground_shell_query = foreground_shell_query
+        self.snapshot_dump_compressed = snapshot_dump_compressed
 
     def create(self) -> Uia2Session:
         try:
@@ -1127,6 +1164,7 @@ class Uia2SessionFactory:
             snapshot_dump_interval=self.snapshot_dump_interval,
             driver_call_timeout=self.driver_call_timeout,
             foreground_shell_query=self.foreground_shell_query,
+            snapshot_dump_compressed=self.snapshot_dump_compressed,
         )
 
 

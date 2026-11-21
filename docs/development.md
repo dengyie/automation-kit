@@ -1006,6 +1006,24 @@ Slidex 顺延正是撞上这一点。此后每次编辑或提交前都重查分�
   `fastpath-194428` / `fastpath51-194505`）；wave2 双机 PROBE COMPLETE。
 - 离线：kit 全量 **957 passed**、覆盖率 97.92%（门禁 ≥80%）。
 
+### 10.14 2026-11-22 复验基线（dump_hierarchy 源头瘦身，§12.16 第七批）
+
+- 动机：第六批后最后一条大报文热路径是 `dump_hierarchy`（Settings 页固定
+  74KB，1/12 概率 >60s）。探索期双机实验收敛出关键负结果：u2 v3 dump 走
+  JSON-RPC HTTP 隧道（非 adb shell），隧道 20 样本 1/20 命中 60.42s——卡顿
+  在 adb transport 层，压缩救不了频率；本 ROM u2.jar 的 `compressed=True`
+  是字节级 no-op、`max_depth` 剪深丢 depth-15 可见行、`root_in_active` 丢
+  systemui 元素。故选型为低成本接线（`snapshot_dump_compressed` 鸭子能力
+  探测，jar 升级时自动受益）+ 第二处裸暴露修复（`_write_hierarchy` 接
+  `driver_call_timeout` 守卫，artifact 捕获不再死等 ~60s）。全记录见 §12.16
+  第七批小节。
+- 真机复验（`.51`/`.52` 双机，红线零重启）：composite 探针双机各 3 轮 7/7
+  全绿、零 stall；`foreground.snapshot_alignment` elapsed 0.22–0.45s（第六批
+  基线持平，`compressed=True` 在 no-op jar 上无回归）；编排器 composite
+  lane 双机 rc=0（run `dumpslim-034401`）；wave2 双机 PROBE COMPLETE。
+- 离线：kit 全量 **963 passed**（+6 dump-slim 测试矩阵）、覆盖率 97.92%
+  （门禁 ≥80%）。
+
 ## 11. 当前状态与差距
 
 ### 11.1 已实现
@@ -1822,6 +1840,43 @@ shell 报文有概率性 ~60s 卡顿。适配器两条热路径裸调用直接�
 - 明知不做：不动 `dump_hierarchy` 74KB 暴露面（adb forward + 本地 socket /
   u2 压缩 dump 属独立批次）；不 patch adbutils、不升级依赖；不改公共契约；
   编排器不加 per-op stall 检测（探针 elapsed_s + stall_health 已够用）。
+
+#### R2 真机迭代批次（2026-11-22 第七批：dump_hierarchy 源头瘦身）
+
+第六批后最后一条大报文热路径是 `dump_hierarchy`：Settings 页固定 74KB，实测
+1/12 概率 >60s 卡顿。探索期实验改变了选型（均为 2026-11-22 双机只读实测）：
+
+- **u2 v3 的 dump 不走 adb shell**——它走 JSON-RPC HTTP
+  （`dumpWindowHierarchy`，经 `create_connection(adbutils.Network.TCP, port)`
+  的 adb 隧道 socket，非 adb forward）。"adb forward + 本地 socket 换读路径"
+  只换框架不省字节，方案证伪放弃。
+- **RPC 隧道同卡**：对 JSON-RPC 隧道本身做 20 样本受控实验，`.52` p50 0.16s
+  但 1/20 命中 60.42s（`.51` 1/15 命中 60.28s）——60s 卡顿在 adb transport 层，
+  与 shell/HTTP 无关。**压缩救不了频率**，只能缩小单次卡顿的代价。
+- **`compressed=True` 在本 ROM 的 u2.jar 上是字节级 no-op**（`.52` 76208B 两种
+  参数完全一致；`.51` 65501B 同样）。kit 仍默认接线 `snapshot_dump_compressed`
+  （见下）：忽略该参数的 jar 零成本，未来升级到真压缩的 jar 时自动受益。
+- **`max_depth` 剪深不可用**：depth≤13 → 63335B 但丢失 13 个蒸馏元素（含
+  Settings 显示/电池/应用管理行，均在 depth 15）；depth≥14 → 字节不变。
+  **`root_in_active` 不可用**：仅省 ~11KB 且丢 systemui/状态栏元素
+  （Termux/Tetherly 通知、以太网、时钟）——探针 instance 语义检查正用这些。
+  单节点 tag 即 426B 属性样板，服务端参数无一处能在保行数的前提下缩体。
+
+平台层接线（本批交付的两项）：
+
+- 双构造器新参数 `snapshot_dump_compressed: bool = True`。`_dump_kwargs` 按
+  `inspect.signature` 对 dump 调用做**鸭子能力探测**：签名含 `compressed`
+  且开关开启 → 传 `compressed=True`；零 kwarg fake（全部既有测试 driver）与
+  C builtin → 传零参，行为不变（既有测试零改动）。`_capture_snapshot` 与
+  `_write_hierarchy` 统一走 `dump(**self._dump_kwargs(dump))`。
+- **第二处裸暴露修复**：`_write_hierarchy`（page_source/ui_tree artifact）原先
+  调 `dump()` 无守卫——一次传输卡顿即死等 ~60s 才失败。现复用
+  `_call_with_timeout(dump, driver_call_timeout)`：超时/异常 →
+  `AdapterArtifactError`（消息契约不变），不加重试（artifact 一次性语义，
+  失败由 runner 处理）。
+- 明知不做：gzip/传输层压缩（u2 HTTP 层明确禁用，nanohttpd 泄漏）；patch u2 /
+  升级依赖；`max_depth` 默认接线（剪深丢可见元素，语义风险 > 收益）；不改
+  公共契约（新参数 additive）。RPC 隧道卡顿根因深挖（用户可选）留待后续。
 
 #### R1 app 侧：dianping publish 选择器对等（dianping 仓，随 0.6.0 消费）
 

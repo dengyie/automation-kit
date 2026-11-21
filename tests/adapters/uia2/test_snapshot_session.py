@@ -1,7 +1,10 @@
 """Semantic snapshot, ref dispatch, scroll and key action tests."""
 
+import time
+
 import pytest
 
+from adapters.errors import AdapterArtifactError
 from adapters.uia2 import RefElement, Uia2Session
 from tests.adapters.uia2._fakes import FakeDevice
 from tests.adapters.uia2.test_distill import SCREEN_XML, _node
@@ -947,3 +950,105 @@ def test_call_with_timeout_passthrough_and_errors():
 
     value, error = _call_with_timeout(slow_boom, 0.1)
     assert value is None and "timed out" in error
+
+
+# --- dump_hierarchy source slimming (snapshot_dump_compressed) --------------
+
+
+class CompressedDumpDevice(SnapshotDevice):
+    """uiautomator2-shaped dump: accepts the server-side ``compressed``
+    kwarg and records what the session actually passed."""
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.dump_kwargs_seen = []
+
+    def dump_hierarchy(self, compressed=False):
+        self.dump_kwargs_seen.append({"compressed": compressed})
+        return FakeDevice.dump_hierarchy(self)
+
+
+class ThrowingDumpDevice(SnapshotDevice):
+    """dump_hierarchy raises (device-side RPC failure)."""
+
+    def dump_hierarchy(self):
+        self.dump_count += 1
+        raise RuntimeError("rpc backend died")
+
+
+def test_dump_kwargs_compressed_passed_to_capable_driver(tmp_path):
+    """A driver whose dump accepts ``compressed`` gets compressed=True and
+    the snapshot distills normally from the (unchanged) XML."""
+    device = CompressedDumpDevice()
+    session = Uia2Session(device, artifact_root=tmp_path)
+
+    result = session.execute_action("semantic_snapshot", refresh=True)
+
+    assert result.success is True
+    assert device.dump_kwargs_seen == [{"compressed": True}]
+    assert '[@1] button: "设置"' in result.data["markdown"]
+
+
+def test_dump_kwargs_skipped_for_zero_kwarg_fakes(tmp_path):
+    """Duck-typed fakes with a zero-kwarg dump_hierarchy get zero kwargs:
+    the capability probe keeps every existing test driver unchanged."""
+    device = SnapshotDevice()
+    session = Uia2Session(device, artifact_root=tmp_path)
+
+    result = session.execute_action("semantic_snapshot", refresh=True)
+
+    assert result.success is True
+    assert device.dump_count == 1
+
+
+def test_dump_kwargs_skipped_when_compressed_disabled(tmp_path):
+    """snapshot_dump_compressed=False restores the plain dump() call even
+    for a compressed-capable driver."""
+    device = CompressedDumpDevice()
+    session = Uia2Session(
+        device, artifact_root=tmp_path, snapshot_dump_compressed=False
+    )
+
+    result = session.execute_action("semantic_snapshot", refresh=True)
+
+    assert result.success is True
+    assert device.dump_kwargs_seen == [{"compressed": False}]
+
+
+def test_capture_artifact_hierarchy_timeout_raises_instead_of_dead_wait(tmp_path):
+    """A dump stuck on the ~60s adb transport stall fails the artifact
+    capture at the wall-clock guard instead of dying-waiting the stall."""
+    device = AlwaysStallingDevice()
+    session = Uia2Session(
+        device,
+        artifact_root=tmp_path,
+        driver_call_timeout=0.2,
+    )
+
+    start = time.monotonic()
+    with pytest.raises(AdapterArtifactError, match="timed out"):
+        session.capture_artifact("page_source", "dump.xml")
+    elapsed = time.monotonic() - start
+
+    assert elapsed < 5.0, "must fail fast at the guard, not wait the stall"
+
+
+def test_capture_artifact_hierarchy_exception_message_unchanged(tmp_path):
+    """A raising dump still surfaces the same AdapterArtifactError contract."""
+    device = ThrowingDumpDevice()
+    session = Uia2Session(device, artifact_root=tmp_path)
+
+    with pytest.raises(AdapterArtifactError, match="hierarchy dump failed") as excinfo:
+        session.capture_artifact("page_source", "dump.xml")
+
+    assert "rpc backend died" in str(excinfo.value)
+
+
+def test_session_factory_threads_snapshot_dump_compressed(tmp_path):
+    from adapters.uia2 import Uia2SessionFactory
+
+    device = SnapshotDevice()
+    factory = Uia2SessionFactory(lambda: device, snapshot_dump_compressed=False)
+    session = factory.create()
+
+    assert session.snapshot_dump_compressed is False
