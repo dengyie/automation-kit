@@ -1024,6 +1024,19 @@ Slidex 顺延正是撞上这一点。此后每次编辑或提交前都重查分�
 - 离线：kit 全量 **963 passed**（+6 dump-slim 测试矩阵）、覆盖率 97.92%
   （门禁 ≥80%）。
 
+### 10.15 2026-11-22 复验基线（dump-slim review 根修，§12.16 第八批）
+
+- 动机：第七批合入后的生产级 review 收尾（三个 P3 根修：`_write_hierarchy`
+  超时记 stall 事件、docstring 精确化、factory 穿透测试改行为断言）+ RPC
+  隧道卡顿根因特征化（结论见 §12.16 第八批：延迟非丢数据、拒连=u2 server
+  冷态自愈、与报文大小无关——守卫语义正确，深挖项关闭）。
+- 真机复验（`.51`/`.52` 双机，红线零重启）：composite 探针双机各 3 轮 7/7
+  全绿；`.51` 实机 artifact 捕获 0.09s/16KB 且 `compressed=True` 确认送达
+  真驱动；编排器 composite lane 双机 rc=0（run `dumpslim2-045910`）；wave2
+  双机 PROBE COMPLETE。
+- 离线：kit 全量 **964 passed**（+1 stall 记录回归测试）、覆盖率 97.92%
+  （门禁 ≥80%）。
+
 ## 11. 当前状态与差距
 
 ### 11.1 已实现
@@ -1877,6 +1890,31 @@ shell 报文有概率性 ~60s 卡顿。适配器两条热路径裸调用直接�
 - 明知不做：gzip/传输层压缩（u2 HTTP 层明确禁用，nanohttpd 泄漏）；patch u2 /
   升级依赖；`max_depth` 默认接线（剪深丢可见元素，语义风险 > 收益）；不改
   公共契约（新参数 additive）。RPC 隧道卡顿根因深挖（用户可选）留待后续。
+
+#### R2 真机迭代批次（2026-11-22 第八批：dump-slim review 根修 + 隧道卡顿特征化）
+
+第七批合入后的生产级 review 收尾批次（`feat/dump-slim-followup`），三个 P3
+根修 + 一项平台事实深挖：
+
+- `_write_hierarchy` 守卫超时现在记 `_stall_events`（`op="dump_artifact"`）——
+  与 `_capture_snapshot` 的 dump stall 观测面对齐；此前 artifact 捕获中招
+  卡顿时 `transport.stall_health` 看不到。附回归测试。
+- `_dump_kwargs` docstring 精确化：探测点事实是 `_capture_snapshot` hoist
+  一次、`_write_hierarchy` 每次调用（无重试循环）。
+- factory 穿透测试升级为行为断言（`CompressedDumpDevice` 收到裸调用），
+  接线拼错不再可能静默通过。
+- **RPC 隧道卡顿根因特征化（只读实验，零重启）**：① `tcp:9008` 隧道
+  `closed` 拒连 ≠ 服务器挂死——只是 u2 app_process server 未运行（冷态
+  20 连拒，`u2.connect` 内部 `_check_alive` 失败自动 relaunch 后即通，
+  自带自愈）；② 暖态 `.52` 20 样本 p50 0.27s、1/20 中招 60.27s，**卡顿
+  报文最终完整送达**（HTTP 200 + 完整 Content-Length 83751/91455）——
+  传输延迟非丢数据，墙钟守卫（放弃+重试）语义正确；③ payload 83→91KB
+  不改变卡顿分布，与报文大小无相关性。结合第六批 shell 同卡结论，根因
+  指向 adbd/mesh 传输层概率性 60s stall（恰为 socket 读超时常量）；
+  缓解已落地，根治需动 mesh/adbd 层（不属 kit 范围），此项关闭。
+- 实机深度测试（`.51`）：真 u2 驱动 `capture_artifact("page_source")`
+  0.09s / 16169B（桌面 launcher 页），`_dump_kwargs` 探针确认
+  `compressed=True` 送达真驱动，`_stall_events` 全程干净。
 
 #### R1 app 侧：dianping publish 选择器对等（dianping 仓，随 0.6.0 消费）
 
