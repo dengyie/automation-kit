@@ -1006,6 +1006,24 @@ Slidex 顺延正是撞上这一点。此后每次编辑或提交前都重查分�
   `fastpath-194428` / `fastpath51-194505`）；wave2 双机 PROBE COMPLETE。
 - 离线：kit 全量 **957 passed**、覆盖率 97.92%（门禁 ≥80%）。
 
+### 10.14 2026-11-22 复验基线（dump_hierarchy 源头瘦身，§12.16 第七批）
+
+- 动机：第六批后最后一条大报文热路径是 `dump_hierarchy`（Settings 页固定
+  74KB，1/12 概率 >60s）。探索期双机实验收敛出关键负结果：u2 v3 dump 走
+  JSON-RPC HTTP 隧道（非 adb shell），隧道 20 样本 1/20 命中 60.42s——卡顿
+  在 adb transport 层，压缩救不了频率；本 ROM u2.jar 的 `compressed=True`
+  是字节级 no-op、`max_depth` 剪深丢 depth-15 可见行、`root_in_active` 丢
+  systemui 元素。故选型为低成本接线（`snapshot_dump_compressed` 鸭子能力
+  探测，jar 升级时自动受益）+ 第二处裸暴露修复（`_write_hierarchy` 接
+  `driver_call_timeout` 守卫，artifact 捕获不再死等 ~60s）。全记录见 §12.16
+  第七批小节。
+- 真机复验（`.51`/`.52` 双机，红线零重启）：composite 探针双机各 3 轮 7/7
+  全绿、零 stall；`foreground.snapshot_alignment` elapsed 0.22–0.45s（第六批
+  基线持平，`compressed=True` 在 no-op jar 上无回归）；编排器 composite
+  lane 双机 rc=0（run `dumpslim-034401`）；wave2 双机 PROBE COMPLETE。
+- 离线：kit 全量 **963 passed**（+6 dump-slim 测试矩阵）、覆盖率 97.92%
+  （门禁 ≥80%）。
+
 ## 11. 当前状态与差距
 
 ### 11.1 已实现
