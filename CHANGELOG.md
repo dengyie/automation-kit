@@ -20,8 +20,6 @@
 - `scripts/`：新增 `live_parallel_smoke.py`（双设备并行 smoke 编排器，
   默认干跑）；`live_probe_wave2.py` 的 SERIAL 改 `AUTOMATION_UIA2_UDID` env。
 
-## Unreleased
-
 真机迭代（2026-11-22 第八批，见总纲 §12.16）：第七批合入后的 review 收尾。
 
 - `adapters.uia2`：`_write_hierarchy` 守卫超时现在记 `_stall_events`

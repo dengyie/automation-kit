@@ -1037,6 +1037,20 @@ Slidex 顺延正是撞上这一点。此后每次编辑或提交前都重查分�
 - 离线：kit 全量 **964 passed**（+1 stall 记录回归测试）、覆盖率 97.92%
   （门禁 ≥80%）。
 
+### 10.16 0.6.0 发布定稿基线（2026-11-22）
+
+- 动机：第七/八批（真机迭代）作为 Unreleased 追加在 0.6.0 块之后，而 0.6.0
+  尚未打 tag——发布语义上七/八批应属 0.6.0 内容。收尾动作：CHANGELOG 的
+  Unreleased 七块（11-06 多窗口对齐 → 11-11 ref 陈旧守卫 → 11-21 卡顿守卫
+  → 11-21 第六批 → 11-22 第七/八批 → 发布工具链）整体折入 0.6.0 块，
+  Unreleased 清空；`pyproject` / `__version__` / CHANGELOG 三方 0.6.0 一致
+  （`test_release_metadata.py` 10 passed 复证）。
+- 版本基线：main `b6f4bb2`（CI 44949534829 绿）之上仅文档定稿变更；发布
+  方式维持既定口径——打 tag `v0.6.0` 触发 `publish.yml`，本地/四仓 CI 继续
+  sibling 检出（§10.8 PyPI 上架为可选动作）。
+- 离线：`tests/test_release_metadata.py` 10 passed（全量套件与第八批基线
+  964 passed 相同，本批无代码变更）。
+
 ## 11. 当前状态与差距
 
 ### 11.1 已实现
